@@ -11,7 +11,7 @@
 :root{
   --amber:#E9A53B; --amber-dim:#8a6428; --red:#E0533F; --cyan:#62C9E6; --green:#8FD17A;
   --ink:#DCE2E6; --dim:#8894A0; --faint:#56616b;
-  --panel:rgba(9,15,22,.80); --panel-2:rgba(18,27,37,.86);
+  --panel:rgba(9,15,22,.9); --panel-2:rgba(18,27,37,.86);
   --line:rgba(233,165,59,.24); --line-cool:rgba(140,170,190,.18);
   --font:"Saira Semi Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
   --display:"Saira Extra Condensed","Arial Narrow","Roboto Condensed",Impact,sans-serif;
@@ -29,7 +29,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .6s}
 #hud.on{opacity:1}
 #hud .pe{pointer-events:auto}
-.panel{background:var(--panel);border:1px solid var(--line-cool);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.panel{background:var(--panel);border:1px solid var(--line-cool)}
 
 #topbar{position:absolute;top:env(safe-area-inset-top,0px);left:0;right:0;height:52px;display:flex;align-items:center;gap:18px;
   padding:0 14px;background:linear-gradient(180deg,rgba(4,8,12,.85),rgba(4,8,12,0));}
@@ -580,6 +580,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 4000);
 // HDR pipeline: MSAA half-float scene -> ambient occlusion -> bloom -> tone map + sRGB
 const composer = new THREE.EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, {type:THREE.HalfFloatType, samples:4}));
+composer.renderTarget2.samples = 4;
 composer.addPass(new THREE.RenderPass(scene, camera));
 const gtao = new THREE.GTAOPass(scene, camera, innerWidth, innerHeight);
 gtao.output = THREE.GTAOPass.OUTPUT.Default; gtao.blendIntensity = 0.72;
@@ -607,7 +608,7 @@ function updateShadowFrustum(){
 }
 function enableShadows(obj, cast=true, receive=true){ obj.traverse(o=>{ if(o.isMesh && !o.userData.noShadow){ const m=o.material; if(m && (m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial)) return; o.castShadow=cast; o.receiveShadow=receive; } }); }
 // graphics quality presets
-const QUALITY = { high:{label:'High', pr:1.6, shadow:4096, ao:true}, medium:{label:'Medium', pr:1.5, shadow:2048, ao:false}, low:{label:'Low', pr:1, shadow:0, ao:false} };
+const QUALITY = { high:{label:'High', pr:1.5, shadow:4096, ao:true, msaa:4}, medium:{label:'Medium', pr:1.25, shadow:2048, ao:false, msaa:2}, low:{label:'Low', pr:1, shadow:0, ao:false, msaa:0} };
 let quality = store.get('gfx', (window.matchMedia && matchMedia('(pointer:coarse)').matches) || innerWidth<900 ? 'medium' : 'high');
 if(!QUALITY[quality]) quality='high';
 
@@ -2115,6 +2116,8 @@ let lastAoR=1; const perfCheck={t:0,n:0,done:false};
 function onResize(){ const w=innerWidth, h=innerHeight; renderer.setSize(w,h,false); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
   Particles.mat.uniforms.uScale.value = h*renderer.getPixelRatio()/(2*Math.tan(camera.fov*Math.PI/360)); if(!cam.menu) cam.rGoal=Math.max(cam.rGoal*0+fitRadius(), 18); }
 addEventListener('resize', onResize);
+canvas.addEventListener('webglcontextlost', e=>{ e.preventDefault(); log('Graphics driver reset. Reloading the view.','sys'); });
+canvas.addEventListener('webglcontextrestored', ()=>{ location.reload(); });
 function applyQuality(){
   const Q=QUALITY[quality];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, Q.pr));
@@ -2123,6 +2126,7 @@ function applyQuality(){
   sun.castShadow=on;
   if(on && sun.shadow.mapSize.x!==Q.shadow){ sun.shadow.mapSize.set(Q.shadow,Q.shadow); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } sun.shadow.camera.right=-1; }
   gtao.enabled=Q.ao; lastAoR=1;
+  for(const rt of [composer.renderTarget1, composer.renderTarget2]){ if(rt.samples!==Q.msaa){ rt.samples=Q.msaa; rt.dispose(); } }
   document.querySelectorAll('.btn-gfx').forEach(b=>b.textContent='Graphics: '+Q.label);
   onResize();
 }
