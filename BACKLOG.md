@@ -6,6 +6,74 @@ describes what it doesn't do yet.
 
 ---
 
+## TOP PRIORITY — Fleet setup before battle
+
+**This is the first thing to build.** Everything else in this file comes after
+it. Steps 1–2 are also phase 1 of the campaign (items 8 and 10), so this work
+feeds straight into it.
+
+### 0. Quick play presets, custom fleets and per-ship loadouts
+
+**Decisions made (Jon):** custom fleets start with choosing hulls against a
+point budget, then add per-ship loadouts. The AI builds to the same budget.
+Add a quick play mode with preset fleets. Starting positions stay automatic
+for now; letting the player place ships is a possible later addition.
+
+**Menu:** three ways into a battle.
+- **Quick play:** pick a preset fleet and fight, in one or two taps.
+- **Custom battle:** build a fleet against a point budget, then fight.
+- **Classic:** today's one-of-each game, kept as one of the presets.
+
+**Step 1 — custom fleets, choosing hulls.**
+- Point budget chosen by the player, for example Skirmish 300, Standard 600,
+  Large 1000. The AI gets the same budget and never more.
+- Hull costs added to `CLASSES`. None exist today. Start from hull, shields,
+  armor and weapons, then adjust through play and AI-vs-AI testing.
+- Builder screen: plus and minus per class, running total against the budget,
+  Start enabled once within budget. Works by tapping, no hover needed.
+- The AI builds within the budget using one of a few approaches (balanced,
+  heavy gunline, swarm, carrier-led), at random or by difficulty.
+- Engine work:
+  - battles accept any mix of ships, including duplicates of a class
+  - starting positions generated for any fleet, replacing the fixed
+    per-class `DEPLOY`
+  - the roster and enemy contacts panels handle any number of ships
+  - ship names handle duplicates (`NAMES` is one name per class today)
+
+**Step 2 — per-ship loadouts.** Tap a ship in the builder to fit its weapons,
+following the slot and budget rules in item 7. Weapons cost points, so a
+heavily armed Frigate costs more than a bare one. This is where the campaign
+shipyard gets built and tested.
+
+**Quick play presets.** Five to seven fixed fleets built to the same budget:
+- Classic: one of each class
+- Gunline: Heavy cruiser and Destroyers
+- Swarm: many Patrol craft and Corvettes
+- Carrier group: Carrier with escorts
+- Torpedo wolfpack: Destroyers and Corvettes, missile-heavy
+
+The player picks one; the AI picks at random or one that counters it. Presets
+are saved fleet lists, so they're nearly free once step 1 works.
+
+**Risk: more ships may simply win.** In Fleet Combat, the side with more hulls
+won almost every battle, and point costs could never be balanced. Hard Burn
+may be less exposed, because hits can miss and asteroids block line of sight,
+but measure it before tuning prices: equal-budget fleets of different shapes,
+AI against AI, a few hundred battles. Cheap safeguard: a **maximum ship count
+per fleet** on top of the budget.
+
+**Order:**
+1. engine work (any fleet, generated starting positions)
+2. hull costs, then measure balance
+3. quick play presets
+4. the custom builder
+5. per-ship loadouts
+
+Presets come before the builder so the engine is tested with fixed fleets
+before players can build anything they like.
+
+---
+
 ## Scoring and records
 
 The goal: a score for every battle, kept on the device across every future
