@@ -170,6 +170,8 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 
 ## 8. Roadmap and ideas discussed
 
+Planned features with full context (scoring and records, multiplayer) live in `BACKLOG.md`. Read it before proposing what to build next, and add new deferred work there rather than here.
+
 - **Path 2, real models:** Jon has the STL files for his ships (free on Printables). The plan:
   1. Simplify them to about 50–150k triangles each.
   2. Compress them (glTF with Draco or meshopt).
