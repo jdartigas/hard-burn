@@ -120,3 +120,110 @@ one building on the one before:
 
 Recommended order: seeded combat rolls → hot-seat → save and restore `state` →
 play by link → live online, if it's still wanted.
+
+---
+
+## Campaign: a shared trading universe
+
+A second game mode built around the existing battle engine, in the spirit of
+Trade Wars. The current game stays on the menu as **quick-launch head-to-head
+battle**. The campaign becomes the main mode.
+
+### Decisions already made (Jon)
+
+- **Shared universe.** All players trade and fight in one persistent world, as
+  in Trade Wars. Not single-player first.
+- **Real-time turn limits.** Each player gets a budget of turns that refills on
+  a real-world clock (for example, per day). A **paid option to buy extra turns**
+  may come later.
+- **Nearly free-form ship loadouts, limited by hull class.** Players choose
+  their own weapons and equipment, but each class caps what it can mount. A
+  Patrol craft can't carry four torpedo launchers, a spinal railgun and two
+  heavy beams.
+- **Pirate encounters are fought by the player** in the hex battle. There is no
+  automatic resolution.
+
+### 6. The core loop
+
+**Trade → earn credits → upgrade the ship → take on harder routes and fights →
+buy more hulls → command a fleet.** A new player starts with one very basic
+ship.
+
+- **Star map:** sectors linked by warp lanes. Ports buy and sell commodities
+  (ore, fuel, equipment and so on).
+- **Trading:** prices move with supply and demand, and ports restock over time.
+  Money comes from finding good buy-low, sell-high routes. In a shared universe,
+  other players' trading moves the same prices.
+- **Turn budget:** moving, trading and fighting cost turns, which refill in real
+  time. This paces play and makes route planning matter.
+- **Encounters:** pirates, patrols and bounty targets, fought in the existing
+  battle engine.
+- **Shipyard:** buy equipment and fit it within the hull's limits (item 7), and
+  buy new hulls. The six classes become the progression ladder, Patrol craft to
+  Fleet carrier.
+- **Stakes:** damage and losses persist. Repairs cost credits. Losing the last
+  ship needs a rule, for example an insurance payout or restarting with a
+  starter ship. Not decided yet.
+
+### 7. Free-form loadouts with class limits
+
+Not yet designed in detail. One workable shape:
+- **Each hull has slots by size:** small, medium, large and spinal. A weapon
+  or module needs a slot of its size. A Patrol craft has a few small slots; only
+  capital hulls have spinal and large ones.
+- **Plus a budget** (mass, power, or both) so a hull can't max every slot with
+  the heaviest option in its size.
+- Weapons and modules become items with a size, a cost and the stats already in
+  `WEAPONS`.
+
+Today loadouts are fixed per class in `CLASSES.weapons`, so the battle engine
+has to read weapons from each ship instead of from its class.
+
+### 8. What has to change in the existing game first
+
+1. **Battles must accept any fleet.** Right now both sides are always one of
+   each class, with fixed starting positions (`DEPLOY`). Campaign fights are
+   1 vs 2 pirates, 3 vs 5 and so on.
+2. **Per-ship loadouts** instead of per-class ones (item 7).
+3. **Battles report results back:** survivors, damage taken and rewards.
+4. **Split the code into multiple files.** The campaign would roughly double
+   the game, and one ~5,000-line `index.html` is hard to work on. Plain
+   JavaScript modules served as separate files still need no build step and
+   work on GitHub Pages.
+5. **Seeded combat rolls** (see item 5). Needed for the server to check a
+   battle's result.
+6. **Save and restore the full battle state.**
+
+### 9. Consequences of a shared universe
+
+These follow from the decisions above and shape everything else:
+- **A real backend from the start of the campaign.** GitHub Pages can keep
+  hosting the game itself, but the world, player accounts, credits, prices,
+  cargo and turn counters must live on a server (Supabase, Firebase or a small
+  custom service).
+- **The server must be the authority.** With a shared economy, and especially
+  with paid turns, the player's browser can't be trusted to report its own
+  credits or battle results. The server checks every trade and move. For
+  battles, it replays the fight from its seed and the player's orders, which is
+  why seeded combat rolls come first.
+- **Accounts and sign-in**, which the game has none of today.
+- **Paid turns** bring payment processing, refunds, taxes and a store's terms,
+  and a design question: buying turns must not let paying players simply
+  out-trade everyone else. Settle how far purchases can go before building it.
+- **Running costs:** a server and database cost money every month, unlike
+  GitHub Pages.
+
+### 10. Suggested phases
+
+Each phase leaves something playable.
+1. **Foundations** (item 8): split the code, battles with any fleet, per-ship
+   loadouts, seeded rolls, save and restore of battle state. Improves the
+   head-to-head mode too.
+2. **Trading prototype:** star map, ports and prices, single-player and
+   offline, to prove trading is fun before paying for a server.
+3. **Pirate encounters:** fights on the map, damage and rewards carried over.
+4. **Shipyard:** equipment, slots and class limits (item 7).
+5. **Fleet command:** more hulls, upkeep, bigger fights.
+6. **Shared universe:** backend, accounts, the server-authoritative economy,
+   real-time turn refills.
+7. **Paid turns**, if still wanted.
