@@ -336,7 +336,9 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass };
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { CopyShader } from 'three/addons/shaders/CopyShader.js';
+const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader };
 window.THREE = THREE;
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
@@ -579,9 +581,23 @@ const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 4000);
 // HDR pipeline: MSAA half-float scene -> ambient occlusion -> bloom -> tone map + sRGB
-const composer = new THREE.EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, {type:THREE.HalfFloatType, samples:4}));
-composer.renderTarget2.samples = 4;
-composer.addPass(new THREE.RenderPass(scene, camera));
+// The scene renders into its own multisampled target and is resolved once into the composer's plain targets.
+// Effects never draw onto a multisampled buffer: GPUs may discard that memory after each resolve, which showed up as black rectangles.
+class MSAARenderPass extends THREE.Pass {
+  constructor(scene, camera){ super(); this.scene=scene; this.camera=camera; this.needsSwap=false; this.samples=4;
+    this.rt=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType, samples:4}); this.rt.resolveDepthBuffer=false;
+    this.quad=new THREE.FullScreenQuad(new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(THREE.CopyShader.uniforms), vertexShader:THREE.CopyShader.vertexShader, fragmentShader:THREE.CopyShader.fragmentShader, blending:THREE.NoBlending, depthTest:false, depthWrite:false})); }
+  setSamples(n){ if(n!==this.samples){ this.samples=n; this.rt.dispose(); this.rt.samples=n; this.rt.resolveDepthBuffer=false; } }
+  setSize(w,h){ this.rt.setSize(w,h); }
+  render(renderer, writeBuffer, readBuffer){
+    const direct=this.samples===0;
+    renderer.setRenderTarget(direct? readBuffer : this.rt); renderer.clear(); renderer.render(this.scene, this.camera);
+    if(!direct){ this.quad.material.uniforms.tDiffuse.value=this.rt.texture; renderer.setRenderTarget(readBuffer); this.quad.render(renderer); }
+  }
+}
+const composer = new THREE.EffectComposer(renderer);
+const scenePass = new MSAARenderPass(scene, camera);
+composer.addPass(scenePass);
 const gtao = new THREE.GTAOPass(scene, camera, innerWidth, innerHeight);
 gtao.output = THREE.GTAOPass.OUTPUT.Default; gtao.blendIntensity = 0.72;
 gtao.updatePdMaterial({lumaPhi:10, depthPhi:2, normalPhi:3, radius:6, rings:2, samples:16});
@@ -608,7 +624,10 @@ function updateShadowFrustum(){
 }
 function enableShadows(obj, cast=true, receive=true){ obj.traverse(o=>{ if(o.isMesh && !o.userData.noShadow){ const m=o.material; if(m && (m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial)) return; o.castShadow=cast; o.receiveShadow=receive; } }); }
 // graphics quality presets
-const QUALITY = { high:{label:'High', pr:1.5, shadow:4096, ao:true, msaa:4}, medium:{label:'Medium', pr:1.25, shadow:2048, ao:false, msaa:2}, low:{label:'Low', pr:1, shadow:0, ao:false, msaa:0} };
+const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, msaa:4}, medium:{label:'Medium', pr:1, shadow:2048, ao:false, msaa:4}, low:{label:'Low', pr:1, shadow:0, ao:false, msaa:0} };
+// diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?msaa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
+const URLQ = new URLSearchParams(location.search);
+const DEBUG = URLQ.has('debug');
 let quality = store.get('gfx', (window.matchMedia && matchMedia('(pointer:coarse)').matches) || innerWidth<900 ? 'medium' : 'high');
 if(!QUALITY[quality]) quality='high';
 
@@ -2110,6 +2129,16 @@ function frame(){
     const focus=(state.rosterHover===s || state.hoverShip===s || s===sel); s.tag.style.opacity= cam.radius<16 ? (state.hoverShip===s?0.9:0) : (focus?1:0.85); s.tag.style.left=sp.x+'px'; s.tag.style.top=sp.y+'px';
     s.tag.style.transform=`translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`; }
   if(!window.__norender) composer.render();
+  if(DEBUG) debugTick();
+}
+let dbgEl=null, dbgErr={}, dbgT=0, dbgGpu='';
+function debugTick(){
+  const gl=renderer.getContext(); let e; while((e=gl.getError())!==gl.NO_ERROR){ dbgErr[e]=(dbgErr[e]||0)+1; }
+  if(performance.now()-dbgT<500) return; dbgT=performance.now();
+  if(!dbgEl){ dbgEl=document.createElement('pre'); dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;z-index:50;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;pointer-events:none;white-space:pre-wrap;max-width:60vw';
+    document.body.appendChild(dbgEl); const ext=gl.getExtension('WEBGL_debug_renderer_info'); dbgGpu= ext? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
+  const r1=composer.renderTarget1;
+  dbgEl.textContent=`GPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  msaa ${scenePass.samples}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
 }
 const clock=new THREE.Clock();
 let lastAoR=1; const perfCheck={t:0,n:0,done:false};
@@ -2120,13 +2149,14 @@ canvas.addEventListener('webglcontextlost', e=>{ e.preventDefault(); log('Graphi
 canvas.addEventListener('webglcontextrestored', ()=>{ location.reload(); });
 function applyQuality(){
   const Q=QUALITY[quality];
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, Q.pr));
-  const on=Q.shadow>0;
+  const prRaw = URLQ.has('pr') ? parseFloat(URLQ.get('pr'))||1 : Math.min(window.devicePixelRatio||1, Q.pr);
+  renderer.setPixelRatio(Math.max(1, Math.floor(prRaw)));   // whole-number scales only
+  const on=Q.shadow>0 && URLQ.get('shadows')!=='0';
   if(renderer.shadowMap.enabled!==on){ renderer.shadowMap.enabled=on; scene.traverse(o=>{ const m=o.material; if(m) (Array.isArray(m)?m:[m]).forEach(x=>x.needsUpdate=true); }); }
   sun.castShadow=on;
   if(on && sun.shadow.mapSize.x!==Q.shadow){ sun.shadow.mapSize.set(Q.shadow,Q.shadow); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } sun.shadow.camera.right=-1; }
-  gtao.enabled=Q.ao; lastAoR=1;
-  for(const rt of [composer.renderTarget1, composer.renderTarget2]){ if(rt.samples!==Q.msaa){ rt.samples=Q.msaa; rt.dispose(); } }
+  gtao.enabled=Q.ao && URLQ.get('ao')!=='0'; lastAoR=1;
+  scenePass.setSamples(URLQ.get('msaa')==='0' ? 0 : Q.msaa);
   document.querySelectorAll('.btn-gfx').forEach(b=>b.textContent='Graphics: '+Q.label);
   onResize();
 }
