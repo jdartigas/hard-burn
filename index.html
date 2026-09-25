@@ -152,6 +152,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .btn-ghost{height:52px;padding:0 20px;background:transparent;border:1px solid rgba(220,226,230,.3);font-size:16px}
 .btn-ghost:hover{border-color:var(--amber)}
 #menu .foot{margin-top:18px;font-size:12.5px;color:var(--faint)}
+.ver{font-size:12.5px;color:var(--faint);margin-top:6px}
+#pause .ver{display:block}
 
 #help,#end,#pause{align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
 .sheet{background:rgba(9,14,20,.96);border:1px solid var(--line);padding:24px 28px;max-width:720px;width:calc(100% - 32px);max-height:88vh;overflow:auto}
@@ -259,6 +261,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
       <button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button>
     </div>
     <div class="foot">Drag to orbit the view, scroll to zoom. Best with sound on; music and effects can be muted separately.</div>
+    <div class="ver" id="ver-menu"></div>
   </div>
 </div>
 
@@ -304,7 +307,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 <div id="pause" class="screen" role="dialog" aria-label="Menu">
   <div class="sheet" style="max-width:420px">
     <h2>Paused</h2>
-    <p>The engagement is on hold.</p>
+    <p>The engagement is on hold. <span class="ver" id="ver-pause"></span></p>
     <div class="cta" style="flex-wrap:wrap">
       <button class="btn-primary" data-close>Resume</button>
       <button class="btn-ghost" id="btn-restart">Restart battle</button>
@@ -338,8 +341,10 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
-const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader };
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass };
 window.THREE = THREE;
+const GAME_VERSION = '10';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -584,8 +589,8 @@ const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 4000
 // The scene renders into its own multisampled target and is resolved once into the composer's plain targets.
 // Effects never draw onto a multisampled buffer: GPUs may discard that memory after each resolve, which showed up as black rectangles.
 class MSAARenderPass extends THREE.Pass {
-  constructor(scene, camera){ super(); this.scene=scene; this.camera=camera; this.needsSwap=false; this.samples=4;
-    this.rt=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType, samples:4}); this.rt.resolveDepthBuffer=false;
+  constructor(scene, camera){ super(); this.scene=scene; this.camera=camera; this.needsSwap=false; this.samples=0;
+    this.rt=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType}); this.rt.resolveDepthBuffer=false;
     this.quad=new THREE.FullScreenQuad(new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(THREE.CopyShader.uniforms), vertexShader:THREE.CopyShader.vertexShader, fragmentShader:THREE.CopyShader.fragmentShader, blending:THREE.NoBlending, depthTest:false, depthWrite:false})); }
   setSamples(n){ if(n!==this.samples){ this.samples=n; this.rt.dispose(); this.rt.samples=n; this.rt.resolveDepthBuffer=false; } }
   setSize(w,h){ this.rt.setSize(w,h); }
@@ -607,6 +612,9 @@ composer.addPass(gtao);
 const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.42, 0.38, 1.0);
 composer.addPass(bloom);
 composer.addPass(new THREE.OutputPass());
+// edge smoothing as a final image pass: multisampled buffers render with black gaps on Apple Metal and some Windows drivers
+const smaa = new THREE.SMAAPass(innerWidth, innerHeight);
+composer.addPass(smaa);
 
 scene.add(new THREE.AmbientLight(0x3a4a5c, 0.55));
 const sunDir = new THREE.Vector3(-0.62, 0.55, -0.56).normalize();
@@ -624,8 +632,8 @@ function updateShadowFrustum(){
 }
 function enableShadows(obj, cast=true, receive=true){ obj.traverse(o=>{ if(o.isMesh && !o.userData.noShadow){ const m=o.material; if(m && (m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial)) return; o.castShadow=cast; o.receiveShadow=receive; } }); }
 // graphics quality presets
-const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, msaa:4}, medium:{label:'Medium', pr:1, shadow:2048, ao:false, msaa:4}, low:{label:'Low', pr:1, shadow:0, ao:false, msaa:0} };
-// diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?msaa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
+const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true}, medium:{label:'Medium', pr:1, shadow:2048, ao:false, aa:true}, low:{label:'Low', pr:1, shadow:0, ao:false, aa:false} };
+// diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?aa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
 const URLQ = new URLSearchParams(location.search);
 const DEBUG = URLQ.has('debug');
 let quality = store.get('gfx', (window.matchMedia && matchMedia('(pointer:coarse)').matches) || innerWidth<900 ? 'medium' : 'high');
@@ -2045,6 +2053,7 @@ $('#btn-restart').onclick=()=>{ closeScreen(); startGame(); };
 $('#btn-again').onclick=()=>startGame();
 $('#btn-tomenu').onclick=()=>toMenu(); $('#btn-endmenu').onclick=()=>toMenu();
 $('#endturn').onclick=()=>endPlayerTurn();
+$('#ver-menu').textContent=`Version ${GAME_VERSION}`; $('#ver-pause').textContent=`Version ${GAME_VERSION}`;
 function toggleSound(){ Sound.init(); const on=Sound.toggle(); $('#btn-sound').textContent= on?'Effects on':'Effects off'; $('#btn-sound').setAttribute('aria-pressed',on); }
 function toggleMusic(){ Sound.init(); const on=Sound.toggleMusic(); $('#btn-music').textContent= on?'Music on':'Music off'; $('#btn-music').setAttribute('aria-pressed',on); }
 $('#btn-sound').onclick=toggleSound; $('#btn-sound').textContent= Sound.on?'Effects on':'Effects off';
@@ -2138,7 +2147,7 @@ function debugTick(){
   if(!dbgEl){ dbgEl=document.createElement('pre'); dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;z-index:50;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;pointer-events:none;white-space:pre-wrap;max-width:60vw';
     document.body.appendChild(dbgEl); const ext=gl.getExtension('WEBGL_debug_renderer_info'); dbgGpu= ext? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
   const r1=composer.renderTarget1;
-  dbgEl.textContent=`GPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  msaa ${scenePass.samples}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
+  dbgEl.textContent=`Version ${GAME_VERSION}\nGPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  smaa ${smaa.enabled?'on':'off'}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
 }
 const clock=new THREE.Clock();
 let lastAoR=1; const perfCheck={t:0,n:0,done:false};
@@ -2156,12 +2165,13 @@ function applyQuality(){
   sun.castShadow=on;
   if(on && sun.shadow.mapSize.x!==Q.shadow){ sun.shadow.mapSize.set(Q.shadow,Q.shadow); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } sun.shadow.camera.right=-1; }
   gtao.enabled=Q.ao && URLQ.get('ao')!=='0'; lastAoR=1;
-  scenePass.setSamples(URLQ.get('msaa')==='0' ? 0 : Q.msaa);
+  scenePass.setSamples(0); smaa.enabled = Q.aa && URLQ.get('aa')!=='0';
   document.querySelectorAll('.btn-gfx').forEach(b=>b.textContent='Graphics: '+Q.label);
   onResize();
 }
 function cycleQuality(){ const order=['high','medium','low']; quality=order[(order.indexOf(quality)+1)%3]; store.set('gfx',quality); Sound.ui(); applyQuality(); }
 document.querySelectorAll('.btn-gfx').forEach(b=>b.onclick=cycleQuality);
+(function watchDpr(){ try{ matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', ()=>{ applyQuality(); watchDpr(); }, {once:true}); }catch(e){} })();
 document.addEventListener('visibilitychange', ()=>{ clock.getDelta(); });
 
 // boot: menu backdrop battle
