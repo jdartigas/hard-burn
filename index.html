@@ -76,7 +76,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 #logbody div{color:#b8c2ca}
 #logbody .p{color:#f0cf96} #logbody .e{color:#f2a597} #logbody .k{color:#fff;font-weight:600} #logbody .sys{color:var(--dim)}
 
-#shippanel{position:absolute;left:calc(50% - 60px);bottom:14px;transform:translateX(-50%);width:min(660px,calc(100% - 700px));min-width:480px;padding:10px 12px 12px}
+#shippanel{position:absolute;left:12px;bottom:14px;width:min(600px,calc(100% - 348px));min-width:480px;padding:10px 12px 12px}
 #sp-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
 #sp-name{font-family:var(--display);font-weight:700;font-size:25px;line-height:1;letter-spacing:.01em}
 #sp-class{font-size:13px;color:var(--dim)}
@@ -345,7 +345,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '12';
+const GAME_VERSION = '13';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
