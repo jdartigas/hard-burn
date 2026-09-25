@@ -345,7 +345,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '13';
+const GAME_VERSION = '14';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -2260,7 +2260,7 @@ function setupBattle(seed){
 }
 function startGame(){
   Sound.init(); Sound.ui();
-  setupBattle(Math.floor(Math.random()*1e9));
+  setupBattle(Math.floor(Math.random()*1e9)); warmUp();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
   cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
@@ -2270,6 +2270,39 @@ function startGame(){
   canvas.focus();
 }
 function toMenu(){ Sound.setMood('menu'); setupBattle(4242); state.phase='menu'; cam.menu=true; $('#hud').classList.remove('on'); showScreen('menu'); }
+
+/* ---------------- shader warm-up ----------------
+   A material's shader is compiled the first time it draws, and on Macs (ANGLE over Metal) that stalls the
+   frame. Weapon effects, shields, close-up detail and wreck debris all first appear mid-battle, so this builds
+   one of each off-board and compiles everything up front. The materials are kept (not disposed) because
+   disposing the last user of a program deletes it. Call only when there are no wrecks. */
+const warmKeep={};   // kept materials, per shadow setting (shadows change every lit shader)
+function warmUp(){
+  const key=renderer.shadowMap.enabled?'shadows':'flat';
+  if(warmKeep[key] || wrecks.length) return;
+  const t0=performance.now();
+  DebrisKit.get();
+  const keep=[], restore=[], junk=[];
+  const a=new THREE.Vector3(0,-60,0), b=new THREE.Vector3(1,-60,0);
+  junk.push(beamMesh(a,b,0.05,0xffffff,1));
+  junk.push(new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshBasicMaterial({color:0xffffff})));
+  junk.push(new THREE.Mesh(new THREE.ConeGeometry(0.06,0.34,6), new THREE.MeshStandardMaterial({color:0x9aa0a6, metalness:0.6, roughness:0.4, emissive:0x222222})));
+  junk.push(new THREE.Mesh(new THREE.RingGeometry(0.94,1,64), new THREE.MeshBasicMaterial({color:0xffb070, transparent:true, opacity:0.55, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide})));
+  junk.forEach(m=>{ m.position.copy(a); scene.add(m); });
+  for(const s of state.ships) for(const o of [s.shieldMesh, s.fineMesh]) if(o && !o.visible){ o.visible=true; restore.push(o); }
+  const dummy=createShip('carrier','player'); dummy.group.position.y=-60;
+  const w=breakUpShip(dummy); w.fineMeshes.forEach(f=>f.im.visible=true);
+  renderer.compile(scene, camera);
+  restore.forEach(o=>o.visible=false);
+  const grab=o=>{ if(o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>keep.push(m)); };
+  junk.forEach(m=>{ scene.remove(m); grab(m); });
+  w.sections.forEach(sec=>{ sec.outer.traverse(grab); scene.remove(sec.outer); });
+  w.shards.forEach(sh=>{ grab(sh.im); scene.remove(sh.im); });
+  wrecks.splice(wrecks.indexOf(w),1);
+  scene.remove(dummy.group); dummy.tag.remove();
+  warmKeep[key]=keep;
+  if(URLQ.has('debug')) console.log(`warm-up ${Math.round(performance.now()-t0)} ms`);
+}
 
 /* ---------------- main loop ---------------- */
 let elapsed=0;
@@ -2363,7 +2396,7 @@ document.querySelectorAll('.btn-gfx').forEach(b=>b.onclick=cycleQuality);
 document.addEventListener('visibilitychange', ()=>{ clock.getDelta(); });
 
 // boot: menu backdrop battle
-setupBattle(4242); applyQuality(); cam.rGoal=46; cam.radius=70; cam.phi=1.12; frame();
+setupBattle(4242); applyQuality(); warmUp(); cam.rGoal=46; cam.radius=70; cam.phi=1.12; frame();
 window.HB = {wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
 </script>
 </body>
