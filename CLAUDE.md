@@ -68,14 +68,14 @@ The script has almost no section banners, so find a section by grepping for one 
 - **Deployment** (`deployFleet`): the first ship of each class takes its `DEPLOY` home cell, so the classic fleet lines up as it always has. Extra copies take the nearest free cell west of `DEPLOY_MAX_X`, keeping a one-hex gap where possible. The enemy's cells are mirrored through the centre, and terrain keeps every deployment cell clear.
 - **Duplicates** are named with numerals (Iron Vesper II) and carry hull numbers like 537-2.
 
-| Class | Hull | Armor | Shield (regen) | Move | Evasion | PD | Weapons | Ability |
-|---|---|---|---|---|---|---|---|---|
-| Patrol craft | 45 | 1 | 15 (+8) | 7 | 32 | .20 | Pulse, missiles | ECM screen |
-| Corvette | 70 | 3 | 25 (+10) | 6 | 24 | .30 | Light railgun, missiles | Hard burn |
-| Frigate | 95 | 4 | 35 (+12) | 5 | 18 | .45 (lends 90% of it within 2 hexes) | Beam, missiles | PD surge |
-| Destroyer | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
-| Heavy cruiser | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
-| Fleet carrier | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
+| Class | Cost | Hull | Armor | Shield (regen) | Move | Evasion | PD | Weapons | Ability |
+|---|---|---|---|---|---|---|---|---|---|
+| Patrol craft | 20 | 45 | 1 | 15 (+8) | 7 | 32 | .20 | Pulse, missiles | ECM screen |
+| Corvette | 40 | 70 | 3 | 25 (+10) | 6 | 24 | .30 | Light railgun, missiles | Hard burn |
+| Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .45 (lends 90% of it within 2 hexes) | Beam, missiles | PD surge |
+| Destroyer | 140 | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
+| Heavy cruiser | 250 | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
+| Fleet carrier | 120 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
 
@@ -163,6 +163,11 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 - Software rendering is slow, around 9 seconds a frame at High. Set `window.__norender = true` so the loop runs logic only, then call `HB.render()` once before each screenshot.
 - End evaluate calls with `; 0` so Playwright doesn't await a long promise like `fireWeapon`.
 - SwiftShader cannot reproduce GPU-driver bugs (see §6.1). For rendering changes, ask Jon to test with `?debug`.
+
+**Balance simulator.** `await HB.sim({west:[...], east:[...]}, n)` runs `n` AI-vs-AI battles with the real rules and AI, no rendering, the clock stepped in large jumps, both sides at Normal, and the fleets swapping sides every battle to cancel the first-move advantage. It reports the `west` fleet's win rate (draws count half), average turns and survivors. Battles are capped at 40 turns (a draw).
+- Speed: about 0.3 s per battle for 6 v 6, up to 10 s for 23 ships. **The tab must be in front**: a background tab runs many times slower.
+- Take balance numbers from 40+ battles per matchup; 40 still carries roughly ±8% noise.
+- It returns to the menu when finished.
 
 **Useful scenarios (either setup):**
 - AI-vs-AI rounds: `HB.runAITurn('player')`, then `HB.endPlayerTurn()`, at `HB.setTimeScale(10)`.

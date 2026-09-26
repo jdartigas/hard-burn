@@ -346,7 +346,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '15';
+const GAME_VERSION = '16';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -390,12 +390,12 @@ const ABIL = {
   repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, range:3},
 };
 const CLASSES = {
-  patrol:   {label:'Patrol craft',  role:'Stealth hunter',         hull:45,  armor:1, shield:15, regen:8,  mp:7, ev:32, pdc:0.20, weapons:['pulse','missL'],        ability:'ecm',        len:1.8, y:0.7},
-  corvette: {label:'Corvette',      role:'Fast skirmisher',        hull:70,  armor:3, shield:25, regen:10, mp:6, ev:24, pdc:0.30, weapons:['railL','missL'],        ability:'burn',       len:2.3, y:0.75},
-  frigate:  {label:'Frigate',       role:'Escort, point defense',  hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.45, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
-  destroyer:{label:'Destroyer',     role:'Line combatant',         hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
-  cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
-  carrier:  {label:'Fleet carrier', role:'Strike and support',     hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
+  patrol:   {label:'Patrol craft',  role:'Stealth hunter',         cost:20, hull:45,  armor:1, shield:15, regen:8,  mp:7, ev:32, pdc:0.20, weapons:['pulse','missL'],        ability:'ecm',        len:1.8, y:0.7},
+  corvette: {label:'Corvette',      role:'Fast skirmisher',        cost:40, hull:70,  armor:3, shield:25, regen:10, mp:6, ev:24, pdc:0.30, weapons:['railL','missL'],        ability:'burn',       len:2.3, y:0.75},
+  frigate:  {label:'Frigate',       role:'Escort, point defense',  cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.45, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
+  destroyer:{label:'Destroyer',     role:'Line combatant',         cost:140, hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
+  cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
+  carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:120, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };
 const ORDER = ['patrol','corvette','frigate','destroyer','cruiser','carrier'];
 const NAMES = {
@@ -407,7 +407,10 @@ const NAMES = {
 // nearest free cell to their class's home (see deployFleet).
 const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5] };
 const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
-const MAX_FLEET = 12;        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
+const MAX_FLEET = 12;
+// Fleet budgets in points; `cost` on each class is what a hull spends. Prices were measured with HB.sim, not
+// derived from stats: see BACKLOG.md item 0 for the method and results. The classic fleet costs 630.
+const BUDGETS = { skirmish:320, standard:640, large:1000 };        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
 const CLASSIC_FLEET = ORDER.slice();   // one of each, the original game
 const DIFF = {
   easy:  {acc:-12, hull:0.9,  caution:0.15, aggr:1.0, focus:0.0, noise:28},
@@ -2352,6 +2355,58 @@ function warmUp(){
 }
 
 /* ---------------- main loop ---------------- */
+// Timers, tweens and effects: everything the game awaits. The frame loop steps it by real time; the balance
+// simulator (below) steps it in large jumps instead, and the frame loop stands aside while it does.
+function stepClock(dt){
+  for(let i=timers.length-1;i>=0;i--){ const t=timers[i]; t.t-=dt; if(t.t<=0){ timers.splice(i,1); t.fn(); } }
+  for(let i=tweens.length-1;i>=0;i--){ const t=tweens[i]; t.t+=dt; const k=Math.min(1,t.t/t.dur); t.fn(t.ease(k)); if(k>=1){ tweens.splice(i,1); t.res(); } }
+  for(let i=fxList.length-1;i>=0;i--){ const f=fxList[i]; if(!f.update(dt)){ fxList.splice(i,1); f.dispose&&f.dispose(); } }
+}
+
+/* ---------------- balance simulator (console only: HB.sim) ----------------
+   AI against AI with the real rules, AI and effects, but the clock jumps SIM_DT game-seconds per step and
+   nothing renders, so a battle takes a fraction of a second. Both sides run the AI at Normal, so neither
+   gets a difficulty modifier. The west side still moves first each turn: swap sides to cancel that out. */
+const SIM_DT = 5, SIM_MAX_TURNS = 40;
+let simRunning=false;
+const simTick = (()=>{ const mc=new MessageChannel(); let res=null; mc.port1.onmessage=()=>{ const r=res; res=null; r&&r(); };
+  return ()=>new Promise(r=>{ res=r; mc.port2.postMessage(0); }); })();   // a macrotask that background tabs don't throttle
+async function simBattle(fleets, seed){
+  setupBattle(seed, fleets); state.phase='starting';
+  let running=true;
+  const pump=(async()=>{ while(running){ stepClock(SIM_DT); await simTick(); } })();
+  const until=async f=>{ while(!f()) await simTick(); };
+  startPlayerTurn();
+  while(!state.over && state.turn<=SIM_MAX_TURNS){
+    await until(()=>state.over || (state.phase==='player' && !state.busy));
+    if(state.over) break;
+    await runAITurn('player'); await endPlayerTurn();
+  }
+  await Promise.all(pendingDeaths.splice(0));
+  running=false; await pump;
+  const side=sd=>{ const all=state.ships.filter(x=>x.side===sd), live=all.filter(x=>x.alive);
+    return {left:live.length, of:all.length, hull:Math.round(live.reduce((a,x)=>a+x.hull,0)/all.reduce((a,x)=>a+x.hullMax,0)*100)}; };
+  const w=alive('player').length, e=alive('enemy').length;
+  return {winner: w&&!e?'west': e&&!w?'east':'draw', turns:state.turn, west:side('player'), east:side('enemy')};
+}
+// HB.sim({west:[...], east:[...]}, n): n battles, fleets swapping sides each battle so the first-move advantage
+// cancels. Reports wins for the fleet passed as `west`.
+async function sim(fleets, n=20, seed0=1){
+  const prevDiff=state.diff, prevScale=timeScale; state.diff='normal'; timeScale=1; simRunning=true; window.__norender=true;
+  const out={a:0, b:0, draw:0, turns:0, n, aLeft:0, bLeft:0};
+  try{
+    for(let i=0;i<n;i++){
+      const swap=i%2===1, f= swap? {player:fleets.east, enemy:fleets.west} : {player:fleets.west, enemy:fleets.east};
+      const r=await simBattle(f, seed0+i);
+      const aWon= swap? r.winner==='east' : r.winner==='west', bWon= swap? r.winner==='west' : r.winner==='east';
+      if(aWon) out.a++; else if(bWon) out.b++; else out.draw++;
+      out.turns+=r.turns; out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
+    }
+  } finally { simRunning=false; window.__norender=false; state.diff=prevDiff; timeScale=prevScale; toMenu(); }
+  out.turns=+(out.turns/n).toFixed(1); out.aLeft=+(out.aLeft/n).toFixed(1); out.bLeft=+(out.bLeft/n).toFixed(1);
+  out.aWinRate=Math.round((out.a+out.draw/2)/n*100);
+  return out;
+}
 let elapsed=0;
 function frame(){
   requestAnimationFrame(frame);
@@ -2360,10 +2415,7 @@ function frame(){
   if(!perfCheck.done && state.phase==='player' && !document.hidden && !window.__norender && rawDt<0.5){ perfCheck.t+=rawDt; perfCheck.n++;
     if(perfCheck.t>6){ perfCheck.done=true; const ms=perfCheck.t/perfCheck.n*1000;
       if(ms>40 && store.get('gfx',null)===null && quality!=='low'){ quality= quality==='high'?'medium':'low'; applyQuality(); log(`Graphics lowered to ${QUALITY[quality].label} to keep the frame rate up. Press G to change it.`,'sys'); } } }
-  // timers & tweens
-  for(let i=timers.length-1;i>=0;i--){ const t=timers[i]; t.t-=dt; if(t.t<=0){ timers.splice(i,1); t.fn(); } }
-  for(let i=tweens.length-1;i>=0;i--){ const t=tweens[i]; t.t+=dt; const k=Math.min(1,t.t/t.dur); t.fn(t.ease(k)); if(k>=1){ tweens.splice(i,1); t.res(); } }
-  for(let i=fxList.length-1;i>=0;i--){ const f=fxList[i]; if(!f.update(dt)){ fxList.splice(i,1); f.dispose&&f.dispose(); } }
+  if(!simRunning) stepClock(dt);
   Particles.update(dt);
   lightPool.forEach(L=>{ if(L.t>0){ L.t-=dt; L.l.intensity=L.i*Math.max(0,L.t/L.max); } else L.l.intensity=0; });
   // camera pan keys
@@ -2444,7 +2496,7 @@ document.addEventListener('visibilitychange', ()=>{ clock.getDelta(); });
 
 // boot: menu backdrop battle
 setupBattle(4242); applyQuality(); warmUp(); cam.rGoal=46; cam.radius=70; cam.phi=1.12; frame();
-window.HB = {wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
+window.HB = {sim, simBattle, wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
 </script>
 </body>
 </html>

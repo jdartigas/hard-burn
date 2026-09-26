@@ -55,6 +55,50 @@ shipyard gets built and tested.
 The player picks one; the AI picks at random or one that counters it. Presets
 are saved fleet lists, so they're nearly free once step 1 works.
 
+**Step 2 results (v16).**
+
+*Does one extra ship decide it?* Largely, yes, for identical fleets. The larger side wins:
+6 v 5 Destroyers 91%, 4 v 3 Heavy cruisers 96%, 8 v 7 Frigates 88% (100 battles each, 40 for the
+Frigates). Carriers are the exception: 3 v 2 is only 61%, because 31 of 40 battles hit the turn limit
+(item 0a).
+
+*But hull count is not the whole story.* Against the six-ship classic fleet, 10 Corvettes, 8 Frigates
+and 12 Patrol craft all lose every battle. Mixed fleets beat single-class ones by a wide margin.
+
+*Exchange rate against the classic fleet* (the count that wins about half the time, 30 battles each):
+Heavy cruiser ~2.5, Carrier ~4.3, Destroyer ~5, Frigate ~10, Corvette over 12, Patrol craft well over 12.
+
+*Prices, after two rounds of equal-budget tests:* Patrol craft 20, Corvette 40, Frigate 60,
+Destroyer 140, Heavy cruiser 250, Fleet carrier 120. Classic fleet 630. Budgets: Skirmish 320,
+Standard 640, Large 1000.
+
+*Equal-budget fleets at 620, against each other (40 battles each):*
+- Gunline (2 Heavy cruisers, Frigate, Corvette, Patrol) beats Carrier group (3 Carriers, Destroyer,
+  2 Frigates) **90%**
+- Swarm (Destroyer, 4 Frigates, 5 Corvettes, 2 Patrol) beats Gunline **65%**
+- Carrier group beats Swarm **74%**
+
+**No single fleet shape dominates; it's rock-paper-scissors.** That is the result that matters for
+fleet building: buying the most hulls is not automatically right, unlike in Fleet Combat.
+
+*Against the classic fleet (630):* Carrier group 73%, Gunline 70%, Swarm 70%, 2 Heavy cruisers and
+2 Frigates 45%, 4 Destroyers and escorts 35%. The classic fleet is a weak build, not a yardstick.
+
+*Caveats.*
+- Prices swing hard: in round 1, one 20-point change bought the Carrier group an extra hull and moved
+  it from 41% to 73%. Small price changes can have large effects, so re-measure after any change.
+- The AI is the same for every fleet. A human will find counters it doesn't use, so treat these as a
+  starting point and adjust by play.
+- 40 battles per matchup leaves roughly ±8% noise.
+
+### 0a. Carrier-only fights stall
+
+Fleets made mostly of Carriers often can't finish each other: 3 v 2 Carriers ended at the 40-turn limit
+in 31 of 40 battles, and the Carrier group drew 13–18 of 40 against the classic fleet. Repair drones and
+strong point defense against the Strike wing are the likely cause. Needs a fix before presets or the
+builder make Carrier-heavy fleets common: a turn limit with a points decision, weaker repair, or better
+Carrier offense against Carriers.
+
 **Risk: more ships may simply win.** In Fleet Combat, the side with more hulls
 won almost every battle, and point costs could never be balanced. Hard Burn
 may be less exposed, because hits can miss and asteroids block line of sight,
@@ -64,7 +108,8 @@ per fleet** on top of the budget.
 
 **Order:**
 1. ~~engine work (any fleet, generated starting positions)~~ **Done in v15.** Battles take any fleet up to 12 a side, duplicates included; see `CLAUDE.md` §4. Testable from the console with `HB.startGame({player:[...], enemy:[...]})`.
-2. hull costs, then measure balance
+2. ~~hull costs, then measure balance~~ **Done in v16.** Costs are `cost` in `CLASSES`, budgets in `BUDGETS`.
+   Measured with the balance simulator (`HB.sim`, see `CLAUDE.md` §7). Results below.
 3. quick play presets
 4. the custom builder
 5. per-ship loadouts
