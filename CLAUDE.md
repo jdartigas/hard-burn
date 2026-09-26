@@ -37,7 +37,7 @@ The script has almost no section banners, so find a section by grepping for one 
 | Section | What's there |
 |---|---|
 | utilities | `$`, `clamp`, `lerp`, `rand`, `mulberry32` (seeded RNG), `store` |
-| data | `WEAPONS`, `ABIL`, `CLASSES`, `ORDER`, `NAMES`, `DEPLOY`, `DIFF`, `SHIP_SCALE=1.25`, `COL` |
+| data | `WEAPONS`, `ABIL`, `CLASSES`, `ORDER`, `NAMES`, `DEPLOY`, `DEPLOY_MAX_X`, `MAX_FLEET`, `CLASSIC_FLEET`, `DIFF`, `SHIP_SCALE=1.25`, `COL` |
 | hex math | Axial pointy-top hexes, `HEX=1.9`, `MAP_R=9`, `MAP_ROWS=6`, `hexToWorld`, `worldToHex`, `hdist`, `hexLine` |
 | audio | `Sound`: Web Audio synthesized effects plus a generative cinematic score, with music and effects on separate gains |
 | renderer and scene | Renderer, composer, `MSAARenderPass` (now just a plain scene pass), lights, `updateShadowFrustum`, `enableShadows`, `QUALITY` presets, URL diagnostics |
@@ -64,7 +64,9 @@ The script has almost no section banners, so find a section by grepping for one 
 
 ## 4. Game design
 
-**Fleets.** Six ships per side, one of each class. The player's fleet is on the west side, the enemy's on the east.
+**Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. There is no fleet-building screen yet (see `BACKLOG.md` item 0). The player's fleet is on the west side, the enemy's on the east.
+- **Deployment** (`deployFleet`): the first ship of each class takes its `DEPLOY` home cell, so the classic fleet lines up as it always has. Extra copies take the nearest free cell west of `DEPLOY_MAX_X`, keeping a one-hex gap where possible. The enemy's cells are mirrored through the centre, and terrain keeps every deployment cell clear.
+- **Duplicates** are named with numerals (Iron Vesper II) and carry hull numbers like 537-2.
 
 | Class | Hull | Armor | Shield (regen) | Move | Evasion | PD | Weapons | Ability |
 |---|---|---|---|---|---|---|---|---|

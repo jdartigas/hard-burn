@@ -63,7 +63,7 @@ AI against AI, a few hundred battles. Cheap safeguard: a **maximum ship count
 per fleet** on top of the budget.
 
 **Order:**
-1. engine work (any fleet, generated starting positions)
+1. ~~engine work (any fleet, generated starting positions)~~ **Done in v15.** Battles take any fleet up to 12 a side, duplicates included; see `CLAUDE.md` §4. Testable from the console with `HB.startGame({player:[...], enemy:[...]})`.
 2. hull costs, then measure balance
 3. quick play presets
 4. the custom builder
@@ -249,9 +249,7 @@ has to read weapons from each ship instead of from its class.
 
 ### 8. What has to change in the existing game first
 
-1. **Battles must accept any fleet.** Right now both sides are always one of
-   each class, with fixed starting positions (`DEPLOY`). Campaign fights are
-   1 vs 2 pirates, 3 vs 5 and so on.
+1. ~~**Battles must accept any fleet.**~~ Done in v15 (item 0, step 1).
 2. **Per-ship loadouts** instead of per-class ones (item 7).
 3. **Battles report results back:** survivors, damage taken and rewards.
 4. **Split the code into multiple files.** The campaign would roughly double

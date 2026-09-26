@@ -46,7 +46,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .tbtn:hover{border-color:var(--amber)}
 .tbtns{display:flex;gap:6px}
 
-#roster{position:absolute;left:12px;top:64px;width:238px;display:flex;flex-direction:column;gap:6px}
+#roster{position:absolute;left:12px;top:64px;width:238px;display:flex;flex-direction:column;gap:6px;max-height:calc(100% - 64px - 290px);overflow-y:auto;scrollbar-width:thin}
 .card{padding:8px 10px 9px;background:var(--panel);border:1px solid var(--line-cool);border-left:3px solid var(--amber-dim);cursor:pointer;text-align:left;width:100%;display:block}
 .card:hover{border-color:rgba(233,165,59,.5)}
 .card.sel{border-color:var(--amber);border-left-color:var(--amber);background:rgba(40,30,12,.82)}
@@ -62,7 +62,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .card .st{font-size:12px;color:var(--dim);display:flex;gap:10px}
 .card .st .ok{color:var(--amber)}
 
-#enemies{position:absolute;right:12px;top:64px;width:220px;padding:8px 10px}
+#enemies{position:absolute;right:12px;top:64px;width:220px;padding:8px 10px;max-height:calc(100% - 64px - 290px);overflow-y:auto;scrollbar-width:thin}
 #enemies h3,#log h3{margin:0 0 6px;font-size:12.5px;font-weight:500;color:var(--dim)}
 .erow{padding:4px 0 6px;border-top:1px solid rgba(255,255,255,.05);cursor:default}
 .erow:first-of-type{border-top:0}
@@ -182,11 +182,12 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
   #log{left:12px;right:auto;bottom:14px;width:calc(100% - 190px);max-height:56px}
   #log h3{display:none}
   #roster{width:200px}
+  #roster,#enemies{max-height:calc(100% - 64px - 420px)}   /* the ship panel sits higher here (bottom 84px) */
 }
 @media (max-width:760px){
   #topbar{height:46px;gap:10px;padding:0 8px}
   #brand{font-size:21px} #strength .lbl{display:none} #turninfo span{display:none}
-  #roster{top:52px;left:8px;right:8px;width:auto;flex-direction:row;overflow-x:auto;gap:4px}
+  #roster{top:52px;left:8px;right:8px;width:auto;flex-direction:row;overflow-x:auto;gap:4px;max-height:none}
   .card{min-width:112px;padding:5px 7px 6px} .card .cl,.card .st span+span{display:none} .card .nm{font-size:12.5px}
   #enemies{display:none}
   #shippanel{left:8px;right:8px;bottom:78px;padding:8px}
@@ -345,7 +346,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '14';
+const GAME_VERSION = '15';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -401,7 +402,13 @@ const NAMES = {
   player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel'},
   enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle'},
 };
+// Home cell per class on the player's side; the enemy's are mirrored through the centre. The first ship of each
+// class deploys here, so the classic one-of-each fleet lines up exactly as it always has. Extra copies take the
+// nearest free cell to their class's home (see deployFleet).
 const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5] };
+const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
+const MAX_FLEET = 12;        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
+const CLASSIC_FLEET = ORDER.slice();   // one of each, the original game
 const DIFF = {
   easy:  {acc:-12, hull:0.9,  caution:0.15, aggr:1.0, focus:0.0, noise:28},
   normal:{acc:0,   hull:1.0,  caution:0.45, aggr:1.0, focus:0.7, noise:5},
@@ -770,7 +777,7 @@ function after(sec, fn){ timers.push({t:sec, fn}); }
 function addFx(obj){ fxList.push(obj); return obj; }
 
 /* ---------------- board ---------------- */
-const board = { cells:new Map(), list:[], group:new THREE.Group(), rocks:[], seed:1 };
+const board = { cells:new Map(), list:[], group:new THREE.Group(), rocks:[], seed:1, deploy:[DEPLOY.carrier] };
 scene.add(board.group);
 for(let q=-MAP_R;q<=MAP_R;q++) for(let r=-MAP_R;r<=MAP_R;r++){
   if(Math.abs(r)>MAP_ROWS) continue; if(hdist({q,r},{q:0,r:0})>MAP_R) continue;
@@ -928,13 +935,13 @@ function generateTerrain(seed){
   let R=mulberry32(seed), tries=0;
   while(true){
     board.list.forEach(c=>{ c.t='open'; c.rock=null; });
-    const dep=new Set(); Object.values(DEPLOY).forEach(([q,r])=>{ dep.add(key(q,r)); dep.add(key(-q,-r)); });
+    const dep=new Set(); board.deploy.forEach(([q,r])=>{ dep.add(key(q,r)); dep.add(key(-q,-r)); });
     const cand = board.list.filter(c=>{ const x=c.q+c.r/2; return Math.abs(x)<=5.5 && Math.abs(c.r)<=5 && (c.q!==0||c.r!==0) && !dep.has(key(c.q,c.r)); });
     const setT=(c,t)=>{ const m=cellAt(-c.q,-c.r); if(c.t==='open'&&m&&m.t==='open'){ c.t=t; m.t=t; } };
     for(let i=0;i<5;i++){ const c=cand[Math.floor(R()*cand.length)]; setT(c,'rock'); const n=Math.floor(R()*3); for(let k=0;k<n;k++){ const d=DIRS[Math.floor(R()*6)]; const nc=cellAt(c.q+d[0],c.r+d[1]); if(nc&&cand.includes(nc)) setT(nc,'rock'); } }
     for(let i=0;i<8;i++){ const c=cand[Math.floor(R()*cand.length)]; setT(c,'debris'); const n=1+Math.floor(R()*3); for(let k=0;k<n;k++){ const d=DIRS[Math.floor(R()*6)]; const nc=cellAt(c.q+d[0],c.r+d[1]); if(nc&&cand.includes(nc)) setT(nc,'debris'); } }
     // connectivity: every deployment must reach every enemy deployment without crossing rock
-    const start=cellAt(DEPLOY.carrier[0],DEPLOY.carrier[1]); const seen=new Set([start.idx]); const qu=[start];
+    const start=cellAt(board.deploy[0][0],board.deploy[0][1]); const seen=new Set([start.idx]); const qu=[start];
     while(qu.length){ const c=qu.shift(); for(const d of DIRS){ const n=cellAt(c.q+d[0],c.r+d[1]); if(n&&n.t!=='rock'&&!seen.has(n.idx)){ seen.add(n.idx); qu.push(n); } } }
     const ok = board.list.filter(c=>c.t!=='rock').every(c=>seen.has(c.idx));
     if(ok || ++tries>30) break;
@@ -1007,7 +1014,7 @@ radTex.wrapS=radTex.wrapT=THREE.RepeatWrapping;
 const radGlow = canvasTex(64,256,(g,w,h)=>{ const gr=g.createLinearGradient(0,0,0,h); gr.addColorStop(0,'#000'); gr.addColorStop(0.6,'#2a0c02'); gr.addColorStop(1,'#a8360a'); g.fillStyle=gr; g.fillRect(0,0,w,h); });
 function decalTex(text, side){
   return canvasTex(256,108,(g,w,h)=>{ g.clearRect(0,0,w,h); g.textAlign='center'; g.textBaseline='middle';
-    g.font='bold 84px "Arial Narrow","Roboto Condensed",Arial,sans-serif'; g.fillStyle= side==='player'?'rgba(240,240,236,.95)':'rgba(40,40,44,.9)'; g.fillText(text,w/2,h/2+4); });
+    g.font='bold 84px "Arial Narrow","Roboto Condensed",Arial,sans-serif'; g.fillStyle= side==='player'?'rgba(240,240,236,.95)':'rgba(40,40,44,.9)'; g.fillText(text,w/2,h/2+4,w*0.94); });   // maxWidth squeezes longer numbers (537-2) to fit
 }
 function shipMaterials(side){
   const t=texCache[side], P=side==='player';
@@ -1072,7 +1079,7 @@ function deckGeometry(len, w0,h0, w1,h1, ch, uvs=1.05){
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.computeVertexNormals(); return g;
 }
 
-function buildShip(cls, side){
+function buildShip(cls, side, copy=0){
   const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const P=side==='player', R=mulberry32((P?1000:2000)+ORDER.indexOf(cls)*77);
   const engines=[], lights=[], greebles={dark:[], hull:[], metal:[]}, decks=[];
@@ -1178,7 +1185,7 @@ function buildShip(cls, side){
   // --- per-class hulls, modeled from the reference miniatures ---
   // shared Expanse vocabulary: drum-housed drive at the stern, V-strut truss to an octagonal engineering section,
   // brick-tiled armor decks forward, livery plates, stripes, hull numbers, PDC turrets everywhere
-  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870'})[cls];
+  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
   const HULL=M.hull, H2=M.hull2, PL=M.plate, ST=M.stripe;
   function drum(r,len,zf,x=0,y=0){ // drive housing: open drum, ribbed, crenellated rim, bell and plume inside
     const zb=zf-len;
@@ -1365,12 +1372,11 @@ const state = {
   busy:false, over:false, reach:null, hoverCell:null, hoverShip:null, stats:null, acting:null,
 };
 let shipId=0;
-function createShip(cls, side){
+function createShip(cls, side, q, r, copy=0){
   const C=CLASSES[cls], d=DIFF[state.diff];
   const hullMax=Math.round(C.hull*(side==='enemy'?d.hull:1));
-  const m=buildShip(cls, side);
-  const [dq,dr]=DEPLOY[cls]; const q= side==='player'?dq:-dq, r= side==='player'?dr:-dr;
-  const s={ id:shipId++, side, cls, C, name:NAMES[side][cls], hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
+  const m=buildShip(cls, side, copy);
+  const s={ id:shipId++, side, cls, C, name:NAMES[side][cls]+(copy?' '+ROMAN[copy]:''), copy, hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
     mp:C.mp, mpMax:C.mp, ev:C.ev, pdc:C.pdc, q, r, alive:true, len:C.len*SHIP_SCALE, baseY:C.y, phase:Math.random()*6,
     weapons:C.weapons.map(k=>({key:k, def:WEAPONS[k], wait:0, ammo:WEAPONS[k].ammo, firedTurn:-1})),
     ability:{key:C.ability, def:ABIL[C.ability], wait:0}, fx:{}, moved:false,
@@ -1386,6 +1392,7 @@ function createShip(cls, side){
   $('#labels').appendChild(el); s.tag=el; s.tagHit=el.querySelector('.hit'); s.tagSh=el.querySelector('.sh i'); s.tagHu=el.querySelector('.hu i'); s.tagHuBar=el.querySelector('.hu'); s.tagFx=el.querySelector('.fx');
   return s;
 }
+const ROMAN = ['','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const alive = side => state.ships.filter(s=>s.alive && s.side===side);
 const other = side => side==='player'?'enemy':'player';
 function shipAt(q,r){ return state.ships.find(s=>s.alive && s.q===q && s.r===r) || null; }
@@ -2253,14 +2260,54 @@ function clearBattle(){
   document.querySelectorAll('.ftxt').forEach(e=>e.remove());
   $('#logbody').innerHTML=''; selRing.visible=tgtRing.visible=actRing.visible=hoverRing.visible=pathLine.visible=false; setTiles(new Map());
 }
-function setupBattle(seed){
-  clearBattle(); board.seed=seed; generateTerrain(seed);
-  for(const side of ['player','enemy']) for(const cls of ORDER) state.ships.push(createShip(cls, side));
+// A fleet is a list of class keys, duplicates allowed, e.g. ['cruiser','destroyer','destroyer'].
+function cleanFleet(list){
+  const f=(Array.isArray(list)?list:[]).filter(c=>CLASSES[c]).slice(0,MAX_FLEET);
+  return f.length ? f : CLASSIC_FLEET.slice();
+}
+// Cells for a fleet on the player's side, in the same order as the list. Heavier classes are placed first, so
+// they get first pick. The first of each class takes its DEPLOY home; later copies take the free zone cell nearest
+// that home, keeping a one-hex gap from every placed ship when the zone allows it.
+function deployFleet(list){
+  const zone=board.list.filter(c=>c.q+c.r/2<=DEPLOY_MAX_X);
+  const cells=new Array(list.length), taken=[], firstSeen=new Set();
+  const order=list.map((cls,i)=>i).sort((a,b)=>ORDER.indexOf(list[b])-ORDER.indexOf(list[a]) || a-b);
+  for(const i of order){
+    const cls=list[i], [hq,hr]=DEPLOY[cls], home={q:hq,r:hr};
+    let pick=null;
+    if(!firstSeen.has(cls) && !taken.some(t=>t.q===hq&&t.r===hr)) pick=home;
+    for(const gap of [2,1]){
+      if(pick) break;
+      let best=Infinity;
+      for(const c of zone){
+        if(taken.some(t=>hdist(t,c)<gap)) continue;
+        const d=hdist(c,home)*10+Math.abs(c.r-hr);   // nearest to home, then closest in row
+        if(d<best){ best=d; pick={q:c.q,r:c.r}; }
+      }
+    }
+    firstSeen.add(cls); taken.push(pick); cells[i]=[pick.q,pick.r];
+  }
+  return cells;
+}
+function setupBattle(seed, fleets={}){
+  clearBattle(); board.seed=seed;
+  const lists={player:cleanFleet(fleets.player), enemy:cleanFleet(fleets.enemy)};
+  const cells={player:deployFleet(lists.player), enemy:deployFleet(lists.enemy).map(([q,r])=>[-q,-r])};
+  board.deploy=[...cells.player, ...cells.enemy];
+  generateTerrain(seed);
+  for(const side of ['player','enemy']){
+    const n={};
+    lists[side].forEach((cls,i)=>{ const copy=n[cls]=(n[cls]??-1)+1; state.ships.push(createShip(cls, side, cells[side][i][0], cells[side][i][1], copy)); });
+  }
+  state.fleets=lists;
   state.turn=0; state.over=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
 }
-function startGame(){
+// fleets: {player:[...], enemy:[...]}. Leave it out to replay the last fleets (classic on the first game).
+let lastFleets={};
+function startGame(fleets){
+  if(fleets && (fleets.player || fleets.enemy)) lastFleets=fleets;
   Sound.init(); Sound.ui();
-  setupBattle(Math.floor(Math.random()*1e9)); warmUp();
+  setupBattle(Math.floor(Math.random()*1e9), lastFleets); warmUp();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
   cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
