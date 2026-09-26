@@ -346,7 +346,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '16';
+const GAME_VERSION = '17';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -379,7 +379,7 @@ const WEAPONS = {
   missL:  {name:'Missile rack',  kind:'missile',range:8, acc:92, dmg:13, shots:2, sh:1, hu:1.0, pierce:0.3, reload:1, ammo:4, guided:true, pdcF:1.0},
   torp:   {name:'Torpedo',       kind:'missile',range:10,acc:90, dmg:44, shots:1, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   torpH:  {name:'Torpedo bay',   kind:'missile',range:10,acc:90, dmg:36, shots:2, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
-  wing:   {name:'Strike wing',   kind:'fighter',range:12,acc:90, dmg:9,  shots:6, sh:1, hu:1.0, pierce:0.25,reload:2, guided:true, pdcF:0.45},
+  wing:   {name:'Strike wing',   kind:'fighter',range:12,acc:90, dmg:9,  shots:6, sh:1, hu:1.0, pierce:0.6, reload:2, guided:true, pdcF:0.45},
 };
 const ABIL = {
   burn:      {name:'Hard burn',        desc:'+3 movement this turn', reload:3},
@@ -387,7 +387,7 @@ const ABIL = {
   overcharge:{name:'Shield overcharge',desc:'Restore 60% of maximum shields', reload:3},
   pdsurge:   {name:'Point defense surge', desc:'Allies within 2 hexes intercept missiles 60% better until your next turn', reload:3},
   brace:     {name:'Brace for impact', desc:'Double armor and 25% less hull damage until your next turn', reload:3},
-  repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, range:3},
+  repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, range:3, amount:45},
 };
 const CLASSES = {
   patrol:   {label:'Patrol craft',  role:'Stealth hunter',         cost:20, hull:45,  armor:1, shield:15, regen:8,  mp:7, ev:32, pdc:0.20, weapons:['pulse','missL'],        ability:'ecm',        len:1.8, y:0.7},
@@ -395,7 +395,7 @@ const CLASSES = {
   frigate:  {label:'Frigate',       role:'Escort, point defense',  cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.45, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
   destroyer:{label:'Destroyer',     role:'Line combatant',         cost:140, hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
   cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
-  carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:120, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
+  carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:150, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };
 const ORDER = ['patrol','corvette','frigate','destroyer','cruiser','carrier'];
 const NAMES = {
@@ -408,9 +408,12 @@ const NAMES = {
 const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5] };
 const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
 const MAX_FLEET = 12;
+// A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
+// each surviving ship's cost times its fraction of hull remaining. Without a limit a standoff never ends.
+const BATTLE_TURNS = 30;
 // Fleet budgets in points; `cost` on each class is what a hull spends. Prices were measured with HB.sim, not
-// derived from stats: see BACKLOG.md item 0 for the method and results. The classic fleet costs 630.
-const BUDGETS = { skirmish:320, standard:640, large:1000 };        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
+// derived from stats: see BACKLOG.md item 0 for the method and results. The classic fleet costs 660.
+const BUDGETS = { skirmish:330, standard:660, large:1000 };        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
 const CLASSIC_FLEET = ORDER.slice();   // one of each, the original game
 const DIFF = {
   easy:  {acc:-12, hull:0.9,  caution:0.15, aggr:1.0, focus:0.0, noise:28},
@@ -1844,7 +1847,7 @@ async function useAbility(s, target=null){
   else if(k==='overcharge'){ const add=Math.min(s.shieldMax-s.shield, s.shieldMax*0.6); s.shield+=add; shieldFlash(s, s.group.position.clone().add(new THREE.Vector3(0,3,0))); s.shMat.uniforms.uFlash.value=2; Sound.shield(); Sound.power(); floatText(s,`+${Math.round(add)} shields`,'sh'); }
   else if(k==='pdsurge'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.pdsurge=1; Particles.burst(o.group.position,26,{speed:3,color:new THREE.Color(1,.85,.4),size:0.28,life:0.7}); } Sound.pdc(); Sound.power(); floatText(s,'PD surge','heal'); }
   else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
-  else if(k==='repair'){ if(!target) return false; const add=Math.min(45, target.hullMax-target.hull); target.hull+=add; Sound.power();
+  else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; Sound.power();
     const a0=s.group.position.clone(), b0=target.group.position.clone();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.5,1,.5),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.5,1,.5),size:0.3,life:0.9}); floatText(target,`+${Math.round(add)} hull`,'heal'); }
@@ -1942,7 +1945,7 @@ function beginSideTurn(side){
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }
 function startPlayerTurn(){
   state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle');
-  banner(`Turn ${state.turn}`, 'Your orders', 'p'); Sound.turn('player');
+  banner(`Turn ${state.turn}`, state.turn>=BATTLE_TURNS?'Final turn: fleet value decides':'Your orders', 'p'); Sound.turn('player');
   const first=alive('player').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))[0];
   select(first||null, true); updateHUD();
 }
@@ -1955,20 +1958,32 @@ async function endPlayerTurn(){
   await runAITurn('enemy');
   await Promise.all(pendingDeaths.splice(0));
   state.busy=false;
+  if(!state.over && state.turn>=BATTLE_TURNS){ endOnTurnLimit(); return; }
   if(!state.over){ await wait(0.3); startPlayerTurn(); }
 }
 function checkEnd(){
   if(state.over) return;
   const p=alive('player').length, e=alive('enemy').length;
   if(p && e) return;
-  state.over=true; const win = e===0;
+  state.over=true; const win = e===0; state.result= win?'player':'enemy';
   after(2.4, ()=>showEnd(win));
 }
-function showEnd(win){
+const fleetValue = side => alive(side).reduce((a,s)=>a+s.C.cost*Math.max(0,s.hull)/s.hullMax, 0);
+function endOnTurnLimit(){
+  state.over=true;
+  const p=Math.round(fleetValue('player')), e=Math.round(fleetValue('enemy'));
+  state.result= p>e?'player': e>p?'enemy':'draw';
+  log(`Turn limit reached. Fleet value left: yours ${p}, enemy ${e}.`, 'sys');
+  after(1.2, ()=>showEnd(state.result==='player', {p,e}));
+}
+function showEnd(win, byValue=null){
   select(null); state.phase='end'; Sound.setMood('end'); (win?Sound.win:Sound.lose)();
-  const t=$('#end-title'); t.textContent= win?'Victory':'Fleet lost'; t.className= win?'win':'lose';
+  const draw= byValue && byValue.p===byValue.e;
+  const t=$('#end-title'); t.textContent= win?'Victory': draw?'Stalemate':'Fleet lost'; t.className= win?'win':'lose';
   const lostP=state.ships.filter(s=>s.side==='player').length-alive('player').length;
-  $('#end-sub').textContent = win ? (lostP===0?`A clean sweep in ${state.turn} turns. Every ship is coming home.`:`The enemy line is broken after ${state.turn} turns, at the cost of ${lostP} ship${lostP>1?'s':''}.`)
+  $('#end-sub').textContent = byValue ? `Turn limit reached after ${BATTLE_TURNS} turns. Fleet value left: yours ${byValue.p}, the enemy's ${byValue.e}. `+
+        (win?'You hold the field.': draw?'Neither side can claim it.':'The enemy holds the field.')
+    : win ? (lostP===0?`A clean sweep in ${state.turn} turns. Every ship is coming home.`:`The enemy line is broken after ${state.turn} turns, at the cost of ${lostP} ship${lostP>1?'s':''}.`)
                                   : `Your last ship went dark on turn ${state.turn}. The enemy holds the field.`;
   const P=state.stats.player, E=state.stats.enemy; const acc=x=>x.shots?Math.round(x.hits/x.shots*100)+'%':'—';
   $('#end-stats').innerHTML=`<span class="h"></span><span class="h">You</span><span class="h">Enemy</span>
@@ -2048,7 +2063,7 @@ function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.s
   const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); s.tagFx.textContent=fx.join(', '); } }
 function weaponStatus(w){ if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 function updateHUD(){
-  $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)}`;
+  $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${BATTLE_TURNS}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
   const str=side=>{ const all=state.ships.filter(s=>s.side===side); const t=all.reduce((a,s)=>a+s.hullMax,0); return all.reduce((a,s)=>a+Math.max(0,s.hull),0)/t*100; };
   $('#sb-p i').style.width=str('player')+'%'; $('#sb-e i').style.width=str('enemy')+'%';
@@ -2129,7 +2144,7 @@ function updateHover(){
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
-    if(state.mode==='repair' && s && h!==s) html+= hdist(s,h)<=3?`<div class="sum">Click to repair up to ${Math.min(45,Math.ceil(h.hullMax-h.hull))} hull</div>`:`<div class="hint">Out of repair range</div>`;
+    if(state.mode==='repair' && s && h!==s) html+= hdist(s,h)<=3?`<div class="sum">Click to repair up to ${Math.min(ABIL.repair.amount,Math.ceil(h.hullMax-h.hull))} hull</div>`:`<div class="hint">Out of repair range</div>`;
     showTooltip(html);
   }
 }
@@ -2303,7 +2318,7 @@ function setupBattle(seed, fleets={}){
     lists[side].forEach((cls,i)=>{ const copy=n[cls]=(n[cls]??-1)+1; state.ships.push(createShip(cls, side, cells[side][i][0], cells[side][i][1], copy)); });
   }
   state.fleets=lists;
-  state.turn=0; state.over=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
+  state.turn=0; state.over=false; state.result=null; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
 }
 // fleets: {player:[...], enemy:[...]}. Leave it out to replay the last fleets (classic on the first game).
 let lastFleets={};
@@ -2367,7 +2382,7 @@ function stepClock(dt){
    AI against AI with the real rules, AI and effects, but the clock jumps SIM_DT game-seconds per step and
    nothing renders, so a battle takes a fraction of a second. Both sides run the AI at Normal, so neither
    gets a difficulty modifier. The west side still moves first each turn: swap sides to cancel that out. */
-const SIM_DT = 5, SIM_MAX_TURNS = 40;
+const SIM_DT = 5;
 let simRunning=false;
 const simTick = (()=>{ const mc=new MessageChannel(); let res=null; mc.port1.onmessage=()=>{ const r=res; res=null; r&&r(); };
   return ()=>new Promise(r=>{ res=r; mc.port2.postMessage(0); }); })();   // a macrotask that background tabs don't throttle
@@ -2377,7 +2392,7 @@ async function simBattle(fleets, seed){
   const pump=(async()=>{ while(running){ stepClock(SIM_DT); await simTick(); } })();
   const until=async f=>{ while(!f()) await simTick(); };
   startPlayerTurn();
-  while(!state.over && state.turn<=SIM_MAX_TURNS){
+  while(!state.over){
     await until(()=>state.over || (state.phase==='player' && !state.busy));
     if(state.over) break;
     await runAITurn('player'); await endPlayerTurn();
@@ -2386,21 +2401,20 @@ async function simBattle(fleets, seed){
   running=false; await pump;
   const side=sd=>{ const all=state.ships.filter(x=>x.side===sd), live=all.filter(x=>x.alive);
     return {left:live.length, of:all.length, hull:Math.round(live.reduce((a,x)=>a+x.hull,0)/all.reduce((a,x)=>a+x.hullMax,0)*100)}; };
-  const w=alive('player').length, e=alive('enemy').length;
-  return {winner: w&&!e?'west': e&&!w?'east':'draw', turns:state.turn, west:side('player'), east:side('enemy')};
+  return {winner: state.result==='player'?'west': state.result==='enemy'?'east':'draw', byValue: alive('player').length>0 && alive('enemy').length>0, turns:state.turn, west:side('player'), east:side('enemy')};
 }
 // HB.sim({west:[...], east:[...]}, n): n battles, fleets swapping sides each battle so the first-move advantage
 // cancels. Reports wins for the fleet passed as `west`.
 async function sim(fleets, n=20, seed0=1){
   const prevDiff=state.diff, prevScale=timeScale; state.diff='normal'; timeScale=1; simRunning=true; window.__norender=true;
-  const out={a:0, b:0, draw:0, turns:0, n, aLeft:0, bLeft:0};
+  const out={a:0, b:0, draw:0, byValue:0, turns:0, n, aLeft:0, bLeft:0};
   try{
     for(let i=0;i<n;i++){
       const swap=i%2===1, f= swap? {player:fleets.east, enemy:fleets.west} : {player:fleets.west, enemy:fleets.east};
       const r=await simBattle(f, seed0+i);
       const aWon= swap? r.winner==='east' : r.winner==='west', bWon= swap? r.winner==='west' : r.winner==='east';
       if(aWon) out.a++; else if(bWon) out.b++; else out.draw++;
-      out.turns+=r.turns; out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
+      if(r.byValue) out.byValue++; out.turns+=r.turns; out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
     }
   } finally { simRunning=false; window.__norender=false; state.diff=prevDiff; timeScale=prevScale; toMenu(); }
   out.turns=+(out.turns/n).toFixed(1); out.aLeft=+(out.aLeft/n).toFixed(1); out.bLeft=+(out.bLeft/n).toFixed(1);
@@ -2496,7 +2510,7 @@ document.addEventListener('visibilitychange', ()=>{ clock.getDelta(); });
 
 // boot: menu backdrop battle
 setupBattle(4242); applyQuality(); warmUp(); cam.rGoal=46; cam.radius=70; cam.phi=1.12; frame();
-window.HB = {sim, simBattle, wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
+window.HB = {sim, simBattle, WEAPONS, CLASSES, ABIL, wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
 </script>
 </body>
 </html>

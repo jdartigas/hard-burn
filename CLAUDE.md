@@ -75,9 +75,11 @@ The script has almost no section banners, so find a section by grepping for one 
 | Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .45 (lends 90% of it within 2 hexes) | Beam, missiles | PD surge |
 | Destroyer | 140 | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
 | Heavy cruiser | 250 | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
-| Fleet carrier | 120 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
+| Fleet carrier | 150 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
+
+**Turn limit.** A battle lasts at most `BATTLE_TURNS` (30) turns. If both fleets survive, the side with more fleet value left wins: each surviving ship's cost times its fraction of hull remaining (`fleetValue`). An exact tie is a stalemate. Without the limit, a standoff (two Carrier fleets, a last ship that keeps running) never ends. The AI doesn't yet play toward the limit.
 
 **Hit chance, direct fire (pulse, beam, rail).** `acc − max(0, dist − opt) × fall − target evasion`. Subtract 15 if the target is in debris and 20 if it's under ECM. Add the difficulty modifier (enemy −12 on Easy, +8 on Hard; player +5 on Easy). Clamp to 5–95. Direct fire needs line of sight, and asteroids block it.
 
@@ -164,7 +166,7 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 - End evaluate calls with `; 0` so Playwright doesn't await a long promise like `fireWeapon`.
 - SwiftShader cannot reproduce GPU-driver bugs (see §6.1). For rendering changes, ask Jon to test with `?debug`.
 
-**Balance simulator.** `await HB.sim({west:[...], east:[...]}, n)` runs `n` AI-vs-AI battles with the real rules and AI, no rendering, the clock stepped in large jumps, both sides at Normal, and the fleets swapping sides every battle to cancel the first-move advantage. It reports the `west` fleet's win rate (draws count half), average turns and survivors. Battles are capped at 40 turns (a draw).
+**Balance simulator.** `await HB.sim({west:[...], east:[...]}, n)` runs `n` AI-vs-AI battles with the real rules and AI, no rendering, the clock stepped in large jumps, both sides at Normal, and the fleets swapping sides every battle to cancel the first-move advantage. It reports the `west` fleet's win rate (draws count half), average turns and survivors. Battles end at the game's own turn limit; `byValue` counts how many were decided on fleet value rather than by destruction.
 - Speed: about 0.3 s per battle for 6 v 6, up to 10 s for 23 ships. **The tab must be in front**: a background tab runs many times slower.
 - Take balance numbers from 40+ battles per matchup; 40 still carries roughly ±8% noise.
 - It returns to the menu when finished.

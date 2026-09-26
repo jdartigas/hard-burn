@@ -69,8 +69,8 @@ and 12 Patrol craft all lose every battle. Mixed fleets beat single-class ones b
 Heavy cruiser ~2.5, Carrier ~4.3, Destroyer ~5, Frigate ~10, Corvette over 12, Patrol craft well over 12.
 
 *Prices, after two rounds of equal-budget tests:* Patrol craft 20, Corvette 40, Frigate 60,
-Destroyer 140, Heavy cruiser 250, Fleet carrier 120. Classic fleet 630. Budgets: Skirmish 320,
-Standard 640, Large 1000.
+Destroyer 140, Heavy cruiser 250, Fleet carrier 120. **The Carrier moved to 150 in v17** (item 0a),
+so the classic fleet is now 660 and the budgets are Skirmish 330, Standard 660, Large 1000.
 
 *Equal-budget fleets at 620, against each other (40 battles each):*
 - Gunline (2 Heavy cruisers, Frigate, Corvette, Patrol) beats Carrier group (3 Carriers, Destroyer,
@@ -91,7 +91,29 @@ fleet building: buying the most hulls is not automatically right, unlike in Flee
   starting point and adjust by play.
 - 40 battles per matchup leaves roughly ±8% noise.
 
-### 0a. Carrier-only fights stall
+### 0a. ~~Carrier-only fights stall~~ Fixed in v17
+
+**What was done:** a 30-turn battle limit decided on fleet value (`CLAUDE.md` §4), and the Strike wing's
+armor penetration raised from 0.25 to 0.6. The Carrier's price rose from 120 to 150 to match.
+
+**What the cause turned out to be:** armor, not shields or repair. Each fighter hit is 9 damage into
+7 armor, so it barely reaches the hull. Two v two Carrier draws (out of 30): unchanged 30; repair
+switched off 30; shields not regenerating under fire 38/40; armor penetration 0.6 13; that plus
+weaker repair 9. Launching fighters every turn ended every stalemate but made the Carrier group win
+98–100% even at 150, and four fighters a turn still drew 17/40 while losing to the gunline. No
+Carrier-only setting both ends the mirror and stays balanced, hence the turn limit.
+
+**After (v17, 40 battles each):** two v two Carriers now finish, 38/40 on fleet value. Classic
+mirror 50%, 11/40 on value, so the limit rarely decides an ordinary battle. At 150 the Carrier group
+(3 Carriers, 2 Frigates, Corvette) wins 35% against the gunline and 45% against the swarm; the
+swarm beats the gunline 65%. At 140 (3 Carriers, Destroyer, Frigate) it won 60% and 70%. The
+Carrier sits on a sharp edge: whether the group can afford a Destroyer matters more than the
+price itself. Adjust by play.
+
+**Still open:** the AI doesn't play toward the limit (it could retreat to protect its value late
+on, or press when behind).
+
+**Original note:**
 
 Fleets made mostly of Carriers often can't finish each other: 3 v 2 Carriers ended at the 40-turn limit
 in 31 of 40 battles, and the Carrier group drew 13–18 of 40 against the classic fleet. Repair drones and
