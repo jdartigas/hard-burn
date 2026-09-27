@@ -28,7 +28,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
 - **Bump `GAME_VERSION`** (near the top of the script) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
-- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`. Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`. Always go through the `store` helper, which wraps `localStorage` in try/catch.
 
 ## 3. Code map (sections appear in this order in the script)
 
@@ -64,7 +64,7 @@ The script has almost no section banners, so find a section by grepping for one 
 
 ## 4. Game design
 
-**Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. There is no fleet-building screen yet (see `BACKLOG.md` item 0). The player's fleet is on the west side, the enemy's on the east.
+**Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. The menu's quick play pickers choose from `PRESETS` (five fleets within the Standard budget); the enemy defaults to Random, rolled again for each new battle but not for a restart. Choices persist as `hardburn.fleetYou` and `hardburn.fleetEnemy`. There is no custom fleet builder yet (see `BACKLOG.md` item 0). The player's fleet is on the west side, the enemy's on the east.
 - **Deployment** (`deployFleet`): the first ship of each class takes its `DEPLOY` home cell, so the classic fleet lines up as it always has. Extra copies take the nearest free cell west of `DEPLOY_MAX_X`, keeping a one-hex gap where possible. The enemy's cells are mirrored through the centre, and terrain keeps every deployment cell clear.
 - **Duplicates** are named with numerals (Iron Vesper II) and carry hull numbers like 537-2.
 

@@ -135,9 +135,22 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 /* ---------- screens ---------- */
 .screen{position:fixed;inset:0;display:none;z-index:10}
 .screen.on{display:flex}
-#menu{align-items:flex-end;padding:0 0 8vh 7vw;background:linear-gradient(90deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.35) 45%,rgba(0,0,0,0) 70%)}
-#menu .inner{max-width:520px}
-#title{font-family:var(--display);font-weight:800;font-size:clamp(84px,15vw,190px);line-height:.78;letter-spacing:-.01em;color:var(--amber);margin:0;
+#menu{align-items:flex-start;overflow-y:auto;padding:24px 0 8vh 7vw;background:linear-gradient(90deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.35) 45%,rgba(0,0,0,0) 70%)}
+#menu .inner{max-width:520px;margin-top:auto}   /* sits at the bottom when it fits, scrolls when it doesn't */
+.pick-h{font-size:12.5px;color:var(--dim);margin:2px 0 6px}
+.fleets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.fchip{padding:7px 10px;text-align:left;background:rgba(10,16,24,.75);border:1px solid var(--line-cool);min-height:44px}
+.fchip:hover{border-color:rgba(233,165,59,.5)}
+.fchip b{display:block;font-size:14.5px;font-weight:600;line-height:1.2}
+.fchip span{display:block;font-size:12px;color:var(--dim)}
+.fchip.on{border-color:var(--amber);background:rgba(58,40,12,.8)}
+.fleet-desc{font-size:13px;color:#b8c2ca;margin:0 0 12px;line-height:1.4}
+.fleet-desc i{font-style:normal;color:var(--dim)}
+@media (max-height:820px) and (min-width:761px){   /* keep Begin above the fold on laptop-height screens */
+  #title{font-size:clamp(64px,min(15vw,11vh),190px)} #menu p.lede{margin:10px 0 14px}
+  .diff span,.fchip span{display:none} .diff{padding:8px 12px} .fchip{min-height:38px} #menu{padding-bottom:4vh}
+}
+#title{font-family:var(--display);font-weight:800;font-size:clamp(64px,min(15vw,13vh),190px);line-height:.78;letter-spacing:-.01em;color:var(--amber);margin:0;
   text-shadow:0 0 40px rgba(233,165,59,.25)}
 #title span{display:block;color:#f4e6cc}
 #menu p.lede{font-size:18px;line-height:1.45;color:#c5cdd3;margin:18px 0 26px;max-width:32em}
@@ -199,6 +212,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
   #endturn{right:8px;bottom:10px;height:52px;padding:0 14px}
   #menu{padding:0 20px 6vh;align-items:flex-end}
   .diffs{grid-template-columns:1fr}
+  .fleets{grid-template-columns:repeat(2,1fr)}
   .diff span{display:none}
   .tag{width:58px} .tag .tn{font-size:10px}
 }
@@ -250,12 +264,17 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 <div id="menu" class="screen on">
   <div class="inner">
     <h1 id="title">Hard<span>Burn</span></h1>
-    <p class="lede">Six ships under your command, six coming the other way. Close the distance, strip their shields and break their line before they break yours.</p>
+    <p class="lede">Choose your fleet and theirs. Close the distance, strip their shields and break their line before they break yours.</p>
     <div class="diffs" role="radiogroup" aria-label="Difficulty">
       <button class="diff" data-d="easy" role="radio"><b>Easy</b><span>Loose enemy formation, poor gunnery.</span></button>
       <button class="diff on" data-d="normal" role="radio"><b>Normal</b><span>A capable commander who focuses fire.</span></button>
       <button class="diff" data-d="hard" role="radio"><b>Hard</b><span>Tougher hulls, sharper guns, no mercy.</span></button>
     </div>
+    <div class="pick-h">Your fleet</div>
+    <div class="fleets" id="pick-you" role="radiogroup" aria-label="Your fleet"></div>
+    <p class="fleet-desc" id="pick-desc"></p>
+    <div class="pick-h">Enemy fleet</div>
+    <div class="fleets" id="pick-enemy" role="radiogroup" aria-label="Enemy fleet"></div>
     <div class="cta">
       <button class="btn-primary" id="btn-start">Begin engagement</button>
       <button class="btn-ghost" id="btn-how">How to play</button>
@@ -346,7 +365,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '17';
+const GAME_VERSION = '18';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -413,7 +432,26 @@ const MAX_FLEET = 12;
 const BATTLE_TURNS = 30;
 // Fleet budgets in points; `cost` on each class is what a hull spends. Prices were measured with HB.sim, not
 // derived from stats: see BACKLOG.md item 0 for the method and results. The classic fleet costs 660.
-const BUDGETS = { skirmish:330, standard:660, large:1000 };        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
+const BUDGETS = { skirmish:330, standard:660, large:1000 };
+// Quick play fleets. Each fits the Standard budget and was measured against every other one with HB.sim;
+// results are in BACKLOG.md item 0. Changing a fleet here changes that balance: re-measure.
+const PRESETS = [
+  {id:'classic',  name:'Classic',          desc:'One of every class. The original engagement.',
+   fleet:['patrol','corvette','frigate','destroyer','cruiser','carrier']},
+  {id:'gunline',  name:'Gunline',          desc:'Two heavy cruisers behind a light screen. Outguns carriers; torpedo boats that get close are its problem.',
+   fleet:['cruiser','cruiser','frigate','corvette','corvette','patrol']},
+  {id:'swarm',    name:'Swarm',            desc:'Twelve light hulls. Too many targets for big guns to keep up with.',
+   fleet:['destroyer','frigate','frigate','frigate','frigate','corvette','corvette','corvette','corvette','corvette','corvette','patrol']},
+  {id:'carrier',  name:'Carrier group',    desc:'Three carriers and their escorts. Strike wings reach anywhere on the board, but heavy guns punish them.',
+   fleet:['carrier','carrier','carrier','frigate','frigate','corvette','patrol']},
+  {id:'wolfpack', name:'Torpedo wolfpack', desc:'Destroyers and corvettes, heavy on missiles. Tears into big ships once it closes.',
+   fleet:['destroyer','destroyer','destroyer','corvette','corvette','corvette','corvette','corvette','patrol','patrol']},
+];
+// "Heavy cruiser ×2, Frigate, Patrol craft ×2", heaviest first
+function fleetSummary(list){
+  const n={}; list.forEach(c=>n[c]=(n[c]||0)+1);
+  return Object.keys(n).sort((a,b)=>ORDER.indexOf(b)-ORDER.indexOf(a)).map(c=>CLASSES[c].label+(n[c]>1?' ×'+n[c]:'')).join(', ');
+}        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
 const CLASSIC_FLEET = ORDER.slice();   // one of each, the original game
 const DIFF = {
   easy:  {acc:-12, hull:0.9,  caution:0.15, aggr:1.0, focus:0.0, noise:28},
@@ -2229,7 +2267,7 @@ addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   const open=document.querySelector('.screen.on');
   if(open && open.id!=='menu'){ if(e.key==='Escape'||(e.key.toLowerCase()==='h'&&open.id==='help')){ if(open.id==='help'||open.id==='pause') closeScreen(); } return; }
-  if(state.phase==='menu'){ if(e.key==='Enter') startGame(); return; }
+  if(state.phase==='menu'){ if(e.key==='Enter') startGame(chosenFleets()); return; }
   const k=e.key.toLowerCase();
   if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){ keys.add(k); e.preventDefault(); return; }
   if(k==='m'){ toggleMusic(); return; }
@@ -2256,12 +2294,30 @@ function closeScreen(){ document.querySelectorAll('.screen').forEach(s=>{ if(s.i
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ Sound.ui(); closeScreen(); });
 document.querySelectorAll('.diff').forEach(b=>{ b.setAttribute('aria-checked', b.dataset.d===state.diff); b.classList.toggle('on', b.dataset.d===state.diff);
   b.onclick=()=>{ Sound.init(); Sound.ui(); state.diff=b.dataset.d; store.set('diff',state.diff); document.querySelectorAll('.diff').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); }; });
-$('#btn-start').onclick=()=>startGame();
+$('#btn-start').onclick=()=>startGame(chosenFleets());
+// quick play fleet pickers; the enemy's "Random" is rolled again for every new battle, not for a restart
+let pickYou=store.get('fleetYou','classic'), pickEnemy=store.get('fleetEnemy','random');
+if(!PRESETS.some(p=>p.id===pickYou)) pickYou='classic';
+if(pickEnemy!=='random' && !PRESETS.some(p=>p.id===pickEnemy)) pickEnemy='random';
+function chosenFleets(){
+  const you=PRESETS.find(p=>p.id===pickYou), en= pickEnemy==='random'? PRESETS[Math.floor(Math.random()*PRESETS.length)] : PRESETS.find(p=>p.id===pickEnemy);
+  return {player:you.fleet, enemy:en.fleet, enemyName:en.name};
+}
+function renderPicks(){
+  const chip=(p,on,sub)=>`<button class="fchip${on?' on':''}" role="radio" aria-checked="${on}" data-id="${p.id}"><b>${p.name}</b><span>${sub}</span></button>`;
+  $('#pick-you').innerHTML=PRESETS.map(p=>chip(p, p.id===pickYou, `${p.fleet.length} ships`)).join('');
+  $('#pick-enemy').innerHTML=chip({id:'random',name:'Random'}, pickEnemy==='random', 'Any of these')+PRESETS.map(p=>chip(p, p.id===pickEnemy, `${p.fleet.length} ships`)).join('');
+  const you=PRESETS.find(p=>p.id===pickYou);
+  $('#pick-desc').innerHTML=`${you.desc} <i>${fleetSummary(you.fleet)}.</i>`;
+  $('#pick-you').querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); pickYou=b.dataset.id; store.set('fleetYou',pickYou); renderPicks(); });
+  $('#pick-enemy').querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); pickEnemy=b.dataset.id; store.set('fleetEnemy',pickEnemy); renderPicks(); });
+}
+renderPicks();
 $('#btn-how').onclick=()=>{ Sound.init(); Sound.ui(); showScreen('help'); };
 $('#btn-help').onclick=()=>{ Sound.ui(); showScreen('help'); };
 $('#btn-pause').onclick=()=>{ Sound.ui(); showScreen('pause'); };
 $('#btn-restart').onclick=()=>{ closeScreen(); startGame(); };
-$('#btn-again').onclick=()=>startGame();
+$('#btn-again').onclick=()=>startGame(chosenFleets());
 $('#btn-tomenu').onclick=()=>toMenu(); $('#btn-endmenu').onclick=()=>toMenu();
 $('#endturn').onclick=()=>endPlayerTurn();
 $('#ver-menu').textContent=`Version ${GAME_VERSION}`; $('#ver-pause').textContent=`Version ${GAME_VERSION}`;
@@ -2329,7 +2385,7 @@ function startGame(fleets){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
   cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
-  log(`Engagement begins on ${state.diff} difficulty. Enemy fleet closing from the east.`, 'sys');
+  log(`Engagement begins on ${state.diff} difficulty. Enemy fleet${lastFleets.enemyName?` (${lastFleets.enemyName})`:''} closing from the east: ${fleetSummary(lastFleets.enemy||CLASSIC_FLEET)}.`, 'sys');
   state.phase='starting'; updateHUD();
   after(1.2, ()=>startPlayerTurn());
   canvas.focus();

@@ -91,6 +91,24 @@ fleet building: buying the most hulls is not automatically right, unlike in Flee
   starting point and adjust by play.
 - 40 battles per matchup leaves roughly ±8% noise.
 
+**Quick play presets (v18).** Every preset against every other, 40 battles each (60 for Carrier v
+Wolfpack). Row fleet's win rate:
+
+| | Classic | Gunline | Swarm | Carrier | Wolfpack | Average |
+|---|---|---|---|---|---|---|
+| Wolfpack (660, 10 ships) | 52 | 75 | 47 | 55 | – | **57** |
+| Swarm (640, 12) | 55 | 57 | – | 45 | 53 | **53** |
+| Gunline (660, 6) | 60 | – | 43 | 70 | 25 | **50** |
+| Classic (660, 6) | – | 40 | 45 | 50 | 48 | **46** |
+| Carrier group (630, 7) | 50 | 30 | 55 | – | 45 | **45** |
+
+Three rounds to get here. The first cut had the Carrier group at 8 ships averaging 69%. Dropping it
+to 6 ships put it at 39%, and a Wolfpack of 9 fell to 34% where 10 made 60%. One hull moves a preset
+10–25 points, so presets were tuned by ship count, not price. Each fleet has a matchup it wins
+clearly (Gunline over Carrier 70, Wolfpack over Gunline 75) and none dominates.
+
+Changing any preset's fleet changes this table: re-measure with `HB.sim`.
+
 ### 0a. ~~Carrier-only fights stall~~ Fixed in v17
 
 **What was done:** a 30-turn battle limit decided on fleet value (`CLAUDE.md` §4), and the Strike wing's
@@ -132,7 +150,8 @@ per fleet** on top of the budget.
 1. ~~engine work (any fleet, generated starting positions)~~ **Done in v15.** Battles take any fleet up to 12 a side, duplicates included; see `CLAUDE.md` §4. Testable from the console with `HB.startGame({player:[...], enemy:[...]})`.
 2. ~~hull costs, then measure balance~~ **Done in v16.** Costs are `cost` in `CLASSES`, budgets in `BUDGETS`.
    Measured with the balance simulator (`HB.sim`, see `CLAUDE.md` §7). Results below.
-3. quick play presets
+3. ~~quick play presets~~ **Done in v18.** Five fleets in `PRESETS`, picked on the menu; the enemy
+   can be Random or a chosen preset. Balanced with a full round robin (below).
 4. the custom builder
 5. per-ship loadouts
 
