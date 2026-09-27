@@ -760,7 +760,7 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
         col+=vec3(0.03,0.07,0.11)*pow(m,2.2)*band*1.4;
         col+=vec3(0.10,0.045,0.03)*pow(n,3.0)*band*1.2;
         float s=max(dot(d,uSun),0.0); col+=vec3(0.5,0.32,0.18)*pow(s,24.0)*0.35 + vec3(0.2,0.14,0.1)*pow(s,4.0)*0.12;
-        vec3 lin=pow(col,vec3(2.2))*uGain; float k=dot(d,uSun)*0.5+0.5;
+        vec3 lin=pow(max(col,vec3(0.0)),vec3(2.2))*uGain; float k=dot(d,uSun)*0.5+0.5;
         lin+=uFill*mix(vec3(0.030,0.042,0.060), vec3(0.085,0.068,0.050), k*k) * (0.75+0.25*smoothstep(-0.6,0.6,d.y));
         gl_FragColor=vec4(lin,1.0); }`
   }));
@@ -785,7 +785,7 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
   const atm = new THREE.Mesh(new THREE.SphereGeometry(146,64,32), new THREE.ShaderMaterial({ transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide,
     uniforms:{uSun:{value:sunDir}},
     vertexShader:`varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader:`varying vec3 vN; varying vec3 vW; uniform vec3 uSun; void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(1.0-abs(dot(vN,v)),3.0); float l=clamp(dot(-vN,uSun)*0.5+0.6,0.0,1.0); gl_FragColor=vec4(pow(vec3(1.0,0.65,0.4)*f*l*0.9,vec3(2.2))*1.6,1.0); }`}));
+    fragmentShader:`varying vec3 vN; varying vec3 vW; uniform vec3 uSun; void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(max(1.0-abs(dot(vN,v)),0.0),3.0);   /* max(): interpolated normals can push |dot| past 1, and pow of a negative is NaN */ float l=clamp(dot(-vN,uSun)*0.5+0.6,0.0,1.0); gl_FragColor=vec4(pow(vec3(1.0,0.65,0.4)*f*l*0.9,vec3(2.2))*1.6,1.0); }`}));
   atm.position.copy(planet.position); scene.add(atm);
   planet.userData.spin = true; window.__planet = planet; planet.userData.noAO = true;
   // image-based lighting: bake the sky, sun and planet into a prefiltered environment map so metal reflects the scene
@@ -1119,20 +1119,23 @@ float h3(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
 float n3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
   return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
              mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
+// NaN safety: pow() with a negative base is undefined, and on Apple GPUs it returns NaN. One NaN pixel is smeared
+// by the bloom blur into a black block, which flashed the board around ships every second or so. So every pow()
+// base here is clamped non-negative, squares are multiplications, and the output is capped before it reaches bloom.
 void main(){
-  vec3 V=normalize(cameraPosition-vW); float soft=pow(abs(dot(normalize(vN),V)),uEdge);
-  float t=vT; float fall=pow(1.0-t,1.35)*smoothstep(0.0,0.05,t);
+  vec3 V=normalize(cameraPosition-vW); float soft=pow(clamp(abs(dot(normalize(vN+vec3(1e-6)),V)),0.0,1.0),uEdge);
+  float t=clamp(vT,0.0,1.0); float u=max(1.0-t,0.0); float fall=pow(u,1.35)*smoothstep(0.0,0.05,t);
   float n=n3(vec3(vP.x*9.0+uSeed, vP.y*9.0, vP.z*2.5+uTime*16.0))*0.6 + n3(vec3(vP.x*23.0, vP.y*23.0+uSeed, vP.z*6.0+uTime*29.0))*0.4;
-  float d=0.0; if(uDiamonds>0.0){ float s=fract(t*uDiamonds); d=exp(-pow((s-0.5)*5.0,2.0))*pow(1.0-t,1.5)*smoothstep(0.0,0.12,t)*smoothstep(0.2,0.9,uPow); }
+  float d=0.0; if(uDiamonds>0.0){ float s=fract(t*uDiamonds), q=(s-0.5)*5.0; d=exp(-q*q)*pow(u,1.5)*smoothstep(0.0,0.12,t)*smoothstep(0.2,0.9,uPow); }
   float flick=0.9+0.1*sin(uTime*53.0+uSeed*7.0);
   float a=(fall*mix(1.0,0.25+1.5*n*n*1.6,uNoise)*0.8+d*2.6)*soft*flick*uPow*uI;
-  vec3 c=mix(uColor,uHot,clamp(pow(1.0-t,3.0)*0.8+d,0.0,1.0));
-  gl_FragColor=vec4(c*a,1.0); }`;
+  vec3 c=mix(uColor,uHot,clamp(u*u*u*0.8+d,0.0,1.0));
+  gl_FragColor=vec4(clamp(c*max(a,0.0),0.0,16.0),1.0); }`;
 const plumeMat = side => new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
   uniforms:{uColor:{value:new THREE.Color(side==='player'?0x8fcfff:0xff9a66)}, uPow:{value:0.4}, uTime:{value:0}},
   vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader:`varying vec2 vUv; uniform vec3 uColor; uniform float uPow; uniform float uTime;
-    void main(){ float a=pow(vUv.y,1.6); float flick=0.85+0.15*sin(uTime*40.0+vUv.y*20.0); vec3 c=mix(uColor,vec3(1.0),pow(vUv.y,5.0)); gl_FragColor=vec4(c*a*uPow*flick,1.0); }`});
+    void main(){ float y=clamp(vUv.y,0.0,1.0); float a=pow(y,1.6); float flick=0.85+0.15*sin(uTime*40.0+y*20.0); vec3 c=mix(uColor,vec3(1.0),pow(y,5.0)); gl_FragColor=vec4(clamp(c*a*uPow*flick,0.0,16.0),1.0); }`});
 
 // chamfered deck section: octagonal frustum along z, back (w0,h0) -> front (w1,h1), UVs in world units so panels tile evenly
 function deckGeometry(len, w0,h0, w1,h1, ch, uvs=1.05){
@@ -1468,7 +1471,7 @@ function buildShip(cls, side, copy=0){
     uniforms:{uColor:{value:new THREE.Color(COL.cyan)}, uFlash:{value:0}, uHit:{value:new THREE.Vector3(0,0,1)}, uTime:{value:0}},
     vertexShader:`varying vec3 vN; varying vec3 vL; varying vec3 vW; void main(){ vL=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
     fragmentShader:`varying vec3 vN; varying vec3 vL; varying vec3 vW; uniform vec3 uColor; uniform float uFlash; uniform vec3 uHit; uniform float uTime;
-      void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(1.0-abs(dot(vN,v)),2.2); float h=pow(max(dot(vL,uHit),0.0),5.0);
+      void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(max(1.0-abs(dot(vN,v)),0.0),2.2);   /* see the plume shader: pow of a negative is NaN, which bloom smears */ float h=pow(max(dot(vL,uHit),0.0),5.0);
         float rip=0.5+0.5*sin(acos(clamp(dot(vL,uHit),-1.0,1.0))*18.0-uTime*14.0);
         float a=(f*0.55+h*(0.8+rip*0.6))*uFlash; gl_FragColor=vec4(uColor*a,1.0); }`});
   const shield=new THREE.Mesh(new THREE.SphereGeometry(1,32,20),shMat); shield.scale.set(L*0.36,L*0.26,L*0.62); shield.visible=false; g.add(shield);
