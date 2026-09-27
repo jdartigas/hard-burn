@@ -392,7 +392,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '22';
+const GAME_VERSION = '23';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -1150,6 +1150,46 @@ function deckGeometry(len, w0,h0, w1,h1, ch, uvs=1.05){
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.computeVertexNormals(); return g;
 }
 
+// A ship is built from ~200 small meshes. Drawn one by one that was ~200 draw calls per ship, per pass (the
+// shadow pass too): most of a frame's cost with the whole board in view, on a Mac especially. The static parts are
+// merged here into one mesh per material and shadow setting, for drawing only. The originals stay in the body,
+// hidden (userData.mergedAway), because breakUpShip cuts the hull apart from them. Animated or transparent parts
+// (engines, nav lights, shield, decals, the instanced detail layer) are left as they are.
+function mergeShipParts(sh){
+  mergeStatic(sh.body, new Set([...sh.engines.map(e=>e.group), ...sh.lights, sh.pickMesh, sh.shieldMesh, sh.fineMesh].filter(Boolean)), true);
+}
+// Merge the opaque, non-instanced meshes under `body` into one mesh per material and shadow setting. With
+// keepOriginals they stay in place, hidden and flagged mergedAway; otherwise they are removed.
+function mergeStatic(body, skip, keepOriginals){
+  let root=body; while(root.parent) root=root.parent; root.updateMatrixWorld(true);
+  const inv=new THREE.Matrix4().copy(body.matrixWorld).invert(), rel=new THREE.Matrix4();
+  const buckets=new Map();
+  const walk=o=>{ if(skip.has(o) || !o.visible) return;
+    const m=o.material;
+    if(o.isMesh && !o.isInstancedMesh && m && !Array.isArray(m) && !m.transparent && !m.isShaderMaterial){
+      const k=m.uuid+(o.castShadow?'c':'')+(o.receiveShadow?'r':'');
+      if(!buckets.has(k)) buckets.set(k,{mat:m, cast:o.castShadow, recv:o.receiveShadow, parts:[]}); buckets.get(k).parts.push(o); }
+    o.children.forEach(walk); };
+  body.children.forEach(walk);
+  const needsUv=m=>!!(m.map||m.normalMap||m.aoMap||m.roughnessMap||m.metalnessMap||m.emissiveMap||m.bumpMap);
+  for(const b of buckets.values()){
+    if(b.parts.length<2) continue;
+    const geos=b.parts.map(o=>{ const g=o.geometry.index? o.geometry.toNonIndexed() : o.geometry.clone();
+      rel.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(rel);
+      if(rel.determinant()<0){ for(const a of Object.values(g.attributes)){ const n=a.itemSize, arr=a.array;   // mirrored part: restore winding
+        for(let t=0;t+2<a.count;t+=3) for(let c=0;c<n;c++){ const i=(t+1)*n+c, j=(t+2)*n+c, v=arr[i]; arr[i]=arr[j]; arr[j]=v; } } }
+      return g; });
+    const names=Object.keys(geos[0].attributes).filter(n=>geos.every(g=>g.attributes[n]));
+    const ok= names.includes('position') && names.includes('normal') && (!needsUv(b.mat)||names.includes('uv')) && (!b.mat.vertexColors||names.includes('color'));
+    let merged=null;
+    if(ok){ geos.forEach(g=>{ for(const n of Object.keys(g.attributes)) if(!names.includes(n)) g.deleteAttribute(n); g.morphAttributes={}; g.clearGroups(); });
+      merged=THREE.mergeGeometries(geos,false); }
+    geos.forEach(g=>g.dispose());
+    if(!merged) continue;
+    const mesh=new THREE.Mesh(merged,b.mat); mesh.castShadow=b.cast; mesh.receiveShadow=b.recv; mesh.userData.mergedProxy=true; mesh.userData.noAO=false; body.add(mesh);
+    b.parts.forEach(o=>{ if(keepOriginals){ o.visible=false; o.userData.mergedAway=true; } else o.parent.remove(o); });
+  }
+}
 function buildShip(cls, side, copy=0){
   const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const P=side==='player', R=mulberry32((P?1000:2000)+ORDER.indexOf(cls)*77);
@@ -1434,6 +1474,7 @@ function buildShip(cls, side, copy=0){
   const shield=new THREE.Mesh(new THREE.SphereGeometry(1,32,20),shMat); shield.scale.set(L*0.36,L*0.26,L*0.62); shield.visible=false; g.add(shield);
   const pickMesh=new THREE.Mesh(new THREE.SphereGeometry(L*0.5,8,6), new THREE.MeshBasicMaterial()); pickMesh.visible=false; g.add(pickMesh);
   enableShadows(g);
+  mergeShipParts({group:g, body, engines, lights, shieldMesh:shield, pickMesh, fineMesh});
   return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh};
 }
 
@@ -1742,7 +1783,7 @@ function breakUpShip(s){
   const mtx=new THREE.Matrix4();
   const overlaps=(a,b)=>{ const out=[]; wreck.sections.forEach((sec,si)=>{ const lo=Math.max(a,bounds[si]), hi=Math.min(b,bounds[si+1]); if(hi-lo>1e-4) out.push([si,lo,hi]); }); return out; };
   body.children.forEach(c=>{
-    if(skip.has(c)) return;
+    if(skip.has(c) || c.userData.mergedProxy) return;
     if(c.isInstancedMesh){
       const buckets=wreck.sections.map(()=>[]);
       for(let j=0;j<c.count;j++){ c.getMatrixAt(j,mtx); const pz=mtx.elements[14], sz=mtx.elements[10], a=pz-sz/2, b=pz+sz/2;
@@ -1756,13 +1797,15 @@ function breakUpShip(s){
     }
     // straight hull decks that span a break are cut into one piece per section instead of poking out of a single one
     if(c.isMesh && c.userData.chunk && Math.abs(c.rotation.x)<1e-3 && Math.abs(c.rotation.y)<0.4){ const bb=c.geometry.boundingBox, a=c.position.z+bb.min.z*c.scale.z, b=c.position.z+bb.max.z*c.scale.z, parts=overlaps(a,b);
-      if(parts.length>1){ parts.forEach(([si,lo,hi])=>{ const sec=wreck.sections[si]; const cl=c.clone(); cl.material=scorchedMaterial(c.material, sec.cache, sec.k);
+      if(parts.length>1){ parts.forEach(([si,lo,hi])=>{ const sec=wreck.sections[si]; const cl=c.clone(); cl.visible=true; cl.material=scorchedMaterial(c.material, sec.cache, sec.k);
           const k=(hi-lo)/(bb.max.z-bb.min.z); cl.scale.z=k; cl.position.z=lo-bb.min.z*k; sec.inner.add(cl); }); return; } }
     const sec=wreck.sections[secOf(c.position.z)];
     const cl=c.clone(true);
-    cl.traverse(o=>{ if(o.material){ const m=scorchedMaterial(o.material, sec.cache, sec.k); if(!m) o.visible=false; else o.material=m; } });
+    cl.traverse(o=>{ if(o.userData.mergedAway) o.visible=true; if(o.material){ const m=scorchedMaterial(o.material, sec.cache, sec.k); if(!m) o.visible=false; else o.material=m; } });
     sec.inner.add(cl);
   });
+  // a wreck stays for the rest of the battle: merge each section's pieces so it costs a handful of draw calls
+  wreck.sections.forEach(sec=>mergeStatic(sec.inner, new Set(), false));
   // torn, glowing cross-sections at every cut
   const radiusAt=z=>{ let r=0.12; decks.forEach(d=>{ const bb=d.geometry.boundingBox; if(d.position.z+bb.min.z<=z && d.position.z+bb.max.z>=z) r=Math.max(r, Math.min(bb.max.x-bb.min.x, bb.max.y-bb.min.y)*0.5+Math.abs(d.position.x)*0.3); }); return r; };
   cuts.forEach((z,ci)=>{ const r=radiusAt(z);
@@ -1826,7 +1869,7 @@ function updateWrecks(dt){
 }
 function clearWrecks(){
   for(const w of wrecks){
-    for(const sec of w.sections){ scene.remove(sec.outer); sec.embers.forEach(e=>{ e.mesh.geometry.dispose(); e.mesh.material.dispose(); }); sec.outer.traverse(o=>{ if(o.isInstancedMesh) o.dispose(); }); sec.cache.forEach(m=>m&&m.dispose()); }
+    for(const sec of w.sections){ scene.remove(sec.outer); sec.embers.forEach(e=>{ e.mesh.geometry.dispose(); e.mesh.material.dispose(); }); sec.outer.traverse(o=>{ if(o.isInstancedMesh) o.dispose(); else if(o.userData.mergedProxy) o.geometry.dispose(); }); sec.cache.forEach(m=>m&&m.dispose()); }
     for(const sh of w.shards){ scene.remove(sh.im); sh.im.dispose(); }
     w.cache.forEach(m=>m&&m.dispose());
   }
@@ -2609,7 +2652,9 @@ function frame(){
     const p=s.group.position.clone(); p.y+=1.0+s.len*0.1; const sp=toScreen(p);
     if(!sp){ setTag(s,0); continue; }
     const focus=(state.rosterHover===s || state.hoverShip===s || s===sel);
-    setTag(s, cam.radius<16 ? (state.hoverShip===s?0.9:0) : (focus?1:0.85),
+    // fade out between radius 20 and 12 rather than cutting off at 16, which blinked every tag while zooming
+    const zf=clamp((cam.radius-12)/8,0,1);
+    setTag(s, +Math.max(state.hoverShip===s?0.9:0, zf*(focus?1:0.85)).toFixed(2),
       `translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`); }
   if(!window.__norender) composer.render();
   if(DEBUG) debugTick();
