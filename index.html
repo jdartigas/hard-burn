@@ -367,7 +367,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '19';
+const GAME_VERSION = '20';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -2038,8 +2038,10 @@ function showEnd(win, byValue=null, surrendered=false){
 
 /* ---------------- selection & player actions ---------------- */
 function select(s, quiet=false){
+  const prev=state.selected;
   state.selected=s && s.alive && s.side==='player' ? s : null; state.mode=null; state.weaponSel='all';
   if(state.selected && !quiet) Sound.select();
+  if(state.selected && (state.selected!==prev || !quiet)) focusShip(state.selected);   // re-selecting recenters too
   recomputeHighlights(); updateHUD();
 }
 function recomputeHighlights(){
@@ -2095,7 +2097,7 @@ function setWeapon(i){
 function nextShip(){
   const list=alive('player').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls)); if(!list.length) return;
   const hasOrders=s=>s.mp>0||s.weapons.some(weaponReady);
-  const idx=list.indexOf(state.selected); for(let k=1;k<=list.length;k++){ const s=list[(idx+k)%list.length]; if(hasOrders(s)||k===list.length){ select(s); camFocus(s.group.position,0.5); return; } }
+  const idx=list.indexOf(state.selected); for(let k=1;k<=list.length;k++){ const s=list[(idx+k)%list.length]; if(hasOrders(s)||k===list.length){ select(s); return; } }
 }
 
 /* ---------------- HUD ---------------- */
@@ -2117,7 +2119,7 @@ function updateHUD(){
     b.innerHTML=`<div class="row"><span class="nm">${s.name}</span><span class="cl">${s.C.label}</span></div>
       <div class="bars"><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
       <div class="st">${s.alive?`<span class="${s.mp>0?'ok':''}">Move ${s.mp}/${s.mpMax}</span><span class="${ready?'ok':''}">${ready} weapon${ready!==1?'s':''} ready</span>`:'<span>Destroyed</span>'}</div>`;
-    if(s.alive) b.onclick=()=>{ if(state.phase==='player'&&!state.busy){ select(s); camFocus(s.group.position,0.35);} };
+    if(s.alive) b.onclick=()=>{ if(state.phase==='player'&&!state.busy){ select(s); } };
     b.onmouseenter=()=>{ state.rosterHover=s; }; b.onmouseleave=()=>{ state.rosterHover=null; };
     ro.appendChild(b);
   }
@@ -2196,6 +2198,9 @@ const MIN_ZOOM=3.5;
 const cam={ target:new THREE.Vector3(0,0,2), goal:new THREE.Vector3(0,0,2), radius:62, theta:0, phi:0.9, rGoal:62, menu:true };
 function fitRadius(){ const a=innerWidth/innerHeight; const base = innerWidth>1100 ? 76 : 66; return a<1.2 ? base*1.2/Math.max(0.45,a) : base; }
 function camFocus(p, amount=1){ cam.goal.lerp(new THREE.Vector3(p.x,0,p.z), amount); }
+// Every way of selecting a ship (board, fleet list, Tab, start of turn) centers it the same way. If the camera
+// is zoomed in following a ship, it follows the new one instead of staying on the old.
+function focusShip(s){ if(cam.menu) return; if(cam.follow) cam.follow=s; else camFocus(s.group.position, 1); }
 function updateCamera(dt){
   if(cam.menu){ cam.theta+=dt*0.05; cam.goal.set(0,0,0); cam.rGoal=46; cam.phi=lerp(cam.phi,1.12,dt); }
   cam.target.lerp(cam.goal, 1-Math.pow(0.02,dt)); cam.radius=lerp(cam.radius,cam.rGoal,1-Math.pow(0.01,dt));
@@ -2415,8 +2420,11 @@ function toMenu(){ Sound.setMood('menu'); setupBattle(4242); state.phase='menu';
 /* ---------------- shader warm-up ----------------
    A material's shader is compiled the first time it draws, and on Macs (ANGLE over Metal) that stalls the
    frame. Weapon effects, shields, close-up detail and wreck debris all first appear mid-battle, so this builds
-   one of each off-board and compiles everything up front. The materials are kept (not disposed) because
-   disposing the last user of a program deletes it. Call only when there are no wrecks. */
+   one of each and prepares it up front. Compiling alone isn't enough: Metal also builds a pipeline for each
+   blend, depth and shadow combination, and textures upload, only when something is actually drawn. So the
+   warm-up really renders everything once, through the full pipeline including the shadow pass, shrunk to a
+   thousandth of its size at the camera target so nothing shows. The materials are kept (not disposed)
+   because disposing the last user of a program deletes it. Call only when there are no wrecks. */
 const warmKeep={};   // kept materials, per shadow setting (shadows change every lit shader)
 function warmUp(){
   const key=renderer.shadowMap.enabled?'shadows':'flat';
@@ -2433,7 +2441,15 @@ function warmUp(){
   for(const s of state.ships) for(const o of [s.shieldMesh, s.fineMesh]) if(o && !o.visible){ o.visible=true; restore.push(o); }
   const dummy=createShip('carrier','player'); dummy.group.position.y=-60;
   const w=breakUpShip(dummy); w.fineMeshes.forEach(f=>f.im.visible=true);
+  // shrink everything to invisible size at the camera target, where the view and the shadow map both see it
+  updateCamera(0); const at=cam.target, tiny=0.001, scaled=[];
+  const shrink=(o,pos)=>{ scaled.push([o,o.scale.clone()]); o.scale.multiplyScalar(tiny); if(pos) o.position.copy(pos); };
+  junk.forEach(m=>shrink(m,at));
+  w.sections.forEach(sec=>shrink(sec.outer,at)); w.shards.forEach(sh=>shrink(sh.im,at));
+  for(const s of state.ships) if(s.shieldMesh) shrink(s.shieldMesh);
   renderer.compile(scene, camera);
+  if(!window.__norender){ updateShadowFrustum(); composer.render(); composer.render(); }
+  scaled.forEach(([o,sc])=>o.scale.copy(sc));
   restore.forEach(o=>o.visible=false);
   const grab=o=>{ if(o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>keep.push(m)); };
   junk.forEach(m=>{ scene.remove(m); grab(m); });

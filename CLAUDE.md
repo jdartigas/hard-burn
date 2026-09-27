@@ -56,7 +56,7 @@ The script has almost no section banners, so find a section by grepping for one 
 | AI | `scoreAttack`, `threatAt`, `evalCell`, `aiShip`, `runAITurn` |
 | turn flow | `beginSideTurn`, `startPlayerTurn`, `endPlayerTurn`, `checkEnd`, `showEnd` |
 | player actions and HUD | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover` |
-| camera and input | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys |
+| camera and input | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys. `focusShip` centers the camera on every selection, whichever way it was made |
 | setup | `clearBattle`, `setupBattle`, `startGame`, `toMenu` |
 | main loop | `frame()`, `debugTick`, `onResize`, `applyQuality`, `cycleQuality` |
 
@@ -146,7 +146,8 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 5. **Lights are physical (r155+).** The sun is 6.5 and ambient 0.55. The environment map comes from PMREM of the sky, a bright sun sphere and the planet, and `scene.environmentIntensity` is 2.2. Flash point lights use `intensity × 4.5`.
 6. **Ambient occlusion:** `gtao.overrideVisibility` is patched to hide transparent, shader, sprite, point and line objects, and anything with `userData.noAO`. Its radius scales with camera distance.
 7. **Shadows:** the sun's shadow frustum follows `cam.target`, sizes to the zoom level, and snaps to texels (`updateShadowFrustum`). Call `enableShadows(obj)` on new meshes. Basic, shader and transparent materials are skipped automatically.
-8. The **close-up detail layer** (`s.fineMesh`, and the wreck `fineMeshes`) only draws within 13 units of the camera.
+8. **Warm-up (`warmUp`) renders, not just compiles.** On Metal, pipelines for each blend, depth and shadow combination, and texture uploads, only happen on the first real draw. So the warm-up builds one of every effect, shield and a full wreck, shrinks them to a thousandth at the camera target, and draws two full frames before removing them. Anything new that first appears mid-battle (a new effect, material or blend mode) should be added to it, or it will stutter the first time it shows.
+9. The **close-up detail layer** (`s.fineMesh`, and the wreck `fineMeshes`) only draws within 13 units of the camera.
 
 **URL diagnostics:**
 - `?debug` shows a bottom-left overlay with version, GPU, device pixel ratio, render scale, buffer sizes, feature flags and GL errors.
