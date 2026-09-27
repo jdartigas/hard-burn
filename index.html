@@ -164,6 +164,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .btn-primary:hover{filter:brightness(1.08)}
 .btn-ghost{height:52px;padding:0 20px;background:transparent;border:1px solid rgba(220,226,230,.3);font-size:16px}
 .btn-ghost:hover{border-color:var(--amber)}
+#btn-surrender.armed{border-color:var(--red);background:rgba(224,83,63,.2);color:#fff}
 #menu .foot{margin-top:18px;font-size:12.5px;color:var(--faint)}
 .ver{font-size:12.5px;color:var(--faint);margin-top:6px}
 #pause .ver{display:block}
@@ -333,6 +334,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
       <button class="btn-ghost" id="btn-restart">Restart battle</button>
       <button class="btn-ghost" id="btn-tomenu">Main menu</button>
       <button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button>
+      <button class="btn-ghost" id="btn-surrender">Surrender</button>
     </div>
   </div>
 </div>
@@ -365,7 +367,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '18';
+const GAME_VERSION = '19';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -2014,12 +2016,14 @@ function endOnTurnLimit(){
   log(`Turn limit reached. Fleet value left: yours ${p}, enemy ${e}.`, 'sys');
   after(1.2, ()=>showEnd(state.result==='player', {p,e}));
 }
-function showEnd(win, byValue=null){
+function showEnd(win, byValue=null, surrendered=false){
   select(null); state.phase='end'; Sound.setMood('end'); (win?Sound.win:Sound.lose)();
   const draw= byValue && byValue.p===byValue.e;
-  const t=$('#end-title'); t.textContent= win?'Victory': draw?'Stalemate':'Fleet lost'; t.className= win?'win':'lose';
+  const t=$('#end-title'); t.textContent= win?'Victory': draw?'Stalemate': surrendered?'Surrendered':'Fleet lost'; t.className= win?'win':'lose';
   const lostP=state.ships.filter(s=>s.side==='player').length-alive('player').length;
-  $('#end-sub').textContent = byValue ? `Turn limit reached after ${BATTLE_TURNS} turns. Fleet value left: yours ${byValue.p}, the enemy's ${byValue.e}. `+
+  const leftP=alive('player').length, allP=state.ships.filter(s=>s.side==='player').length;
+  $('#end-sub').textContent = surrendered ? `You surrendered on turn ${Math.max(1,state.turn)} with ${leftP} of ${allP} ship${allP>1?'s':''} still in the fight. The enemy holds the field.`
+    : byValue ? `Turn limit reached after ${BATTLE_TURNS} turns. Fleet value left: yours ${byValue.p}, the enemy's ${byValue.e}. `+
         (win?'You hold the field.': draw?'Neither side can claim it.':'The enemy holds the field.')
     : win ? (lostP===0?`A clean sweep in ${state.turn} turns. Every ship is coming home.`:`The enemy line is broken after ${state.turn} turns, at the cost of ${lostP} ship${lostP>1?'s':''}.`)
                                   : `Your last ship went dark on turn ${state.turn}. The enemy holds the field.`;
@@ -2274,7 +2278,7 @@ addEventListener('keydown', e=>{
   if(k==='g'){ cycleQuality(); return; }
   if(k==='n'){ toggleSound(); return; }
   if(k==='h'){ showScreen('help'); return; }
-  if(k==='p'){ showScreen('pause'); return; }
+  if(k==='p'){ openPause(); return; }
   if(k==='c' && state.selected){ cam.follow=null; camFocus(state.selected.group.position,1); return; }
   if(k==='z'){ const t=state.selected||state.hoverShip||state.acting; if(t){ if(cam.follow===t && cam.rGoal<20){ cam.follow=null; cam.rGoal=fitRadius(); } else zoomTo(t); } return; }
   if(state.phase!=='player' || state.busy) return;
@@ -2315,7 +2319,23 @@ function renderPicks(){
 renderPicks();
 $('#btn-how').onclick=()=>{ Sound.init(); Sound.ui(); showScreen('help'); };
 $('#btn-help').onclick=()=>{ Sound.ui(); showScreen('help'); };
-$('#btn-pause').onclick=()=>{ Sound.ui(); showScreen('pause'); };
+$('#btn-pause').onclick=()=>{ Sound.ui(); openPause(); };
+// Surrender takes two presses: the first arms it, the second (within 4 s) ends the battle as a loss.
+// It can't be undone, so it lives in the pause menu rather than beside End turn.
+let surrenderArmed=0;
+function disarmSurrender(){ surrenderArmed=0; const b=$('#btn-surrender'); b.classList.remove('armed'); b.textContent='Surrender'; }
+function openPause(){ disarmSurrender(); $('#btn-surrender').style.display= (state.over||state.phase==='menu'||state.phase==='end')?'none':''; showScreen('pause'); }
+$('#btn-surrender').onclick=()=>{
+  if(state.over) return;
+  if(!surrenderArmed || performance.now()-surrenderArmed>4000){ surrenderArmed=performance.now(); const b=$('#btn-surrender'); b.classList.add('armed'); b.textContent='Confirm surrender'; Sound.ui(); return; }
+  disarmSurrender(); closeScreen(); surrender();
+};
+function surrender(){
+  if(state.over) return;
+  state.over=true; state.result='enemy'; state.surrendered=true;
+  log(`You surrendered on turn ${Math.max(1,state.turn)}.`, 'sys');
+  after(0.4, ()=>showEnd(false, null, true));
+}
 $('#btn-restart').onclick=()=>{ closeScreen(); startGame(); };
 $('#btn-again').onclick=()=>startGame(chosenFleets());
 $('#btn-tomenu').onclick=()=>toMenu(); $('#btn-endmenu').onclick=()=>toMenu();
@@ -2374,7 +2394,7 @@ function setupBattle(seed, fleets={}){
     lists[side].forEach((cls,i)=>{ const copy=n[cls]=(n[cls]??-1)+1; state.ships.push(createShip(cls, side, cells[side][i][0], cells[side][i][1], copy)); });
   }
   state.fleets=lists;
-  state.turn=0; state.over=false; state.result=null; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
+  state.turn=0; state.over=false; state.result=null; state.surrendered=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
 }
 // fleets: {player:[...], enemy:[...]}. Leave it out to replay the last fleets (classic on the first game).
 let lastFleets={};

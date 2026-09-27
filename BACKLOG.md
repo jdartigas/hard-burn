@@ -365,6 +365,31 @@ These follow from the decisions above and shape everything else:
 - **Running costs:** a server and database cost money every month, unlike
   GitHub Pages.
 
+### 11. Withdrawing from battle
+
+Surrender (v19) ends a quick play battle as a loss. **Withdrawal is different**: a campaign mechanic
+that lets the player pull a damaged ship or fleet out of a fight to keep it, rather than lose it.
+Belongs with phase 3 (pirate encounters), when ships persist between battles.
+
+**Decided (Jon): withdrawing must cost something.** If it were instant and free, the player could
+leave every fight the moment it turned, and no battle would carry real risk.
+
+Ways to make it costly, which can combine:
+- **Ships have to get away.** A ship escapes by reaching its own rear edge, or by spending a turn
+  or two spooling its drive while it can still be shot. Fast hulls escape more easily, which gives
+  Patrol craft and Corvettes value they lack now; slow capitals may not make it.
+- **Ship by ship, not all or nothing.** Pull a damaged Heavy cruiser out while the screen covers
+  it. That creates real decisions, including a rearguard that doesn't come home.
+- **Leaving has consequences.** Salvage and bounty are forfeited; pirates may take cargo; ships
+  that fought need repair; possibly a reputation cost for abandoning an escort mission.
+- **The AI can withdraw too.** A pirate that breaks off when it's losing feels alive.
+
+Open questions:
+- How many turns does escaping take, and can a ship fire while spooling up?
+- Does an escaped ship count toward fleet value at the turn limit? Probably not, or discounted.
+- In multiplayer, withdrawing concedes the field to the opponent.
+- How it's recorded in scores (item 2), separately from a loss.
+
 ### 10. Suggested phases
 
 Each phase leaves something playable.
@@ -373,7 +398,8 @@ Each phase leaves something playable.
    head-to-head mode too.
 2. **Trading prototype:** star map, ports and prices, single-player and
    offline, to prove trading is fun before paying for a server.
-3. **Pirate encounters:** fights on the map, damage and rewards carried over.
+3. **Pirate encounters:** fights on the map, damage and rewards carried over. Withdrawal
+   (item 11) belongs here.
 4. **Shipyard:** equipment, slots and class limits (item 7).
 5. **Fleet command:** more hulls, upkeep, bigger fights.
 6. **Shared universe:** backend, accounts, the server-authoritative economy,

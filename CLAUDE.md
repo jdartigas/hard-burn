@@ -79,6 +79,8 @@ The script has almost no section banners, so find a section by grepping for one 
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
 
+**Surrender.** In the pause menu (two presses: the first arms it, the second within 4 s confirms). Ends the battle at once as a loss, with its own "Surrendered" end screen. Hidden when no battle is running. It is not withdrawal; that is a campaign mechanic still to design (`BACKLOG.md` item 11).
+
 **Turn limit.** A battle lasts at most `BATTLE_TURNS` (30) turns. If both fleets survive, the side with more fleet value left wins: each surviving ship's cost times its fraction of hull remaining (`fleetValue`). An exact tie is a stalemate. Without the limit, a standoff (two Carrier fleets, a last ship that keeps running) never ends. The AI doesn't yet play toward the limit.
 
 **Hit chance, direct fire (pulse, beam, rail).** `acc − max(0, dist − opt) × fall − target evasion`. Subtract 15 if the target is in debris and 20 if it's under ECM. Add the difficulty modifier (enemy −12 on Easy, +8 on Hard; player +5 on Easy). Clamp to 5–95. Direct fire needs line of sight, and asteroids block it.
