@@ -28,7 +28,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
 - **Bump `GAME_VERSION`** (near the top of the script) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
-- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`. Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `hud` (which HUD drawers are open). Always go through the `store` helper, which wraps `localStorage` in try/catch.
 
 ## 3. Code map (sections appear in this order in the script)
 
@@ -55,7 +55,7 @@ The script has almost no section banners, so find a section by grepping for one 
 | combat | `fireWeapon`, `destroyShip`, `fireAll`, `useAbility`, `moveShip` |
 | AI | `scoreAttack`, `threatAt`, `evalCell`, `aiShip`, `runAITurn` |
 | turn flow | `beginSideTurn`, `startPlayerTurn`, `endPlayerTurn`, `checkEnd`, `showEnd` |
-| player actions and HUD | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover` |
+| player actions and HUD | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover`. Layout: the fleet lists are drawers that slide off the sides (`#tg-roster`, `#tg-enemies`), the selected ship's orders run along one command bar at the bottom with End turn beside it, and the log shows its last two lines until expanded. `measureHud` sets `--hud-bottom` so the log and lists sit above the bar however it wraps |
 | camera and input | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys. `focusShip` centers the camera on every selection, whichever way it was made |
 | setup | `clearBattle`, `setupBattle`, `startGame`, `toMenu` |
 | main loop | `frame()`, `debugTick`, `onResize`, `applyQuality`, `cycleQuality` |
@@ -120,6 +120,7 @@ The script has almost no section banners, so find a section by grepping for one 
   - **Enemy livery:** pale grey tile, oxide-red plates.
 - **Drive plumes** have three shader layers (a core with shock diamonds, a turbulent sheath and an outer glow), plus a nozzle flare and sparks. Throttle is `engine.boost`.
 - **Destruction:** a chain of internal blasts, then the main blast. The hull splits at deck boundaries into 2–4 sections with glowing torn edges, venting and fires. Long parts are cut at the breaks. About 56 detailed debris pieces from `DebrisKit` persist. Sections drift and tumble for the rest of the battle.
+- **Camera:** pan, zoom and drag-rotation all ease toward a goal each frame. Wheel zoom scales with the wheel's actual delta (trackpads send many small ones), not a fixed step per event.
 - **UI palette:** amber `#E9A53B`, red `#E0533F`, cyan `#62C9E6`, ink `#DCE2E6`. Panels are solid rgba with **no `backdrop-filter`** (see §6).
 
 ## 6. Rendering pipeline and hard-won lessons (read before changing graphics)

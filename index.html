@@ -46,7 +46,14 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .tbtn:hover{border-color:var(--amber)}
 .tbtns{display:flex;gap:6px}
 
-#roster{position:absolute;left:12px;top:64px;width:238px;display:flex;flex-direction:column;gap:6px;max-height:calc(100% - 64px - 290px);overflow-y:auto;scrollbar-width:thin}
+/* Battle HUD: the fleet lists are drawers that slide off the sides, and the selected ship's orders run along one
+   command bar at the bottom. The aim is as little UI over the board as possible. */
+#roster{position:absolute;left:12px;top:64px;width:238px;display:flex;flex-direction:column;gap:6px;max-height:calc(100% - 76px - var(--hud-bottom,100px));overflow-y:auto;scrollbar-width:thin;transition:transform .25s ease,opacity .25s}
+#hud.roster-off #roster{transform:translateX(calc(-100% - 16px));opacity:0;pointer-events:none}
+.drawer-tab{position:absolute;top:64px;height:34px;min-width:30px;padding:0 8px;background:var(--panel-2);border:1px solid var(--line-cool);color:var(--dim);font-size:12.5px;transition:left .25s ease,right .25s ease}
+.drawer-tab:hover{border-color:var(--amber);color:var(--ink)}
+#tg-roster{left:254px} #hud.roster-off #tg-roster{left:0;border-left:0}
+#tg-enemies{right:236px} #hud.enemies-off #tg-enemies{right:0;border-right:0}
 .card{padding:8px 10px 9px;background:var(--panel);border:1px solid var(--line-cool);border-left:3px solid var(--amber-dim);cursor:pointer;text-align:left;width:100%;display:block}
 .card:hover{border-color:rgba(233,165,59,.5)}
 .card.sel{border-color:var(--amber);border-left-color:var(--amber);background:rgba(40,30,12,.82)}
@@ -62,7 +69,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .card .st{font-size:12px;color:var(--dim);display:flex;gap:10px}
 .card .st .ok{color:var(--amber)}
 
-#enemies{position:absolute;right:12px;top:64px;width:220px;padding:8px 10px;max-height:calc(100% - 64px - 290px);overflow-y:auto;scrollbar-width:thin}
+#enemies{position:absolute;right:12px;top:64px;width:220px;padding:8px 10px;max-height:calc(100% - 160px - var(--hud-bottom,100px));overflow-y:auto;scrollbar-width:thin;transition:transform .25s ease,opacity .25s}
+#hud.enemies-off #enemies{transform:translateX(calc(100% + 16px));opacity:0;pointer-events:none}
 #enemies h3,#log h3{margin:0 0 6px;font-size:12.5px;font-weight:500;color:var(--dim)}
 .erow{padding:4px 0 6px;border-top:1px solid rgba(255,255,255,.05);cursor:default}
 .erow:first-of-type{border-top:0}
@@ -71,20 +79,29 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .erow.dead{opacity:.3}
 .erow .mbar{margin-top:3px}
 
-#log{position:absolute;right:12px;bottom:14px;width:300px;max-height:190px;padding:8px 10px;display:flex;flex-direction:column}
-#logbody{overflow-y:auto;font-size:12.5px;line-height:1.35;display:flex;flex-direction:column;gap:3px;scrollbar-width:thin}
+#log{position:absolute;right:12px;bottom:calc(var(--hud-bottom,100px) + 8px);width:300px;padding:5px 10px 6px;display:flex;flex-direction:column;z-index:1}
+#log h3{display:flex;justify-content:space-between;align-items:center;margin:0 0 3px!important;font-size:11.5px!important}
+#tg-log{background:none;border:0;color:var(--dim);font-size:11.5px;padding:0 0 0 8px}
+#tg-log:hover{color:var(--amber)}
+#hud:not(.log-open) #logbody{max-height:34px;overflow:hidden}   /* newest entries are on top: collapsed shows the last two */
+#hud.log-open #logbody{max-height:200px}
+#logbody{overflow-y:auto;font-size:12px;line-height:1.35;display:flex;flex-direction:column;gap:3px;scrollbar-width:thin}
 #logbody div{color:#b8c2ca}
 #logbody .p{color:#f0cf96} #logbody .e{color:#f2a597} #logbody .k{color:#fff;font-weight:600} #logbody .sys{color:var(--dim)}
 
-#shippanel{position:absolute;left:12px;bottom:14px;width:min(600px,calc(100% - 348px));min-width:480px;padding:10px 12px 12px}
-#sp-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
-#sp-name{font-family:var(--display);font-weight:700;font-size:25px;line-height:1;letter-spacing:.01em}
-#sp-class{font-size:13px;color:var(--dim)}
-#sp-stats{display:grid;grid-template-columns:1.3fr 1.3fr .7fr .7fr .7fr;gap:10px;font-size:12.5px;color:var(--dim);margin-bottom:9px;align-items:end}
-#sp-stats b{display:block;color:var(--ink);font-weight:600;font-size:14px}
-#sp-stats .mbar{height:5px;margin-top:3px}
-#sp-weapons{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.wbtn{position:relative;text-align:left;padding:7px 8px 7px;background:var(--panel-2);border:1px solid var(--line-cool);min-height:58px}
+#shippanel{position:absolute;left:12px;right:196px;bottom:12px;min-height:74px;padding:8px 10px;display:flex;align-items:center}
+#sp-body{gap:12px;align-items:center;width:100%;min-width:0}
+#sp-head{flex:none;width:150px;min-width:0}
+
+#sp-name{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.05;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sp-class{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.25}
+#sp-stats{flex:none;width:216px;display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--dim)}
+#sp-stats .sr{display:grid;grid-template-columns:44px 74px 1fr;align-items:center;gap:6px}
+#sp-stats .sx b{color:var(--ink);font-weight:600}
+#sp-stats .sr b{color:var(--ink);font-weight:600;font-size:12.5px;white-space:nowrap}
+#sp-stats .mbar{height:4px}
+#sp-weapons{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.wbtn{position:relative;text-align:left;flex:1 1 0;min-width:118px;max-width:200px;padding:6px 8px;background:var(--panel-2);border:1px solid var(--line-cool);min-height:58px}
 .wbtn:hover:not(:disabled){border-color:var(--amber)}
 .wbtn.on{border-color:var(--amber);background:rgba(58,40,12,.9);box-shadow:inset 0 0 0 1px var(--amber)}
 .wbtn:disabled{opacity:.42;cursor:default}
@@ -93,11 +110,11 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .wbtn .wd{font-size:11.5px;color:var(--dim);display:block;margin-top:2px}
 .wbtn .ws{font-size:11.5px;display:block;margin-top:2px;color:var(--amber)}
 .wbtn:disabled .ws{color:var(--dim)}
-#sp-bottom{display:flex;gap:6px;margin-top:6px}
-#abil{flex:1}
+#sp-bottom{display:flex;flex:none}
+#abil{min-width:150px;max-width:190px}
 #sp-empty{font-size:13.5px;color:var(--dim);padding:6px 2px}
 
-#endturn{position:absolute;right:12px;bottom:216px;width:300px;height:54px;padding:0 20px;background:var(--amber);color:#1a1206;border:0;font-weight:700;font-size:17px;font-family:var(--font)}
+#endturn{position:absolute;right:12px;bottom:12px;width:172px;height:76px;padding:0 20px;background:var(--amber);color:#1a1206;border:0;font-weight:700;font-size:17px;font-family:var(--font)}
 #endturn:hover{filter:brightness(1.08)}
 #endturn:disabled{background:#3a3326;color:#8c8068;cursor:default}
 #endturn.ready{animation:pulse 1.6s ease-in-out infinite}
@@ -192,27 +209,31 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 
 @media (max-height:900px) and (min-width:761px){ .card{padding:5px 9px 6px} .card .bars{margin:4px 0 3px} #roster{gap:4px} .card .st{font-size:11.5px} }
 @media (max-height:760px) and (min-width:761px){ .card .st{display:none} }
-@media (max-width:1100px){
-  #shippanel{width:auto;left:12px;right:12px;transform:none;bottom:84px;min-width:0}
-  #endturn{right:12px;bottom:14px;height:56px;width:auto}
-  #log{left:12px;right:auto;bottom:14px;width:calc(100% - 190px);max-height:56px}
-  #log h3{display:none}
-  #roster{width:200px}
-  #roster,#enemies{max-height:calc(100% - 64px - 420px)}   /* the ship panel sits higher here (bottom 84px) */
+@media (max-width:1100px){   /* the bar wraps: ship and stats on one row, weapons and ability on the next */
+  #sp-body{flex-wrap:wrap;row-gap:6px}
+  #sp-weapons{order:3;flex:1 1 100%}
+  #sp-bottom{order:2;margin-left:auto}
+  #endturn{width:150px}
+  #shippanel{right:174px}
+  #log{width:260px}
+  #roster{width:200px} #tg-roster{left:216px}
 }
 @media (max-width:760px){
   #topbar{height:46px;gap:10px;padding:0 8px}
   #brand{font-size:21px} #strength .lbl{display:none} #turninfo span{display:none}
   #roster{top:52px;left:8px;right:8px;width:auto;flex-direction:row;overflow-x:auto;gap:4px;max-height:none}
   .card{min-width:112px;padding:5px 7px 6px} .card .cl,.card .st span+span{display:none} .card .nm{font-size:12.5px}
-  #enemies{display:none}
-  #shippanel{left:8px;right:8px;bottom:78px;padding:8px}
-  #sp-stats{grid-template-columns:1fr 1fr 1fr;gap:6px}
-  #sp-stats .x{display:none}
-  #sp-weapons{grid-template-columns:repeat(2,1fr)}
-  #sp-name{font-size:21px}
-  #log{left:8px;width:calc(100% - 170px);bottom:10px}
-  #endturn{right:8px;bottom:10px;height:52px;padding:0 14px}
+  #enemies,#tg-enemies,#tg-roster{display:none}
+  #hud.roster-off #roster{transform:none;opacity:1;pointer-events:auto}   /* the phone roster is already a thin strip */
+  #shippanel{left:8px;right:8px;bottom:62px;padding:6px 8px;min-height:0}
+  #sp-body{row-gap:5px}
+  #sp-head{width:auto;flex:1} #sp-class{display:none} #sp-name{font-size:18px}
+  #sp-bottom{order:1} #sp-stats{order:2;width:100%;flex-direction:row;gap:10px} #sp-stats .sr{flex:1;grid-template-columns:auto auto 1fr} #sp-stats .sx{display:none}
+  .wbtn{min-width:104px;flex:none} .wbtn .wn{white-space:nowrap} .wbtn .wd{display:none}
+  #abil{min-width:0;max-width:none} #abil .ws{display:none}
+  #log{left:8px;right:auto;width:calc(100% - 150px);bottom:8px}
+  #hud:not(.log-open) #logbody{max-height:16px}
+  #endturn{right:8px;bottom:8px;width:130px;height:48px;padding:0 10px}
   #menu{padding:0 20px 6vh;align-items:flex-end}
   .diffs{grid-template-columns:1fr}
   .fleets{grid-template-columns:repeat(2,1fr)}
@@ -245,7 +266,9 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
   </header>
 
   <nav id="roster" class="pe" aria-label="Your ships"></nav>
+  <button id="tg-roster" class="drawer-tab pe" aria-controls="roster" title="Show or hide your fleet list"></button>
   <aside id="enemies" class="panel pe"><h3>Enemy contacts</h3><div id="elist"></div></aside>
+  <button id="tg-enemies" class="drawer-tab pe" aria-controls="enemies" title="Show or hide the enemy list"></button>
 
   <section id="shippanel" class="panel pe" aria-live="polite">
     <div id="sp-empty">Select one of your ships to give it orders.</div>
@@ -258,7 +281,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
   </section>
 
   <button id="endturn" class="pe">End turn<small>Space</small></button>
-  <section id="log" class="panel pe"><h3>Combat log</h3><div id="logbody"></div></section>
+  <section id="log" class="panel pe"><h3>Combat log<button id="tg-log" aria-controls="logbody"></button></h3><div id="logbody"></div></section>
 </div>
 
 <div id="tooltip"></div>
@@ -369,7 +392,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '21';
+const GAME_VERSION = '22';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -2134,13 +2157,13 @@ function updateHUD(){
   }
   // ship panel
   const s=state.selected;
-  $('#sp-empty').style.display= s?'none':'block'; $('#sp-body').style.display= s?'block':'none';
+  $('#sp-empty').style.display= s?'none':'block'; $('#sp-body').style.display= s?'flex':'none';
   $('#sp-empty').textContent = state.phase==='enemy' ? 'The enemy is maneuvering. Stand by.' : 'Select one of your ships to give it orders.';
   if(s){
     $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`;
-    $('#sp-stats').innerHTML=`<div>Hull<b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
-      <div>Shields<b>${Math.round(s.shield)} / ${s.shieldMax} <span style="color:var(--dim);font-weight:400;font-size:12px">+${s.regen}/turn</span></b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
-      <div>Move<b>${s.mp} / ${s.mpMax}</b></div><div class="x">Armor<b>${s.armor}${s.fx.brace?' ×2':''}</b></div><div class="x">Evasion<b>${s.ev}${s.fx.ecm?' +20':''}</b></div>`;
+    $('#sp-stats').innerHTML=`<div class="sr"><span>Hull</span><b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
+      <div class="sr" title="Regenerates ${s.regen} a turn"><span>Shields</span><b>${Math.round(s.shield)} / ${s.shieldMax}</b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
+      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>`;
     const wc=$('#sp-weapons'); wc.innerHTML='';
     s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
       b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">Range ${d.range}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}</span>`;
@@ -2148,8 +2171,8 @@ function updateHUD(){
     const ab=document.createElement('button'); ab.className='wbtn'+(state.weaponSel==='all'?' on':''); ab.disabled=state.busy||state.phase!=='player'||!s.weapons.some(weaponReady);
     ab.innerHTML=`<span class="k">F</span><span class="wn">All weapons</span><span class="wd">Fire everything in reach</span><span class="ws">${s.weapons.filter(weaponReady).length} ready</span>`; ab.onclick=()=>setWeapon('all'); wc.appendChild(ab);
     const bot=$('#sp-bottom'); bot.innerHTML=''; const a=s.ability;
-    const bb=document.createElement('button'); bb.id='abil'; bb.className='wbtn'+(state.mode==='repair'?' on':''); bb.style.minHeight='44px'; bb.disabled=!abilityReady(s)||state.busy||state.phase!=='player';
-    bb.innerHTML=`<span class="k">Q</span><span class="wn">${a.def.name}</span><span class="wd">${state.mode==='repair'?'Click a highlighted ally to repair it, or press Q to cancel':a.def.desc}${a.wait?`. Recharging, ${a.wait} turn${a.wait>1?'s':''}`:''}</span>`;
+    const bb=document.createElement('button'); bb.id='abil'; bb.className='wbtn'+(state.mode==='repair'?' on':''); bb.disabled=!abilityReady(s)||state.busy||state.phase!=='player'; bb.title=a.def.desc;
+    bb.innerHTML=`<span class="k">Q</span><span class="wn">${a.def.name}</span><span class="wd">${state.mode==='repair'?'Click an ally to repair':'Ability'}</span><span class="ws">${state.mode==='repair'?'Q to cancel': a.wait?`Recharging, ${a.wait} turn${a.wait>1?'s':''}`:'Ready'}</span>`;
     bb.onclick=playerAbility; bot.appendChild(bb);
   }
   const et=$('#endturn'); et.disabled= state.phase!=='player'||state.busy;
@@ -2205,6 +2228,9 @@ function camFocus(p, amount=1){ cam.goal.lerp(new THREE.Vector3(p.x,0,p.z), amou
 function focusShip(s){ if(cam.menu) return; if(cam.follow) cam.follow=s; else camFocus(s.group.position, 1); }
 function updateCamera(dt){
   if(cam.menu){ cam.theta+=dt*0.05; cam.goal.set(0,0,0); cam.rGoal=46; cam.phi=lerp(cam.phi,1.12,dt); }
+  // drag-rotation eases toward where the pointer put it, like pan and zoom, instead of stepping per pointer event
+  if(cam.thGoal!=null && !cam.menu){ const k=1-Math.pow(0.0002,dt); cam.theta+=(cam.thGoal-cam.theta)*k; cam.phi+=(cam.phGoal-cam.phi)*k;
+    if(!drag && Math.abs(cam.thGoal-cam.theta)<1e-4 && Math.abs(cam.phGoal-cam.phi)<1e-4) cam.thGoal=cam.phGoal=null; }
   cam.target.lerp(cam.goal, 1-Math.pow(0.02,dt)); cam.radius=lerp(cam.radius,cam.rGoal,1-Math.pow(0.01,dt));
   const r=cam.radius; camera.position.set(cam.target.x + r*Math.sin(cam.phi)*Math.sin(cam.theta), r*Math.cos(cam.phi), cam.target.z + r*Math.sin(cam.phi)*Math.cos(cam.theta));
   if(cam.follow){ if(cam.follow.alive && !cam.menu) cam.goal.set(cam.follow.group.position.x,0,cam.follow.group.position.z); else cam.follow=null; }
@@ -2237,7 +2263,7 @@ canvas.addEventListener('pointermove', e=>{
   if(pinch && pointers.size===2){ const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); cam.rGoal=clamp(pinch.r*pinch.d/d,MIN_ZOOM,110); return; }
   if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
     if(!drag.moved && Math.hypot(dx,dy)>6){ drag.moved=true; hideTooltip(); }
-    if(drag.moved && !cam.menu){ if(drag.btn===0 && !e.shiftKey){ cam.theta-=dx*0.006; cam.phi=clamp(cam.phi-dy*0.004,0.3,cam.radius<20?1.5:1.3); } else { const k=cam.radius*0.0016; cam.follow=null; panBy(-dx*k, -dy*k); } drag.x=e.clientX; drag.y=e.clientY; }
+    if(drag.moved && !cam.menu){ if(drag.btn===0 && !e.shiftKey){ if(cam.thGoal==null){ cam.thGoal=cam.theta; cam.phGoal=cam.phi; } cam.thGoal-=dx*0.006; cam.phGoal=clamp(cam.phGoal-dy*0.004,0.3,cam.radius<20?1.5:1.3); } else { const k=cam.radius*0.0016; cam.follow=null; panBy(-dx*k, -dy*k); } drag.x=e.clientX; drag.y=e.clientY; }
     if(drag.moved) return; }
   if(state.phase==='menu') return;
   const {cell, ship}=pickAt(e.clientX,e.clientY);
@@ -2257,9 +2283,13 @@ function endPointer(e){
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', e=>{ pointers.delete(e.pointerId); drag=null; pinch=null; });
 canvas.addEventListener('contextmenu', e=>e.preventDefault());
-canvas.addEventListener('wheel', e=>{ e.preventDefault(); if(cam.menu) return; cam.rGoal=clamp(cam.rGoal*(1+Math.sign(e.deltaY)*(cam.rGoal<20?0.14:0.1)),MIN_ZOOM,110); }, {passive:false});
+// Zoom by how far the wheel actually moved. A trackpad sends many tiny deltas per gesture; stepping a fixed 10%
+// per event made it lurch. A mouse notch (about 100) still moves about 12%. Trackpad pinch arrives with ctrlKey.
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); if(cam.menu) return;
+  const d= e.deltaMode===1? e.deltaY*16 : e.deltaMode===2? e.deltaY*innerHeight : e.deltaY;
+  cam.rGoal=clamp(cam.rGoal*Math.exp(clamp(d,-150,150)*(e.ctrlKey?0.01:0.0012)),MIN_ZOOM,110); }, {passive:false});
 canvas.addEventListener('dblclick', e=>{ if(cam.menu) return; const {ship}=pickAt(e.clientX,e.clientY); if(ship) zoomTo(ship); });
-function zoomTo(s){ cam.follow=s; cam.rGoal=Math.max(MIN_ZOOM, s.len*1.9); cam.phi=Math.min(cam.phi,1.15); Sound.ui(); }
+function zoomTo(s){ cam.thGoal=cam.phGoal=null; cam.follow=s; cam.rGoal=Math.max(MIN_ZOOM, s.len*1.9); cam.phi=Math.min(cam.phi,1.15); Sound.ui(); }
 function onClick(x,y){
   if(state.phase!=='player' || state.busy) return;
   const {cell, ship}=pickAt(x,y); if(!cell) return;
@@ -2329,6 +2359,19 @@ renderPicks();
 $('#btn-how').onclick=()=>{ Sound.init(); Sound.ui(); showScreen('help'); };
 $('#btn-help').onclick=()=>{ Sound.ui(); showScreen('help'); };
 $('#btn-pause').onclick=()=>{ Sound.ui(); openPause(); };
+// HUD drawers: fleet lists and the log fold away; the choice is remembered (hardburn.hud)
+const hudPrefs=Object.assign({roster:true, enemies:true, log:false}, store.get('hud',{}));
+function applyHudPrefs(){ const h=$('#hud'); h.classList.toggle('roster-off',!hudPrefs.roster); h.classList.toggle('enemies-off',!hudPrefs.enemies); h.classList.toggle('log-open',hudPrefs.log);
+  $('#tg-roster').textContent= hudPrefs.roster?'‹':'Fleet ›'; $('#tg-enemies').textContent= hudPrefs.enemies?'›':'‹ Enemy';
+  $('#tg-log').textContent= hudPrefs.log?'Less':'More';
+  $('#tg-roster').setAttribute('aria-expanded',hudPrefs.roster); $('#tg-enemies').setAttribute('aria-expanded',hudPrefs.enemies); $('#tg-log').setAttribute('aria-expanded',hudPrefs.log); }
+for(const k of ['roster','enemies','log']) $('#tg-'+k).onclick=e=>{ e.stopPropagation(); hudPrefs[k]=!hudPrefs[k]; store.set('hud',hudPrefs); applyHudPrefs(); Sound.ui(); };
+applyHudPrefs();
+// --hud-bottom: height of the bottom command area, so the log and fleet lists sit above it however it wraps
+function measureHud(){ const top=Math.min($('#shippanel').getBoundingClientRect().top, $('#endturn').getBoundingClientRect().top);
+  document.documentElement.style.setProperty('--hud-bottom', Math.max(0,Math.round(innerHeight-top))+'px'); }
+try{ const ro=new ResizeObserver(measureHud); ro.observe($('#shippanel')); ro.observe($('#endturn')); }catch(e){}
+addEventListener('resize', measureHud); measureHud();
 // Surrender takes two presses: the first arms it, the second (within 4 s) ends the battle as a loss.
 // It can't be undone, so it lives in the pause menu rather than beside End turn.
 let surrenderArmed=0;
@@ -2413,7 +2456,7 @@ function startGame(fleets){
   setupBattle(Math.floor(Math.random()*1e9), lastFleets); warmUp();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
-  cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
+  cam.thGoal=cam.phGoal=null; cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
   log(`Engagement begins on ${state.diff} difficulty. Enemy fleet${lastFleets.enemyName?` (${lastFleets.enemyName})`:''} closing from the east: ${fleetSummary(lastFleets.enemy||CLASSIC_FLEET)}.`, 'sys');
   state.phase='starting'; updateHUD();
   after(1.2, ()=>startPlayerTurn());
