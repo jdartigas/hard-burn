@@ -1854,9 +1854,10 @@ function updateWrecks(dt){
             const gas=t<5 && Math.random()<0.3; Particles.emit(_wp, _wd.multiplyScalar(gas?rand(1.5,3):rand(1,2.2)).add(new THREE.Vector3(rand(-.3,.3),rand(-.3,.3),rand(-.3,.3))), gas?C_VENT_DIM:C_FIRE, gas?rand(0.2,0.4):rand(0.22,0.45), gas?rand(0.6,1.0):rand(0.3,0.6), 1.4, gas?0.5:0.3); }
           else Particles.emit(_wp, new THREE.Vector3(rand(-.2,.2),rand(.1,.5),rand(-.2,.2)), Math.random()<0.7?C_FIRE:C_SPARK, rand(0.18,0.36)*(0.5+sec.heat), rand(0.4,0.8), 1.5, 0.25); }
       }
-      // shorted power: blue-white arcs flicker across the wreck now and then
+      // shorted power: blue-white arcs flicker across the wreck now and then. Sparks only, no point light: a light
+      // here lit up the whole hex board around every wreck for the rest of the battle, which read as the board flickering.
       if(Math.random()<dt*(0.25+sec.heat*0.6)){ _wp.set(rand(-.2,.2),rand(-.1,.2),rand(sec.z0,sec.z1)); sec.inner.localToWorld(_wp);
-        Particles.burst(_wp, 10, {speed:3, color:C_ARC, size:0.12, life:0.25, drag:3}); if(Math.random()<0.4) flash(_wp, 0x9fd8ff, 0.8, 0.12); }
+        Particles.burst(_wp, 10, {speed:3, color:C_ARC, size:0.12, life:0.25, drag:3}); }
     }
     for(const sh of w.shards){ const im=sh.im;
       sh.data.forEach((d,j)=>{ d.v.multiplyScalar(Math.max(0,1-0.95*dt)); if(d.v.lengthSq()<0.0004) d.v.setLength(0.02); d.p.addScaledVector(d.v, dt);
