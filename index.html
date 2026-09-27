@@ -121,14 +121,16 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 
 /* ---------- world labels ---------- */
 #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
-.tag{position:absolute;transform:translate(-50%,-100%);width:74px;text-align:center;transition:opacity .2s}
+/* Tags move by transform only, on their own compositor layer: left/top would force a page layout and a repaint
+   of every tag, every frame, because ships bob constantly. That was the main cost of a frame. */
+.tag{position:absolute;left:0;top:0;will-change:transform;width:74px;text-align:center;transition:opacity .2s}
 .tag .tn{font-size:11.5px;font-weight:600;white-space:nowrap;text-shadow:0 1px 3px #000,0 0 6px #000;margin-bottom:2px}
 .tag.player .tn{color:#f3d7a4} .tag.enemy .tn{color:#f5ad9f}
 .tag .mbar{height:3px;margin-top:2px;background:rgba(0,0,0,.55)}
 .tag .hit{display:none;margin:0 auto 3px;font-weight:700;font-size:13px;padding:1px 6px;background:rgba(0,0,0,.7);border:1px solid var(--red);color:#fff;width:max-content}
 .tag .hit.show{display:block}
 .tag .fx{font-size:10.5px;color:var(--cyan);white-space:nowrap;text-shadow:0 1px 2px #000}
-.ftxt{position:absolute;transform:translate(-50%,-50%);font-weight:700;font-size:17px;text-shadow:0 1px 3px #000,0 0 8px #000;white-space:nowrap;pointer-events:none}
+.ftxt{position:absolute;left:0;top:0;will-change:transform;transform:translate(-50%,-50%);font-weight:700;font-size:17px;text-shadow:0 1px 3px #000,0 0 8px #000;white-space:nowrap;pointer-events:none}
 .ftxt.sh{color:var(--cyan)} .ftxt.hu{color:#fff} .ftxt.miss{color:#9aa4ac;font-size:14px;font-weight:600} .ftxt.int{color:#7fd6ff;font-size:13px;font-weight:600}
 .ftxt.heal{color:var(--green)} .ftxt.big{font-size:22px;color:#ffcf7a}
 
@@ -367,7 +369,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '20';
+const GAME_VERSION = '21';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -1525,7 +1527,7 @@ function floatText(s, text, cls, dy=0){
   const el=document.createElement('div'); el.className='ftxt '+cls; el.textContent=text; $('#labels').appendChild(el);
   const base=s.group.position.clone(); base.y+=1.2+dy; const off=new THREE.Vector3(rand(-.6,.6),0,rand(-.4,.4)); base.add(off);
   addFx({t:0, dur:1.3, update(dt){ this.t+=dt; const k=this.t/this.dur; const p=base.clone(); p.y+=k*1.8; const sp=toScreen(p);
-      if(sp){ el.style.left=sp.x+'px'; el.style.top=sp.y+'px'; el.style.opacity= k<0.7?1:1-(k-0.7)/0.3; } else el.style.opacity=0; return k<1; },
+      if(sp){ el.style.transform=`translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-50%)`; el.style.opacity= k<0.7?1:1-(k-0.7)/0.3; } else el.style.opacity=0; return k<1; },
     dispose(){ el.remove(); }});
 }
 
@@ -2210,6 +2212,8 @@ function updateCamera(dt){
   if(shake>0){ camera.position.x+=(Math.random()-.5)*shake*0.6; camera.position.y+=(Math.random()-.5)*shake*0.6; shake=Math.max(0,shake-dt*2.2); }
 }
 function panBy(dx,dz){ const f=new THREE.Vector3(Math.sin(cam.theta),0,Math.cos(cam.theta)), rt=new THREE.Vector3(f.z,0,-f.x); cam.goal.addScaledVector(rt,dx).addScaledVector(f,dz); cam.goal.x=clamp(cam.goal.x,-40,40); cam.goal.z=clamp(cam.goal.z,-26,26); }
+// Write a tag's style only when it changes: even an unchanged write can dirty style.
+function setTag(s, op, tf){ const t=s.tag; if(t._op!==op){ t._op=op; t.style.opacity=op; } if(tf!==undefined && t._tf!==tf){ t._tf=tf; t.style.transform=tf; } }
 function toScreen(p){ V.copy(p).project(camera); if(V.z>1) return null; return {x:(V.x*0.5+0.5)*innerWidth, y:(-V.y*0.5+0.5)*innerHeight}; }
 
 /* ---------------- input ---------------- */
@@ -2558,11 +2562,12 @@ function frame(){
   tiles.material.opacity=clamp(cam.radius/40,0.08,0.32);
   // labels
   const showTags = state.phase!=='menu';
-  for(const s of state.ships){ if(!s.alive || !showTags){ s.tag.style.opacity=0; continue; }
+  for(const s of state.ships){ if(!s.alive || !showTags){ setTag(s,0); continue; }
     const p=s.group.position.clone(); p.y+=1.0+s.len*0.1; const sp=toScreen(p);
-    if(!sp){ s.tag.style.opacity=0; continue; }
-    const focus=(state.rosterHover===s || state.hoverShip===s || s===sel); s.tag.style.opacity= cam.radius<16 ? (state.hoverShip===s?0.9:0) : (focus?1:0.85); s.tag.style.left=sp.x+'px'; s.tag.style.top=sp.y+'px';
-    s.tag.style.transform=`translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`; }
+    if(!sp){ setTag(s,0); continue; }
+    const focus=(state.rosterHover===s || state.hoverShip===s || s===sel);
+    setTag(s, cam.radius<16 ? (state.hoverShip===s?0.9:0) : (focus?1:0.85),
+      `translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`); }
   if(!window.__norender) composer.render();
   if(DEBUG) debugTick();
 }

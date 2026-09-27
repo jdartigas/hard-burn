@@ -147,7 +147,8 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 6. **Ambient occlusion:** `gtao.overrideVisibility` is patched to hide transparent, shader, sprite, point and line objects, and anything with `userData.noAO`. Its radius scales with camera distance.
 7. **Shadows:** the sun's shadow frustum follows `cam.target`, sizes to the zoom level, and snaps to texels (`updateShadowFrustum`). Call `enableShadows(obj)` on new meshes. Basic, shader and transparent materials are skipped automatically.
 8. **Warm-up (`warmUp`) renders, not just compiles.** On Metal, pipelines for each blend, depth and shadow combination, and texture uploads, only happen on the first real draw. So the warm-up builds one of every effect, shield and a full wreck, shrinks them to a thousandth at the camera target, and draws two full frames before removing them. Anything new that first appears mid-battle (a new effect, material or blend mode) should be added to it, or it will stutter the first time it shows.
-9. The **close-up detail layer** (`s.fineMesh`, and the wreck `fineMeshes`) only draws within 13 units of the camera.
+9. **Screen-space labels move by `transform`, never `left`/`top`.** Ship tags and floating damage numbers follow bobbing ships every frame. Moving them with `left`/`top` forced a page layout and a repaint of every tag (with text shadows) each frame: about half the frame time on an M2 Max, and the stutter players saw. They now use `translate3d` on their own compositor layer (`will-change: transform`), and `setTag` writes a style only when it changes. Keep any new per-frame DOM overlay the same way.
+10. The **close-up detail layer** (`s.fineMesh`, and the wreck `fineMeshes`) only draws within 13 units of the camera.
 
 **URL diagnostics:**
 - `?debug` shows a bottom-left overlay with version, GPU, device pixel ratio, render scale, buffer sizes, feature flags and GL errors.
