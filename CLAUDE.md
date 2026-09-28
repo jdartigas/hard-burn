@@ -155,7 +155,7 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 13. The **close-up detail layer** (`s.fineMesh`, and the wreck `fineMeshes`) only draws within 13 units of the camera.
 
 **URL diagnostics:**
-- `?debug` shows a bottom-left overlay with version, GPU, device pixel ratio, render scale, buffer sizes, feature flags and GL errors.
+- `?debug` shows a bottom-left overlay with version, live performance over the last half second (fps, average and worst frame, time in game code, draw calls and triangles across all passes), GPU, device pixel ratio, render scale, buffer sizes, feature flags and GL errors. Ask Jon for this overlay when he reports slowness: a slow frame with low game-code time and normal draw calls points at the browser or machine, not the game.
 - `?shadows=0`, `?aa=0`, `?ao=0` and `?pr=1` each turn off a single feature to isolate driver problems.
 
 ## 7. Testing

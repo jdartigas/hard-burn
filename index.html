@@ -392,7 +392,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '23';
+const GAME_VERSION = '24';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -715,6 +715,7 @@ const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true}, medi
 // diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?aa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
 const URLQ = new URLSearchParams(location.search);
 const DEBUG = URLQ.has('debug');
+if(DEBUG) renderer.info.autoReset=false;   // count draws across every pass of a frame, reset in frame()
 let quality = store.get('gfx', (window.matchMedia && matchMedia('(pointer:coarse)').matches) || innerWidth<900 ? 'medium' : 'high');
 if(!QUALITY[quality]) quality='high';
 
@@ -2610,6 +2611,7 @@ async function sim(fleets, n=20, seed0=1){
 let elapsed=0;
 function frame(){
   requestAnimationFrame(frame);
+  const fT0=DEBUG? performance.now() : 0; if(DEBUG) renderer.info.reset();
   const rawDt=clock.getDelta(), dt=Math.min(rawDt,0.05)*timeScale; elapsed+=dt;
   // one-time frame-rate check early in a battle: step graphics down if the machine is struggling (never overrides a manual choice)
   if(!perfCheck.done && state.phase==='player' && !document.hidden && !window.__norender && rawDt<0.5){ perfCheck.t+=rawDt; perfCheck.n++;
@@ -2661,16 +2663,19 @@ function frame(){
     setTag(s, +Math.max(state.hoverShip===s?0.9:0, zf*(focus?1:0.85)).toFixed(2),
       `translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`); }
   if(!window.__norender) composer.render();
-  if(DEBUG) debugTick();
+  if(DEBUG){ dbgFrames.push([rawDt*1000, performance.now()-fT0, renderer.info.render.calls, renderer.info.render.triangles]); debugTick(); }
 }
-let dbgEl=null, dbgErr={}, dbgT=0, dbgGpu='';
+let dbgEl=null, dbgErr={}, dbgT=0, dbgGpu='', dbgFrames=[], dbgPerf='';
 function debugTick(){
   const gl=renderer.getContext(); let e; while((e=gl.getError())!==gl.NO_ERROR){ dbgErr[e]=(dbgErr[e]||0)+1; }
   if(performance.now()-dbgT<500) return; dbgT=performance.now();
+  // performance over the last half second: what a player can read off when the game feels slow
+  if(dbgFrames.length){ const f=dbgFrames.splice(0), n=f.length, avg=i=>f.reduce((a,x)=>a+x[i],0)/n, worst=Math.max(...f.map(x=>x[0]));
+    dbgPerf=`fps ${Math.round(1000/avg(0))}  frame ${avg(0).toFixed(1)} ms avg, ${worst.toFixed(0)} worst  game code ${avg(1).toFixed(1)} ms\ndraw calls ${Math.round(avg(2))}  triangles ${(avg(3)/1e6).toFixed(2)}M  ${document.hidden?'TAB HIDDEN':''}`; }
   if(!dbgEl){ dbgEl=document.createElement('pre'); dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;z-index:50;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;pointer-events:none;white-space:pre-wrap;max-width:60vw';
     document.body.appendChild(dbgEl); const ext=gl.getExtension('WEBGL_debug_renderer_info'); dbgGpu= ext? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
   const r1=composer.renderTarget1;
-  dbgEl.textContent=`Version ${GAME_VERSION}\nGPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  smaa ${smaa.enabled?'on':'off'}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
+  dbgEl.textContent=`Version ${GAME_VERSION}\n${dbgPerf}\nGPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  smaa ${smaa.enabled?'on':'off'}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
 }
 const clock=new THREE.Clock();
 let lastAoR=1; const perfCheck={t:0,n:0,done:false};
