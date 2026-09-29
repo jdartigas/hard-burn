@@ -102,6 +102,20 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
 .wbtn:disabled .ws{color:var(--dim)}
 #sp-bottom{display:flex;flex:none}
 #abil{min-width:150px;max-width:190px}
+/* Touch tablets in landscape (iPad): a slimmer command bar. Buttons keep a 44px tap height; the keyboard hints and
+   each weapon's range line go (the range is in its tooltip and the target readout). Phones have their own layout. */
+@media (min-width:761px) and (orientation:landscape){
+  html.touch #shippanel{min-height:0;padding:5px 8px;right:160px}
+  html.touch #sp-body{gap:10px}
+  html.touch #sp-head{width:124px} html.touch #sp-name{font-size:17px} html.touch #sp-class{font-size:11px;margin-top:2px}
+  html.touch #sp-stats{width:176px;gap:2px;font-size:10.5px} html.touch #sp-stats .sr{grid-template-columns:38px 58px 1fr} html.touch #sp-stats .sr b{font-size:11.5px}
+  html.touch .wbtn{min-height:44px;min-width:86px;max-width:160px;padding:4px 8px}
+  html.touch .wbtn .k{display:none} html.touch .wbtn .wn{font-size:12.5px;padding-right:0} html.touch .wbtn .wd{display:none} html.touch .wbtn .ws{font-size:10.5px;margin-top:1px}
+  html.touch #abil{min-width:112px;max-width:150px}
+  html.touch #endturn{width:140px;height:56px;font-size:15px}
+  /* one row even below 1100px wide (1024 iPads): the slimmer buttons fit, and the weapons scroll if they don't */
+  html.touch #sp-body{flex-wrap:nowrap} html.touch #sp-weapons{order:0;flex:1 1 auto} html.touch #sp-bottom{order:0;margin-left:0}
+}
 #sp-empty{font-size:13.5px;color:var(--dim);padding:6px 2px}
 
 #endturn{position:absolute;right:12px;bottom:12px;width:172px;height:76px;padding:0 20px;background:var(--amber);color:#1a1206;border:0;font-weight:700;font-size:17px;font-family:var(--font)}

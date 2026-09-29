@@ -231,6 +231,7 @@ Planned features with full context (scoring and records, multiplayer) live in `B
   - Click a ship to select it, a hex to move, and an enemy or asteroid to fire.
   - Right-click or Esc cancels.
   - Drag to orbit, Shift-drag to pan, scroll to zoom.
+- **Touch devices** get `html.touch` (set in `index.html` from `pointer:coarse`). On touch tablets in landscape (iPad) the command bar is slimmer and stays one row: 44px tap targets, no keyboard hints, no range line on weapon buttons. Phones keep their own layout; desktop is unaffected.
 - **Touch:** one finger drags to orbit; two fingers pinch to zoom and drag to pan at the same time; tap to select, move and fire; double-tap a ship to follow it.
   - Double-click a ship to zoom in and follow it.
 - **Keys:**
