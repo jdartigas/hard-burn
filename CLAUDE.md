@@ -5,61 +5,68 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Owner:** Jon. He prefers concise answers and hard-refreshes to test.
 - **Repo:** https://github.com/jdartigas/hard-burn (default branch `main`).
 - **Live:** https://jdartigas.github.io/hard-burn/ (GitHub Pages, static).
-- **Version:** the current version is `GAME_VERSION` in the script. It shows on the intro screen and in the pause menu.
+- **Version:** `GAME_VERSION` in the small script at the top of `index.html`. It shows on the intro screen and in the pause menu, and is appended to every css/js URL so a release is never mixed with cached old files.
 
 ---
 
 ## 1. Repo layout and deployment
 
-- The whole game is **one self-contained `index.html`**: roughly 2,370 lines of inline CSS and one `<script type="module">`. There is no build step, no package.json and no bundler.
+- **No build step, no package.json, no bundler.** Split into files in v29:
+  - `index.html`: the markup, `GAME_VERSION`, the three.js import map and a small module that loads three.js and then the game.
+  - `css/hard-burn.css`: all styles.
+  - `js/*.js`: the game, **plain scripts (not modules) sharing one global scope**, loaded in this order by `index.html`: `core` (utilities, all game data, hex maths), `audio`, `render`, `board`, `ships`, `rules`, `wrecks`, `combat`, `hud`, `input`, `menus`, `main`. Each file's header says what it holds.
+  - **Load order matters:** code that runs at load time (not inside a function called later) can only use names from earlier files or earlier in the same file. Function calls at runtime can go anywhere. A new file must be added to the list in `index.html`.
+  - Every top-level name is global, so it must not collide with a browser global (`open`, `close`, `name`, `status`, `top`...). Checked for all 287 names in v29; check new ones the same way.
+  - Globals are reachable from the browser console (`state`, `CLASSES`, `createShip`...), which makes debugging much easier. `window.HB` still exposes the test hooks.
 - **Three.js r169** loads from jsDelivr through an import map:
   - `three` → `https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js`
   - `three/addons/` → `.../three@0.169.0/examples/jsm/`
   - Addons used: `EffectComposer`, `RenderPass`, `UnrealBloomPass`, `GTAOPass`, `OutputPass`, `Pass`/`FullScreenQuad`, `CopyShader`, `SMAAPass`, `mergeGeometries`.
   - Everything is spread into a single `THREE` object: `const THREE = { ...THREE_NS, EffectComposer, ... }`. Code calls `THREE.GTAOPass` and so on, and `window.THREE` is set for debugging.
 - **Fonts:** Google Fonts, Saira Extra Condensed and Saira Semi Condensed.
-- **Deploy:** commit `index.html` to the repo root on `main`. GitHub Pages serves it, so **pushing to `main` updates the live site.**
-- The local folder `~/Desktop/Hard Burn` is not a git checkout. Before committing, clone the repo or `git init` there and add `origin`, and check that the local `index.html` matches what's on `main` first.
+- **Deploy:** commit to `main`. GitHub Pages serves the repo root, so **pushing to `main` updates the live site.**
 - **No assets on disk.** Every texture, model, sound and piece of music is generated procedurally at runtime.
-- Splitting into modules is fine if it helps, but keep it build-free and static-hostable. The single file is not why anything has broken so far.
+- Keep it build-free and static-hostable.
 
 ## 2. Release conventions
 
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
-- **Bump `GAME_VERSION`** (near the top of the script) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
+- **Bump `GAME_VERSION`** (top of `index.html`) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
 - `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `custom` (the builder's fleet), `hud` (which HUD drawers are open), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
 - **Scores and records live in `hardburn.scores`, and losing them would lose Jon's history.** Never rename the key. The shape is `{format, games, bests}`; each game keeps the raw facts (fleets, difficulty, seed, result, turns, fleet values, damage) plus its score and `formula` version, so the formula can change and old games be rescored. If the format changes, bump `SCORES_FORMAT` and convert old data in `loadScores`, never drop it. `loadScores` validates everything it reads, because Import brings in files from outside; render record fields through `esc()`. Simulator battles are never recorded.
 
-## 3. Code map (sections appear in this order in the script)
+## 3. Code map (sections in load order; the file is in brackets)
 
-The script has almost no section banners, so find a section by grepping for one of its names below (for example `function hitCore`, `const CLASSES`).
+Find a section by grepping `js/` for one of its names below (for example `function hitCore`, `const CLASSES`).
 
 | Section | What's there |
 |---|---|
-| utilities | `$`, `clamp`, `lerp`, `rand`, `mulberry32` (seeded RNG), `store` |
-| data | `WEAPONS`, `ABIL`, `CLASSES`, `ORDER`, `NAMES`, `DEPLOY`, `DEPLOY_MAX_X`, `MAX_FLEET`, `CLASSIC_FLEET`, `DIFF`, `SHIP_SCALE=1.25`, `COL` |
-| hex math | Axial pointy-top hexes, `HEX=1.9`, `MAP_R=9`, `MAP_ROWS=6`, `hexToWorld`, `worldToHex`, `hdist`, `hexLine` |
-| audio | `Sound`: Web Audio synthesized effects plus a generative cinematic score, with music and effects on separate gains |
-| renderer and scene | Renderer, composer, `MSAARenderPass` (now just a plain scene pass), lights, `updateShadowFrustum`, `enableShadows`, `QUALITY` presets, URL diagnostics |
-| procedural textures | `canvasTex`, `panelTexture`, `glowTex` |
-| environment | Nebula sky shader, stars, sun, gas giant with atmosphere, PMREM environment map |
-| particles | `Particles`: one additive `Points` pool of 6,000 with `emit`/`burst`/`update` |
-| timing | `tween`, `wait`, `after`, `addFx`. All scaled by `timeScale` and driven by the frame loop, not `setTimeout` |
-| board | Hex cells, grid lines, highlight tiles (`InstancedMesh`), selection rings, path line |
-| asteroids | `RockNoise`, `makeRockGeometry` (about 12.5k triangles, craters, fractures), `rockMat` with shader micro-detail, `makeRockTarget`, `destroyRock`, `generateTerrain` |
-| ship models | `armorTextures` (generated color, normal and packed AO/rough/metal maps), `shipMaterials`, `deckGeometry`, `buildShip` (per-class builders, greebles, conduits, close-up detail layer) |
-| game state | `state`, `createShip`, `shipAt`, `weaponReady` |
-| rules | `hasLOS`, `hitCore`, `hitChance`, `interceptChance`, `applyDamage`, `expected`, `reachable`, `pathTo` |
-| FX | `fxRail`, `fxBeam`, `fxPulse`, `fxGuided`, `impactFx`, `floatText`, `flash` (pooled point lights), `addShake` |
-| destruction | `DebrisKit`, `breakUpShip`, `updateWrecks`, `clearWrecks`, `explodeShip` |
-| combat | `fireWeapon`, `destroyShip`, `fireAll`, `useAbility`, `moveShip` |
-| AI | `scoreAttack`, `threatAt`, `evalCell`, `aiShip`, `runAITurn` |
-| turn flow | `beginSideTurn`, `startPlayerTurn`, `endPlayerTurn`, `checkEnd`, `showEnd` |
-| player actions and HUD | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover`. Layout: the fleet lists are drawers that slide off the sides (`#tg-roster`, `#tg-enemies`), the selected ship's orders run along one command bar at the bottom with End turn beside it, and the log shows its last two lines until expanded. `measureHud` sets `--hud-bottom` so the log and lists sit above the bar however it wraps |
-| camera and input | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys. `focusShip` centers the camera on every selection, whichever way it was made |
-| setup | `clearBattle`, `setupBattle`, `startGame`, `toMenu` |
-| main loop | `frame()`, `debugTick`, `onResize`, `applyQuality`, `cycleQuality` |
+| utilities (`core`) | `$`, `clamp`, `lerp`, `rand`, `mulberry32` (seeded RNG), `store` |
+| data (`core`) | `WEAPONS`, `ABIL`, `CLASSES`, `ORDER`, `NAMES`, `DEPLOY`, `DEPLOY_MAX_X`, `MAX_FLEET`, `CLASSIC_FLEET`, `DIFF`, `SHIP_SCALE=1.25`, `COL` |
+| hex math (`core`) | Axial pointy-top hexes, `HEX=1.9`, `MAP_R=9`, `MAP_ROWS=6`, `hexToWorld`, `worldToHex`, `hdist`, `hexLine` |
+| audio (`audio`) | `Sound`: Web Audio synthesized effects plus a generative cinematic score, with music and effects on separate gains |
+| renderer and scene (`render`) | Renderer, composer, `MSAARenderPass` (now just a plain scene pass), lights, `updateShadowFrustum`, `enableShadows`, `QUALITY` presets, URL diagnostics |
+| procedural textures (`render`) | `canvasTex`, `panelTexture`, `glowTex` |
+| environment (`render`) | Nebula sky shader, stars, sun, gas giant with atmosphere, PMREM environment map |
+| particles (`render`) | `Particles`: one additive `Points` pool of 6,000 with `emit`/`burst`/`update` |
+| timing (`render`) | `tween`, `wait`, `after`, `addFx`. All scaled by `timeScale` and driven by the frame loop, not `setTimeout` |
+| board (`board`) | Hex cells, grid lines, highlight tiles (`InstancedMesh`), selection rings, path line |
+| asteroids (`board`) | `RockNoise`, `makeRockGeometry` (about 12.5k triangles, craters, fractures), `rockMat` with shader micro-detail, `makeRockTarget`, `destroyRock`, `generateTerrain` |
+| ship models (`ships`) | `armorTextures` (generated color, normal and packed AO/rough/metal maps), `shipMaterials`, `deckGeometry`, `buildShip` (per-class builders, greebles, conduits, close-up detail layer) |
+| game state (`rules`) | `state`, `createShip`, `shipAt`, `weaponReady` |
+| rules (`rules`) | `hasLOS`, `hitCore`, `hitChance`, `interceptChance`, `applyDamage`, `expected`, `reachable`, `pathTo` |
+| FX (`rules`) | `fxRail`, `fxBeam`, `fxPulse`, `fxGuided`, `impactFx`, `floatText`, `flash` (pooled point lights), `addShake` |
+| destruction (`wrecks`) | `DebrisKit`, `breakUpShip`, `updateWrecks`, `clearWrecks`, `explodeShip` |
+| combat (`combat`) | `fireWeapon`, `destroyShip`, `fireAll`, `useAbility`, `moveShip` |
+| AI (`combat`) | `scoreAttack`, `threatAt`, `evalCell`, `aiShip`, `runAITurn` |
+| turn flow (`combat`) | `beginSideTurn`, `startPlayerTurn`, `endPlayerTurn`, `checkEnd`, `showEnd` |
+| player actions and HUD (`hud`) | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover`. Layout: the fleet lists are drawers that slide off the sides (`#tg-roster`, `#tg-enemies`), the selected ship's orders run along one command bar at the bottom with End turn beside it, and the log shows its last two lines until expanded. `measureHud` sets `--hud-bottom` so the log and lists sit above the bar however it wraps |
+| scores and records (`hud`) | `scoreBattle`, `loadScores`/`saveScores`, `recordBattle`, `considerBest`, `fleetName`, `esc` |
+| camera and input (`input`) | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys. `focusShip` centers the camera on every selection, whichever way it was made |
+| screens and menus (`menus`) | Menu fleet pickers (`chosenFleets`, `renderPicks`), fleet builder (`openBuilder`, `renderBuilder`), records panel, import/export, pause and surrender, HUD drawers (`applyHudPrefs`, `measureHud`) |
+| setup (`main`) | `clearBattle`, `setupBattle`, `startGame`, `toMenu` |
+| main loop (`main`) | `frame()`, `debugTick`, `onResize`, `applyQuality`, `cycleQuality` |
 
 `window.HB` exposes test hooks: `render`, `applyQuality`, `state`, `cam`, `board`, `wrecks`, `explodeShip`, `destroyRock`, `fireWeapon`, `runAITurn`, `endPlayerTurn`, `startGame`, `setTimeScale` and more.
 

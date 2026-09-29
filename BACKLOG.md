@@ -370,7 +370,7 @@ has to read weapons from each ship instead of from its class.
 1. ~~**Battles must accept any fleet.**~~ Done in v15 (item 0, step 1).
 2. **Per-ship loadouts** instead of per-class ones (item 7).
 3. **Battles report results back:** survivors, damage taken and rewards.
-4. **Split the code into multiple files.** The campaign would roughly double
+4. ~~**Split the code into multiple files.**~~ **Done in v29** (`CLAUDE.md` §1). The campaign would roughly double
    the game, and one ~5,000-line `index.html` is hard to work on. Plain
    JavaScript modules served as separate files still need no build step and
    work on GitHub Pages.

@@ -1,0 +1,449 @@
+// Hard Burn: ship models: armor textures, materials, per-class builders, drive plumes, mesh merging.
+// Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
+// so anything used at load time must be defined in an earlier file (or earlier in this one).
+'use strict';
+
+/* ---------------- ship models ---------------- */
+/* ---------------- ship models (Expanse-inspired: stacked decks, drive at the stern, keel guns, PDC turrets) ----------------
+   Player fleet: sleek naval style, chamfered armored decks, grey with amber markings.
+   Enemy fleet: cobbled frontier style, boxy modules, exposed trusses, strapped-on tanks, patchwork plating. */
+// Armor tile set: color, normal (from a height field), and packed occlusion/roughness/metalness, all generated.
+// Tiles run lengthwise along the hull like the reference models; panel seams every quarter; chipped paint shows bare metal.
+function armorTextures(seed){
+  const S=1024, R=mulberry32(seed);
+  const H=new Float32Array(S*S), Cc=new Float32Array(S*S), Ro=new Float32Array(S*S), Me=new Float32Array(S*S), Ao=new Float32Array(S*S);
+  H.fill(0.08); Cc.fill(0.46); Ro.fill(0.8); Ao.fill(0.62);
+  const rect=(x0,y0,w,h,fn)=>{ for(let y=Math.max(0,y0|0); y<Math.min(S,(y0+h)|0); y++) for(let x=Math.max(0,x0|0); x<Math.min(S,(x0+w)|0); x++) fn(y*S+x, x-x0, y-y0); };
+  const CW=32;
+  for(let cx=0; cx<S; cx+=CW){
+    let y=-Math.floor(R()*90);
+    while(y<S){
+      const bl=58+Math.floor(R()*58), shade=0.62+R()*0.1-(R()<0.06?0.1:0), rough=0.55+R()*0.2, tilt=(R()-0.5)*0.05;
+      rect(cx+2,y+2,CW-4,bl-4,(i,lx,ly)=>{ const ex=Math.min(lx,CW-5-lx), ey=Math.min(ly,bl-5-ly), e=Math.min(ex,ey);
+        const bevel=Math.min(1,e/3.5); H[i]=0.5+0.42*bevel+tilt*(ly/bl-0.5); Cc[i]=shade*(0.94+0.06*bevel); Ro[i]=rough; Ao[i]=0.8+0.2*bevel; });
+      y+=bl;
+    }
+  }
+  // panel seams and recessed service hatches
+  for(let k=0;k<4;k++){ const ys=k*256+Math.floor(R()*30); rect(0,ys,S,5,(i)=>{ H[i]=0.02; Ao[i]=0.3; Cc[i]*=0.6; }); }
+  for(let k=0;k<6;k++){ const hx=Math.floor(R()*28)*CW+2, hy=Math.floor(R()*S), hw=CW*(1+Math.floor(R()*2))-4, hh=40+Math.floor(R()*50);
+    rect(hx,hy,hw,hh,(i,lx,ly)=>{ const e=Math.min(lx,ly,hw-1-lx,hh-1-ly); if(e<2){ H[i]=0.15; Ao[i]=0.4; } else { H[i]=0.62; Cc[i]=0.5; Ro[i]=0.5; } }); }
+  // chipped paint -> bare metal along tile edges
+  for(let k=0;k<900;k++){ const cx=Math.floor(R()*S/CW)*CW+(R()<0.5?2:CW-6)+Math.floor(R()*4), cy=Math.floor(R()*S), r=1+R()*3.2;
+    rect(cx-r,cy-r*2,r*2+1,r*4+1,(i,lx,ly)=>{ const dx=lx-r, dy=(ly-r*2)/2; if(dx*dx+dy*dy<=r*r){ Cc[i]=0.78; Ro[i]=0.32; Me[i]=0.95; H[i]-=0.04; } }); }
+  // grime streaks running aft
+  for(let k=0;k<160;k++){ const x=Math.floor(R()*S), y=Math.floor(R()*S), len=40+R()*160, w=1+Math.floor(R()*3), a=0.05+R()*0.1;
+    rect(x,y,w,len,(i,lx,ly)=>{ Cc[i]*=1-a*(1-ly/len); Ro[i]=Math.min(1,Ro[i]+a); }); }
+  const toCanvas=(fn)=>canvasTex(S,S,(g)=>{ const img=g.createImageData(S,S), d=img.data; for(let i=0;i<S*S;i++){ const [r,gg,b]=fn(i); d[i*4]=r; d[i*4+1]=gg; d[i*4+2]=b; d[i*4+3]=255; } g.putImageData(img,0,0); }, false);
+  const map=toCanvas(i=>{ const v=Math.round(clamp(Cc[i],0,1)*255); return [v,v,v]; }); map.colorSpace=THREE.SRGBColorSpace;
+  const normal=toCanvas(i=>{ const x=i%S, y=(i/S)|0; const hL=H[y*S+((x-1+S)%S)], hR=H[y*S+((x+1)%S)], hU=H[((y-1+S)%S)*S+x], hD=H[((y+1)%S)*S+x];
+    const nx=(hL-hR)*4, ny=(hD-hU)*4, nz=1, l=Math.hypot(nx,ny,nz); return [Math.round((nx/l*0.5+0.5)*255), Math.round((ny/l*0.5+0.5)*255), Math.round((nz/l*0.5+0.5)*255)]; });
+  const orm=toCanvas(i=>[Math.round(clamp(Ao[i],0,1)*255), Math.round(clamp(Ro[i],0.05,1)*255), Math.round(clamp(0.12+Me[i]*0.85,0,1)*255)]);
+  const emis=canvasTex(S,S,(g,w,h)=>{ g.fillStyle='#000'; g.fillRect(0,0,w,h);
+    for(let i=0;i<16;i++){ const x=Math.floor(R()*32)*CW+10, y=Math.floor(R()*h), n=2+Math.floor(R()*5); g.fillStyle='rgba(255,210,150,1)'; for(let k=0;k<n;k++) g.fillRect(x,y+k*11,10,6); } });
+  for(const t of [map,normal,orm,emis]){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=MAX_ANISO; }
+  return {map, normal, orm, emis};
+}
+const texCache = {player:armorTextures(11), enemy:armorTextures(23)};
+const smoothTex = panelTexture(31); smoothTex.map.wrapS=smoothTex.map.wrapT=THREE.RepeatWrapping;
+const radTex = canvasTex(128,256,(g,w,h)=>{ g.fillStyle='#2a2320'; g.fillRect(0,0,w,h); for(let x=0;x<w;x+=8){ g.fillStyle='#6d5a4a'; g.fillRect(x+1,0,5,h); g.fillStyle='#1a1512'; g.fillRect(x+6,0,2,h); } for(let y=0;y<h;y+=64){ g.fillStyle='#15110f'; g.fillRect(0,y,w,4); } });
+radTex.wrapS=radTex.wrapT=THREE.RepeatWrapping;
+const radGlow = canvasTex(64,256,(g,w,h)=>{ const gr=g.createLinearGradient(0,0,0,h); gr.addColorStop(0,'#000'); gr.addColorStop(0.6,'#2a0c02'); gr.addColorStop(1,'#a8360a'); g.fillStyle=gr; g.fillRect(0,0,w,h); });
+function decalTex(text, side){
+  return canvasTex(256,108,(g,w,h)=>{ g.clearRect(0,0,w,h); g.textAlign='center'; g.textBaseline='middle';
+    g.font='bold 84px "Arial Narrow","Roboto Condensed",Arial,sans-serif'; g.fillStyle= side==='player'?'rgba(240,240,236,.95)':'rgba(40,40,44,.9)'; g.fillText(text,w/2,h/2+4,w*0.94); });   // maxWidth squeezes longer numbers (537-2) to fit
+}
+function shipMaterials(side){
+  const t=texCache[side], P=side==='player';
+  // player livery: charcoal tile armor with rust-orange plates and white stripes; enemy: pale grey tile with oxide-red plates
+  const NS=new THREE.Vector2(1.1,1.1);
+  const hull = (color, rough=1, metal=1, emis=true) => new THREE.MeshStandardMaterial({map:t.map, normalMap:t.normal, normalScale:NS, roughnessMap:t.orm, metalnessMap:t.orm, aoMap:t.orm, aoMapIntensity:1, color, metalness:metal, roughness:rough, ...(emis?{emissiveMap:t.emis, emissive:0xffffff, emissiveIntensity:2.2}:{})});
+  return {
+    hull: hull(P?0x8a8a8e:0xcfd3d6),
+    hull2: hull(P?0x606066:0xa9aeb3, 0.95),
+    plate: hull(P?0xe8672a:0xb03a2c, 0.95, 1, false),
+    deckTop: hull(P?0x4a4a4e:0x8d9297, 1, 1, false),
+    stripe: new THREE.MeshStandardMaterial({color: P?0xefefea:0xc93a2c, metalness:0.1, roughness:0.45}),
+    drum: new THREE.MeshStandardMaterial({color: P?0x3c3c42:0x4c5156, metalness:0.85, roughness:0.38, side:THREE.DoubleSide}),
+    bay: new THREE.MeshBasicMaterial({color:0x9a7a4a}),
+    patches: [],
+    dark: new THREE.MeshStandardMaterial({color: P?0x2f353b:0x2d2723, metalness:0.8, roughness:0.42}),
+    metal: new THREE.MeshStandardMaterial({color: P?0x9aa1a8:0x8f8479, metalness:1.0, roughness:0.26}),
+    accent: new THREE.MeshStandardMaterial({color: P?COL.player:COL.enemy, metalness:0.3, roughness:0.5, emissive: P?COL.player:COL.enemy, emissiveIntensity:0.1}),
+    glow: new THREE.MeshBasicMaterial({color: P?0x9fdcff:0xffb07a}),
+    bellIn: new THREE.MeshBasicMaterial({color: P?0x1c3a5c:0x4a2410, side:THREE.DoubleSide}),
+    bell: new THREE.MeshStandardMaterial({color: P?0x7d848a:0x7a6f67, metalness:1.0, roughness:0.22, side:THREE.DoubleSide}),
+    window: new THREE.MeshBasicMaterial({color:new THREE.Color(0xffe2b0).multiplyScalar(2.2)}),
+    rad: new THREE.MeshStandardMaterial({map:radTex, color:0xffffff, metalness:0.3, roughness:0.7, emissiveMap:radGlow, emissive:0xffffff, emissiveIntensity:1.6, side:THREE.DoubleSide}),
+  };
+}
+const PLUME_VS=`uniform float uLen; varying float vT; varying vec3 vN; varying vec3 vW; varying vec3 vP;
+void main(){ vT=clamp(-position.z/uLen,0.0,1.0); vP=position; vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`;
+const PLUME_FS=`uniform vec3 uColor; uniform vec3 uHot; uniform float uPow; uniform float uTime; uniform float uDiamonds; uniform float uEdge; uniform float uNoise; uniform float uI; uniform float uSeed;
+varying float vT; varying vec3 vN; varying vec3 vW; varying vec3 vP;
+float h3(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+float n3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
+// NaN safety: pow() with a negative base is undefined, and on Apple GPUs it returns NaN. One NaN pixel is smeared
+// by the bloom blur into a black block, which flashed the board around ships every second or so. So every pow()
+// base here is clamped non-negative, squares are multiplications, and the output is capped before it reaches bloom.
+void main(){
+  vec3 V=normalize(cameraPosition-vW); float soft=pow(clamp(abs(dot(normalize(vN+vec3(1e-6)),V)),0.0,1.0),uEdge);
+  float t=clamp(vT,0.0,1.0); float u=max(1.0-t,0.0); float fall=pow(u,1.35)*smoothstep(0.0,0.05,t);
+  float n=n3(vec3(vP.x*9.0+uSeed, vP.y*9.0, vP.z*2.5+uTime*16.0))*0.6 + n3(vec3(vP.x*23.0, vP.y*23.0+uSeed, vP.z*6.0+uTime*29.0))*0.4;
+  float d=0.0; if(uDiamonds>0.0){ float s=fract(t*uDiamonds), q=(s-0.5)*5.0; d=exp(-q*q)*pow(u,1.5)*smoothstep(0.0,0.12,t)*smoothstep(0.2,0.9,uPow); }
+  float flick=0.9+0.1*sin(uTime*53.0+uSeed*7.0);
+  float a=(fall*mix(1.0,0.25+1.5*n*n*1.6,uNoise)*0.8+d*2.6)*soft*flick*uPow*uI;
+  vec3 c=mix(uColor,uHot,clamp(u*u*u*0.8+d,0.0,1.0));
+  gl_FragColor=vec4(clamp(c*max(a,0.0),0.0,16.0),1.0); }`;
+const plumeMat = side => new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+  uniforms:{uColor:{value:new THREE.Color(side==='player'?0x8fcfff:0xff9a66)}, uPow:{value:0.4}, uTime:{value:0}},
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`varying vec2 vUv; uniform vec3 uColor; uniform float uPow; uniform float uTime;
+    void main(){ float y=clamp(vUv.y,0.0,1.0); float a=pow(y,1.6); float flick=0.85+0.15*sin(uTime*40.0+y*20.0); vec3 c=mix(uColor,vec3(1.0),pow(y,5.0)); gl_FragColor=vec4(clamp(c*a*uPow*flick,0.0,16.0),1.0); }`});
+
+// chamfered deck section: octagonal frustum along z, back (w0,h0) -> front (w1,h1), UVs in world units so panels tile evenly
+function deckGeometry(len, w0,h0, w1,h1, ch, uvs=1.05){
+  const ring=(w,h,z)=>{ const c=Math.min(w,h)*ch, x=w/2, y=h/2;
+    return [[x-c,y],[x,y-c],[x,-y+c],[x-c,-y],[-x+c,-y],[-x,-y+c],[-x,y-c],[-x+c,y]].map(([a,b])=>new THREE.Vector3(a,b,z)); };
+  const A=ring(w0,h0,-len/2), B=ring(w1,h1,len/2);
+  const pos=[], uv=[]; let per=0;
+  for(let i=0;i<8;i++){ const j=(i+1)%8; const a0=A[i],a1=A[j],b0=B[i],b1=B[j]; const edge=a0.distanceTo(a1);
+    const u0=per*uvs, u1=(per+edge)*uvs; per+=edge; const v0=-len/2*uvs, v1=len/2*uvs;
+    pos.push(...a0.toArray(),...b1.toArray(),...a1.toArray(), ...a0.toArray(),...b0.toArray(),...b1.toArray());
+    uv.push(u0,v0,u1,v1,u1,v0, u0,v0,u0,v1,u1,v1); }
+  const cap=(R,front)=>{ const cz=R[0].z; for(let i=0;i<8;i++){ const j=(i+1)%8; const p=front?[R[j],R[i]]:[R[i],R[j]];
+      pos.push(0,0,cz,...p[0].toArray(),...p[1].toArray()); uv.push(0.5,0.5,p[0].x*uvs+0.5,p[0].y*uvs+0.5,p[1].x*uvs+0.5,p[1].y*uvs+0.5); } };
+  cap(A,false); cap(B,true);
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2)); g.computeVertexNormals(); return g;
+}
+
+// A ship is built from ~200 small meshes. Drawn one by one that was ~200 draw calls per ship, per pass (the
+// shadow pass too): most of a frame's cost with the whole board in view, on a Mac especially. The static parts are
+// merged here into one mesh per material and shadow setting, for drawing only. The originals stay in the body,
+// hidden (userData.mergedAway), because breakUpShip cuts the hull apart from them. Animated or transparent parts
+// (engines, nav lights, shield, decals, the instanced detail layer) are left as they are.
+function mergeShipParts(sh){
+  mergeStatic(sh.body, new Set([...sh.engines.map(e=>e.group), ...sh.lights, sh.pickMesh, sh.shieldMesh, sh.fineMesh].filter(Boolean)), true);
+}
+// Merge the opaque, non-instanced meshes under `body` into one mesh per material and shadow setting. With
+// keepOriginals they stay in place, hidden and flagged mergedAway; otherwise they are removed.
+function mergeStatic(body, skip, keepOriginals){
+  let root=body; while(root.parent) root=root.parent; root.updateMatrixWorld(true);
+  const inv=new THREE.Matrix4().copy(body.matrixWorld).invert(), rel=new THREE.Matrix4();
+  const buckets=new Map();
+  const walk=o=>{ if(skip.has(o) || !o.visible) return;
+    const m=o.material;
+    if(o.isMesh && !o.isInstancedMesh && m && !Array.isArray(m) && !m.transparent && !m.isShaderMaterial){
+      const k=m.uuid+(o.castShadow?'c':'')+(o.receiveShadow?'r':'');
+      if(!buckets.has(k)) buckets.set(k,{mat:m, cast:o.castShadow, recv:o.receiveShadow, parts:[]}); buckets.get(k).parts.push(o); }
+    o.children.forEach(walk); };
+  body.children.forEach(walk);
+  const needsUv=m=>!!(m.map||m.normalMap||m.aoMap||m.roughnessMap||m.metalnessMap||m.emissiveMap||m.bumpMap);
+  for(const b of buckets.values()){
+    if(b.parts.length<2) continue;
+    const geos=b.parts.map(o=>{ const g=o.geometry.index? o.geometry.toNonIndexed() : o.geometry.clone();
+      rel.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(rel);
+      if(rel.determinant()<0){ for(const a of Object.values(g.attributes)){ const n=a.itemSize, arr=a.array;   // mirrored part: restore winding
+        for(let t=0;t+2<a.count;t+=3) for(let c=0;c<n;c++){ const i=(t+1)*n+c, j=(t+2)*n+c, v=arr[i]; arr[i]=arr[j]; arr[j]=v; } } }
+      return g; });
+    const names=Object.keys(geos[0].attributes).filter(n=>geos.every(g=>g.attributes[n]));
+    const ok= names.includes('position') && names.includes('normal') && (!needsUv(b.mat)||names.includes('uv')) && (!b.mat.vertexColors||names.includes('color'));
+    let merged=null;
+    if(ok){ geos.forEach(g=>{ for(const n of Object.keys(g.attributes)) if(!names.includes(n)) g.deleteAttribute(n); g.morphAttributes={}; g.clearGroups(); });
+      merged=THREE.mergeGeometries(geos,false); }
+    geos.forEach(g=>g.dispose());
+    if(!merged) continue;
+    const mesh=new THREE.Mesh(merged,b.mat); mesh.castShadow=b.cast; mesh.receiveShadow=b.recv; mesh.userData.mergedProxy=true; mesh.userData.noAO=false; body.add(mesh);
+    b.parts.forEach(o=>{ if(keepOriginals){ o.visible=false; o.userData.mergedAway=true; } else o.parent.remove(o); });
+  }
+}
+function buildShip(cls, side, copy=0){
+  const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
+  const P=side==='player', R=mulberry32((P?1000:2000)+ORDER.indexOf(cls)*77);
+  const engines=[], lights=[], greebles={dark:[], hull:[], metal:[]}, decks=[];
+  const nav=P?0xffcf80:0xff6a50;
+  const CH = 0.2;
+  const add=(m,x=0,y=0,z=0,chunk=false)=>{ m.position.set(x,y,z); m.userData.chunk=chunk; body.add(m); return m; };
+  const pickHull=()=> M.hull;
+  const pick2=a=>a[Math.floor(R()*a.length)];
+  // --- kit ---
+  // layered drive plume: white-hot core with shock diamonds, turbulent sheath, soft outer glow and a nozzle flare
+  function makePlume(r,x,y,z){
+    const grp=new THREE.Group(); grp.position.set(x,y,z); body.add(grp);
+    const hot=new THREE.Color(P?0xf2f8ff:0xfff2dc), col=new THREE.Color(P?0x5aaeff:0xff7a36);
+    const layer=(rNear,rFar,len,o)=>{ const g=new THREE.CylinderGeometry(rFar,rNear,len,28,32,true); g.translate(0,len/2,0); g.rotateX(-Math.PI/2);
+      const m=new THREE.ShaderMaterial({transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+        uniforms:{uColor:{value:o.col||col}, uHot:{value:hot}, uPow:{value:0.3}, uTime:{value:0}, uLen:{value:len}, uDiamonds:{value:o.d||0}, uEdge:{value:o.edge}, uNoise:{value:o.noise}, uI:{value:o.i}, uSeed:{value:Math.random()*10}},
+        vertexShader:PLUME_VS, fragmentShader:PLUME_FS});
+      grp.add(new THREE.Mesh(g,m)); return m; };
+    const mats=[
+      layer(r*0.26, r*0.13, r*11, {d:7, edge:1.3, noise:0.35, i:0.7, col:hot.clone().lerp(col,0.45)}),   // core + shock diamonds
+      layer(r*0.55, r*0.95, r*7.5, {edge:1.5, noise:1.0, i:0.55}),                                        // turbulent sheath
+      layer(r*0.9, r*1.8, r*4.5, {edge:2.2, noise:1.0, i:0.22}),                                       // outer bloom
+    ];
+    const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:hot.clone().lerp(col,0.35), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+    spr.position.z=-r*0.15; grp.add(spr);
+    const mach=new THREE.Mesh(new THREE.CircleGeometry(r*0.3,24),new THREE.MeshBasicMaterial({color:hot, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+    mach.position.z=-r*0.9; grp.add(mach);
+    return {group:grp, mats, sprite:spr, mach, r, col, base:new THREE.Vector3(x,y,z)};
+  }
+  function deck(z0,z1,w0,h0,w1,h1,o={}){
+    const mat=o.mat||pickHull(); const ch=o.ch!==undefined?o.ch:CH;
+    const m=add(new THREE.Mesh(deckGeometry(z1-z0,w0,h0,w1,h1,ch),mat), o.x||0, o.y||0, (z0+z1)/2, true);
+    const d={z0,z1,w0,h0,w1,h1,x:o.x||0,y:o.y||0,ch}; if(o.greeble!==false) decks.push(d); return m;
+  }
+  function collar(z0,z1,w,h,o={}){ // recessed seam between decks, ribbed
+    deck(z0,z1,w,h,w,h,{mat:M.dark,greeble:false,...o});
+    const n=Math.max(2,Math.round((z1-z0)/0.025)); for(let i=0;i<n;i++){ const z=lerp(z0,z1,(i+0.5)/n); greebles.metal.push([o.x||0,o.y||0,z, w*1.04, h*1.04, 0.008]); }
+  }
+  function truss(z0,z1,w,h,o={}){ // exposed open framework (frontier style)
+    const x0=o.x||0, y0=o.y||0, hw=w/2, hh=h/2; const corners=[[hw,hh],[-hw,hh],[-hw,-hh],[hw,-hh]];
+    corners.forEach(([a,b])=>rod(new THREE.Vector3(x0+a,y0+b,z0),new THREE.Vector3(x0+a,y0+b,z1),0.014,M.metal));
+    const segs=Math.max(1,Math.round((z1-z0)/0.18));
+    for(let s=0;s<segs;s++){ const za=lerp(z0,z1,s/segs), zb=lerp(z0,z1,(s+1)/segs);
+      for(let k=0;k<4;k++){ const [a,b]=corners[k], [c,d]=corners[(k+1)%4]; rod(new THREE.Vector3(x0+a,y0+b,za),new THREE.Vector3(x0+c,y0+d,zb),0.008,M.metal); rod(new THREE.Vector3(x0+a,y0+b,za),new THREE.Vector3(x0+c,y0+d,za),0.008,M.metal); } }
+    // spine pipes through the truss
+    rod(new THREE.Vector3(x0+hw*0.3,y0,z0),new THREE.Vector3(x0+hw*0.3,y0,z1),0.03,M.dark); rod(new THREE.Vector3(x0-hw*0.35,y0+hh*0.2,z0),new THREE.Vector3(x0-hw*0.35,y0+hh*0.2,z1),0.022,M.hull2);
+  }
+  const UP=new THREE.Vector3(0,1,0);
+  function rod(a,b,r,mat,seg=6){ const len=a.distanceTo(b); const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg,1),mat);
+    m.position.copy(a).lerp(b,0.5); m.quaternion.setFromUnitVectors(UP, b.clone().sub(a).normalize()); body.add(m); return m; }
+  function tube(r,z0,z1,x,y,mat=M.dark,seg=16){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,z1-z0,seg),mat); m.rotation.x=Math.PI/2; return add(m,x,y,(z0+z1)/2); }
+  function engine(r,x,y,z){
+    const prof=[]; for(let i=0;i<=18;i++){ const t=i/18; prof.push(new THREE.Vector2(r*(0.36+0.64*Math.pow(t,0.75)), -t*r*1.5)); }
+    const bg=new THREE.LatheGeometry(prof,48); bg.rotateX(Math.PI/2);
+    add(new THREE.Mesh(bg,M.bell),x,y,z);
+    const inner=new THREE.Mesh(bg.clone().scale(0.96,0.96,1),M.bellIn); add(inner,x,y,z);
+    // throat housing, gimbal ring and actuators
+    tube(r*0.52, z-0.02, z+r*0.35, x, y, M.dark, 24);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(r*0.5,r*0.07,8,32),M.metal); add(ring,x,y,z-r*0.12);
+    for(let k=0;k<4;k++){ const a=k*Math.PI/2+Math.PI/4; rod(new THREE.Vector3(x+Math.cos(a)*r*0.55,y+Math.sin(a)*r*0.55,z+r*0.2), new THREE.Vector3(x+Math.cos(a)*r*0.72,y+Math.sin(a)*r*0.72,z-r*0.55), r*0.045, M.dark); }
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(r,r*0.035,6,48),M.dark); add(rim,x,y,z-r*1.5);
+    const disk=new THREE.Mesh(new THREE.CircleGeometry(r*0.36,24),M.glow); disk.rotation.y=Math.PI; add(disk,x,y,z-0.005);
+    engines.push(makePlume(r,x,y,z-r*1.5));
+  }
+  function pdc(x,y,z,dir=1,axis='y'){ // dir: which way the turret faces out (up/down or left/right)
+    const grp=new THREE.Group();
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,0.03,16),M.dark); grp.add(base);
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(0.048,20,12,0,Math.PI*2,0,Math.PI/2),M.metal); dome.position.y=0.015; grp.add(dome);
+    [-0.014,0.014].forEach(o=>{ const b=new THREE.Mesh(new THREE.CylinderGeometry(0.007,0.007,0.13,8),M.dark); b.rotation.x=Math.PI/2-0.35; b.position.set(o,0.05,0.055); grp.add(b);
+      const mz=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.02,8),M.dark); mz.rotation.x=Math.PI/2-0.35; mz.position.set(o,0.072,0.115); grp.add(mz); });
+    const sensor=new THREE.Mesh(new THREE.BoxGeometry(0.02,0.018,0.03),M.dark); sensor.position.set(0.035,0.04,0.0); grp.add(sensor);
+    if(axis==='y'){ if(dir<0) grp.rotation.z=Math.PI; } else grp.rotation.z = -dir*Math.PI/2;
+    grp.rotation.y = R()*0.8-0.4; add(grp,x,y,z);
+  }
+  function radiator(x,y,z,w,d,tilt=0){ // flat fin radiating off the hull, ribbed and heat-glowing at the root
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(w,d,1,1),M.rad); p.rotation.set(-Math.PI/2,0,0); p.rotation.y=tilt;
+    const grp=new THREE.Group(); grp.add(p); p.rotation.z = x>0? 0 : Math.PI;
+    const spar=new THREE.Mesh(new THREE.BoxGeometry(w,0.02,0.03),M.dark); spar.position.z=d/2; grp.add(spar);
+    const spar2=spar.clone(); spar2.position.z=-d/2; grp.add(spar2);
+    const root=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,d,8),M.metal); root.rotation.x=Math.PI/2; root.position.x= x>0?-w/2:w/2; grp.add(root);
+    grp.rotation.z = x>0? -tilt : tilt; add(grp,x,y,z);
+  }
+  function dish(x,y,z,r){ const prof=[]; for(let i=0;i<=10;i++){ const t=i/10; prof.push(new THREE.Vector2(r*t, r*0.35*t*t)); }
+    const d=new THREE.Mesh(new THREE.LatheGeometry(prof,32),new THREE.MeshStandardMaterial({color:0xd8dcdf,metalness:0.4,roughness:0.5,side:THREE.DoubleSide}));
+    const grp=new THREE.Group(); grp.add(d); const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.014,r*1.1,8),M.dark); mast.position.y=-r*0.5; grp.add(mast);
+    const feed=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,r*0.6,6),M.dark); feed.position.y=r*0.3; grp.add(feed);
+    grp.rotation.set(-0.6,R()*6,0.3); add(grp,x,y+r*0.5,z); }
+  function windows(x,y,z,len,n,axis='z'){ for(let i=0;i<n;i++){ const t=(i+0.5)/n; const w=new THREE.Mesh(new THREE.BoxGeometry(axis==='z'?0.012:0.025,0.012,axis==='z'?len/n*0.55:0.012),M.window);
+      add(w, x, y, z + (t-0.5)*len); } }
+  function stripe(z0,z1,w,y,x=0){ [-1,1].forEach(k=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.006,z1-z0),M.accent); add(m,x+k*w*0.32,y,(z0+z1)/2); }); }
+  function decal(text,x,y,z,s,flip){ const m=new THREE.Mesh(new THREE.PlaneGeometry(s*4,s),new THREE.MeshBasicMaterial({map:decalTex(text,side),transparent:true,depthWrite:false}));
+    m.rotation.y = flip? -Math.PI/2 : Math.PI/2; add(m,x,y,z); }
+  function tank(x,y,z,r,len,mat=M.hull2){ const m=new THREE.Mesh(new THREE.CapsuleGeometry(r,len,8,20),mat); m.rotation.x=Math.PI/2; add(m,x,y,z,true);
+    for(let i=-1;i<=1;i+=2){ const s=new THREE.Mesh(new THREE.TorusGeometry(r*1.04,0.008,6,24),M.dark); add(s,x,y,z+i*len*0.3); } }
+  function rail(y,z0,z1,s){ const h=deck(z0,z1,s,s,s*0.9,s*0.9,{y,mat:M.dark,ch:0.3,greeble:false});
+    const n=Math.round((z1-z0)/0.09); for(let i=0;i<n;i++){ const c=new THREE.Mesh(new THREE.TorusGeometry(s*0.62,s*0.1,6,16),M.metal); add(c,0,y,lerp(z0+0.05,z1-0.05,i/(n-1))); }
+    const muzzle=new THREE.Mesh(new THREE.CylinderGeometry(s*0.55,s*0.7,s*0.9,16),M.metal); muzzle.rotation.x=Math.PI/2; add(muzzle,0,y,z1+s*0.3);
+    const bore=new THREE.Mesh(new THREE.CircleGeometry(s*0.3,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,y,z1+s*0.76); return h; }
+  function light(x,y,z,c){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.028,10,8),new THREE.MeshBasicMaterial({color:c})); add(s,x,y,z); lights.push(s); }
+  function rcs(x,y,z){ const b=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.05),M.dark); add(b,x,y,z);
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([a,c])=>{ const n=new THREE.Mesh(new THREE.ConeGeometry(0.012,0.025,8,1,true),M.metal); n.rotation.z = a? -a*Math.PI/2 : (c>0?0:Math.PI); add(n,x+a*0.035,y+c*0.035,z); }); }
+
+  // --- per-class hulls, modeled from the reference miniatures ---
+  // shared Expanse vocabulary: drum-housed drive at the stern, V-strut truss to an octagonal engineering section,
+  // brick-tiled armor decks forward, livery plates, stripes, hull numbers, PDC turrets everywhere
+  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
+  const HULL=M.hull, H2=M.hull2, PL=M.plate, ST=M.stripe;
+  function drum(r,len,zf,x=0,y=0){ // drive housing: open drum, ribbed, crenellated rim, bell and plume inside
+    const zb=zf-len;
+    const shell=new THREE.Mesh(new THREE.CylinderGeometry(r,r*0.97,len,40,1,true),M.drum); shell.rotation.x=Math.PI/2; add(shell,x,y,(zf+zb)/2,true);
+    const inner=new THREE.Mesh(new THREE.CylinderGeometry(r*0.9,r*0.9,len*0.98,40,1,true),M.dark); inner.rotation.x=Math.PI/2; add(inner,x,y,(zf+zb)/2);
+    for(let i=0;i<18;i++){ const a=i/18*Math.PI*2; greebles.metal.push([x+Math.cos(a)*r*1.01,y+Math.sin(a)*r*1.01,(zf+zb)/2, 0.018,0.018,len*0.9]); }
+    for(let i=0;i<12;i++){ const a=(i+0.5)/12*Math.PI*2; const m=new THREE.Mesh(new THREE.BoxGeometry(r*0.36,r*0.14,len*0.22),M.drum);
+      m.position.set(x+Math.cos(a)*r*0.96,y+Math.sin(a)*r*0.96,zb-len*0.05); m.rotation.z=a+Math.PI/2; body.add(m); }
+    [zf-0.01, zb+len*0.3, zb+0.01].forEach(z=>{ const t=new THREE.Mesh(new THREE.TorusGeometry(r*1.005,r*0.035,8,40),M.metal); add(t,x,y,z); });
+    const cap=new THREE.Mesh(new THREE.CircleGeometry(r*0.92,32),M.dark); cap.rotation.y=Math.PI; add(cap,x,y,zf-0.005);
+    // drive bell set deep in the drum
+    const prof=[]; for(let i=0;i<=16;i++){ const t=i/16; prof.push(new THREE.Vector2(r*(0.25+0.6*Math.pow(t,0.8)), -t*len*0.9)); }
+    const bg=new THREE.LatheGeometry(prof,40); bg.rotateX(Math.PI/2); add(new THREE.Mesh(bg,M.bellIn),x,y,zf-len*0.05);
+    const disk=new THREE.Mesh(new THREE.CircleGeometry(r*0.26,24),M.glow); disk.rotation.y=Math.PI; add(disk,x,y,zf-len*0.06);
+    engines.push(makePlume(r,x,y,zb+len*0.06));
+  }
+  function struts(z0,z1,r0,r1,x=0,y=0,n=6){ // V truss between drive drum and engineering section, around a central drive shaft
+    for(let i=0;i<n;i++){ const a=i/n*Math.PI*2, b=a+Math.PI/n;
+      const p0=new THREE.Vector3(x+Math.cos(a)*r0,y+Math.sin(a)*r0,z0), p1=new THREE.Vector3(x+Math.cos(b)*r1,y+Math.sin(b)*r1,z1), p2=new THREE.Vector3(x+Math.cos(a+2*Math.PI/n)*r0,y+Math.sin(a+2*Math.PI/n)*r0,z0);
+      rod(p0,p1,0.014,M.metal); rod(p2,p1,0.014,M.metal); }
+    tube(Math.min(r0,r1)*0.45,z0,z1,x,y,M.dark,20);
+    [0.3,0.7].forEach(t=>{ const g=new THREE.Mesh(new THREE.TorusGeometry(Math.min(r0,r1)*0.5,0.012,6,24),M.metal); add(g,x,y,lerp(z0,z1,t)); });
+  }
+  function plate(z0,z1,w0,h0,w1,h1,o={}){ return deck(z0,z1,w0,h0,w1,h1,{mat:o.mat||HULL,...o}); }
+  function sidePlates(z0,z1,w,h,y=0,mat=PL,t=0.018){ // livery panels hugging both flanks
+    [-1,1].forEach(s=>{ deck(z0,z1,t,h,t,h*0.92,{x:s*(w/2+t/2),y,mat,ch:0.1,greeble:false}); }); }
+  function topPlate(z0,z1,w0,w1,y,mat=PL,t=0.016){ deck(z0,z1,w0,t,w1,t,{y:y+t/2,mat,ch:0.05,greeble:false}); }
+  function stripes(z0,z1,y,sep,w=0.02){ [-1,1].forEach(s=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w,0.008,z1-z0),ST); add(m,s*sep,y,(z0+z1)/2); }); }
+  function chevron(z,y,w){ [-1,1].forEach(s=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(w*0.62,0.008,0.05),ST); m.rotation.y=s*0.55; add(m,s*w*0.24,y,z); }); }
+  function barrels(xs,y,z0,z1,r=0.014){ xs.forEach(x=>{ tube(r,z0,z1,x,y,M.metal,10); tube(r*1.8,z0,z0+0.08,x,y,M.dark,10); tube(r*1.35,z1-0.03,z1,x,y,M.dark,10); }); }
+  function grille(z,y,w,h){ // recessed bow face with framed viewports
+    const back=new THREE.Mesh(new THREE.PlaneGeometry(w,h),M.dark); add(back,0,y,z+0.004);
+    const rows=2, cols=Math.max(3,Math.round(w/0.09));
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const win=new THREE.Mesh(new THREE.PlaneGeometry(w/cols*0.62,h/rows*0.36), r===0?M.window:M.dark); add(win,-w/2+(c+0.5)*w/cols,y+h*0.22-r*h*0.46,z+0.007); }
+    [[0,h/2],[0,-h/2]].forEach(([_,dy])=>{ const f=new THREE.Mesh(new THREE.BoxGeometry(w*1.02,0.02,0.02),PL); add(f,0,y+dy,z+0.01); });
+  }
+  function number(text,x,y,z,s,face){ // hull number decal: face 'top' | 'l' | 'r'
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(s*2.4,s),new THREE.MeshBasicMaterial({map:decalTex(text,side),transparent:true,depthWrite:false}));
+    if(face==='top'){ m.rotation.x=-Math.PI/2; m.rotation.z=-Math.PI/2; } else m.rotation.y = face==='r'? Math.PI/2 : -Math.PI/2; add(m,x,y,z); }
+  function turretBlock(z,y,w){ plate(z-w*0.6,z+w*0.6,w,0.07,w*0.9,0.07,{y:y+0.035,mat:PL,ch:0.25,greeble:false}); pdc(0,y+0.07,z,1); }
+
+  if(cls==='patrol'){
+    const SM=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x8c9095:0xa9adb2, metalness:0.55, roughness:0.42});
+    const SM2=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x5a5e63:0x7c8186, metalness:0.7, roughness:0.38});
+    // angular stealth hunter: stacked knife-edged plates, twin ventral drive pods
+    const spine=plate(-0.82,0.92,.32,.18,.03,.04,{ch:.46,mat:SM,greeble:false}); 
+    plate(-0.7,0.6,.14,.12,.03,.03,{y:.12,ch:.46,mat:SM2,greeble:false});
+    [-1,1].forEach(s=>{
+      const w=plate(-0.78,0.38,.26,.13,.1,.08,{x:s*.25,y:.02,ch:.4,mat:SM,greeble:false}); w.rotation.z=-s*0.32;
+      const c=plate(-0.2,0.62,.14,.1,.04,.05,{x:s*.14,y:.07,ch:.45,mat:SM2,greeble:false}); c.rotation.z=-s*0.5;
+      plate(-0.82,0.05,.17,.17,.14,.14,{x:s*.19,y:-.14,ch:.3,mat:M.dark});
+      for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.CylinderGeometry(.035,.04,.05,16),M.metal); add(b,s*.19,-.24,-0.6+i*.17); }
+      drum(.08,.1,-0.82,s*.19,-.14);
+      const fin=plate(-0.78,-0.4,.012,.18,.012,.06,{x:s*.36,y:.1,ch:.2,mat:SM2,greeble:false}); fin.rotation.z=s*0.4;
+    });
+    stripes(-0.5,0.4,.095,.05,.012); pdc(0,.17,-.2,1); pdc(0,-.1,.35,-1);
+    windows(0,.11,.55,.14,3); number(idn,.0,.187,-.35,.06,'top');
+    light(.44,.12,-.75,nav); light(-.44,.12,-.75,nav);
+  } else if(cls==='corvette'){
+    drum(.2,.3,-0.86);
+    struts(-0.86,-0.68,.17,.2);
+    plate(-0.68,-0.2,.44,.42,.44,.42,{mat:H2}); sidePlates(-0.62,-0.28,.44,.3); turretBlock(-0.44,.21,.16);
+    collar(-0.2,-0.14,.34,.32);
+    plate(-0.14,0.52,.48,.38,.54,.38); sidePlates(-0.05,0.45,.5,.2,-.04);
+    plate(0.52,1.12,.54,.38,.1,.08,{ch:.34,y:-.02}); 
+    [-1,1].forEach(s=>{ const p=plate(0.5,1.0,.03,.26,.02,.1,{x:s*.22,y:-.05,mat:PL,ch:.1,greeble:false}); p.rotation.y=s*0.36; });
+    topPlate(0.0,0.5,.3,.3,.19,H2); stripes(0.55,0.95,.12,.09); chevron(0.9,.08,.14);
+    barrels([-.05,.05],-.14,0.7,1.34,.012);
+    pdc(.27,.1,.2,1,'x'); pdc(-.27,.1,.2,-1,'x'); pdc(0,-.2,.3,-1); pdc(.25,-.1,-.45,1,'x'); pdc(-.25,-.1,-.45,-1,'x');
+    windows(0,.14,.8,.2,4); number(idn,0,.2,.2,.08,'top'); number(idn,.276,-.02,-.02,.07,'r'); number(idn,-.276,-.02,-.02,.07,'l');
+    light(.24,0,-.5,nav); light(-.24,0,-.5,nav); rcs(.25,.2,.5); rcs(-.25,.2,.5);
+  } else if(cls==='frigate'){
+    drum(.17,.24,-1.0);
+    struts(-1.0,-0.9,.15,.18);
+    plate(-0.9,0.5,.5,.3,.5,.3,{ch:.16});
+    [-1,1].forEach(s=>{ plate(-0.85,0.45,.1,.07,.1,.07,{x:s*.2,y:.18,ch:.25,mat:H2}); });  // raised trench rails
+    plate(-0.35,-0.05,.18,.12,.16,.1,{y:.2,ch:.3,mat:PL}); pdc(0,.26,-.2,1); pdc(0,.16,.25,1);
+    sidePlates(-0.8,0.45,.5,.22,-.01);
+    plate(0.5,1.24,.5,.3,.64,.1,{ch:.2,y:-.03,mat:PL}); topPlate(0.55,1.2,.36,.5,.07,HULL); chevron(1.0,.095,.3); chevron(1.1,.08,.36);
+    barrels([-.06,.06],-.1,0.9,1.52,.013);
+    stripes(-0.8,0.4,.155,.21,.015);
+    pdc(.27,0,-.5,1,'x'); pdc(-.27,0,-.5,-1,'x'); pdc(0,-.17,.0,-1); pdc(.3,-.02,.8,1,'x'); pdc(-.3,-.02,.8,-1,'x');
+    windows(0,.19,.3,.3,4); number(idn,.3,-.05,1.05,.06,'r'); number(idn,-.3,-.05,1.05,.06,'l'); number(idn,0,.19,-.6,.07,'top');
+    light(.27,0,-.85,nav); light(-.27,0,-.85,nav); rcs(.26,.15,.4); rcs(-.26,.15,.4);
+  } else if(cls==='destroyer'){
+    drum(.25,.34,-1.16);
+    struts(-1.16,-1.0,.21,.24);
+    plate(-1.0,-0.55,.52,.5,.52,.5,{mat:H2}); sidePlates(-0.95,-0.62,.52,.34); turretBlock(-0.78,.25,.18);
+    plate(-0.55,-0.25,.4,.38,.42,.38); turretBlock(-0.4,.19,.2);
+    collar(-0.25,-0.19,.36,.34);
+    plate(-0.19,0.9,.62,.44,.72,.46);
+    plate(-0.1,0.8,.24,.08,.3,.08,{y:.27,ch:.3,mat:H2}); // raised spine ridge
+    [-1,1].forEach(s=>{ plate(0.0,0.82,.1,.3,.1,.32,{x:s*.39,y:-.02,mat:PL,ch:.2}); });
+    plate(0.9,1.46,.82,.54,.76,.48,{ch:.24}); sidePlates(0.95,1.4,.82,.3,-.02); topPlate(1.0,1.42,.5,.46,.27,PL);
+    plate(0.95,1.4,.5,.12,.46,.1,{y:-.3,ch:.3,mat:H2});
+    grille(1.46,-.02,.56,.26);
+    stripes(0.95,1.42,.29,.33,.02); stripes(-0.1,0.8,.235,.33,.018);
+    pdc(.36,.24,.9,1); pdc(-.36,.24,.9,1); pdc(.42,0,1.2,1,'x'); pdc(-.42,0,1.2,-1,'x'); pdc(.45,-.1,.4,1,'x'); pdc(-.45,-.1,.4,-1,'x'); pdc(0,-.25,.3,-1); pdc(0,-.37,1.2,-1);
+    windows(0,.31,.3,.4,6); number(idn,0,.285,.55,.1,'top'); number(idn,.414,.05,-.3,.08,'r'); number(idn,-.414,.05,-.3,.08,'l');
+    light(.3,.2,-.95,nav); light(-.3,.2,-.95,nav); rcs(.34,.28,1.3); rcs(-.34,.28,1.3); rcs(.28,-.24,-.7); rcs(-.28,-.24,-.7);
+  } else if(cls==='cruiser'){
+    // four drives in a 2x2 cluster, heavy midships, long gun spine to a launcher head
+    [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(([sx,sy])=>{ drum(.16,.3,-1.4,sx*.2,sy*.18); });
+    struts(-1.4,-1.28,.34,.36,0,0,8);
+    plate(-1.28,-0.7,.9,.62,.86,.58,{mat:H2}); sidePlates(-1.2,-0.8,.9,.4);
+    [-1,1].forEach(s=>{ plate(-1.1,-0.1,.22,.34,.2,.3,{x:s*.56,y:-.04,mat:HULL,ch:.25}); topPlate(-1.0,-0.2,.14,.12,.13,PL);
+      const fin=plate(-1.0,-0.45,.02,.3,.02,.14,{x:s*.66,y:.22,mat:H2,ch:.1,greeble:false}); fin.rotation.z=s*0.3; });
+    plate(-0.7,0.25,.6,.52,.5,.44); plate(-0.55,0.05,.26,.16,.22,.12,{y:.34,ch:.3,mat:H2}); windows(0,.42,-.25,.4,6); dish(.18,.3,-.4,.1);
+    collar(0.25,0.32,.3,.3);
+    plate(0.32,1.55,.28,.28,.26,.26,{ch:.22}); topPlate(0.35,1.5,.1,.1,.14,PL); stripes(0.35,1.5,.145,.1,.014);
+    [-1,1].forEach(s=>{ plate(0.4,1.3,.05,.12,.05,.1,{x:s*.17,y:-.02,mat:H2,ch:.2}); });
+    plate(1.55,1.86,.38,.36,.36,.34,{ch:.15,mat:H2}); sidePlates(1.58,1.82,.38,.26);
+    for(let r=0;r<3;r++) for(let c=0;c<3;c++){ const t=new THREE.Mesh(new THREE.CircleGeometry(.038,16),M.dark); add(t,(c-1)*.1,(r-1)*.095,1.865); }
+    const bore=new THREE.Mesh(new THREE.CircleGeometry(.025,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,0,1.868);
+    pdc(.3,.28,-.3,1); pdc(-.3,.28,-.3,1); pdc(.46,-.05,-1.0,1,'x'); pdc(-.46,-.05,-1.0,-1,'x'); pdc(0,.15,.9,1); pdc(0,-.15,1.2,-1); pdc(.2,.2,1.7,1); pdc(-.2,.2,1.7,1); pdc(.68,-.05,-.6,1,'x'); pdc(-.68,-.05,-.6,-1,'x');
+    number(idn,0,.285,-1.0,.09,'top'); number(idn,.195,0,1.72,.06,'r'); number(idn,-.195,0,1.72,.06,'l');
+    light(.46,.2,-1.25,nav); light(-.46,.2,-1.25,nav); light(0,.36,1.84,0xffffff); rcs(.2,.2,1.6); rcs(-.2,.2,1.6);
+  } else if(cls==='carrier'){
+    // broad-beamed flight hull in the same yard style: three drives, launch bays down both flanks and in the bow
+    drum(.2,.3,-1.4,.34,0); drum(.2,.3,-1.4,-.34,0); drum(.24,.34,-1.4,0,.02);
+    struts(-1.4,-1.26,.3,.46,0,0,8);
+    plate(-1.26,-0.8,.9,.56,.94,.56,{mat:H2}); sidePlates(-1.2,-0.86,.94,.36);
+    plate(-0.8,1.2,1.0,.5,1.0,.5,{ch:.18});
+    [-1,1].forEach(s=>{ for(let i=0;i<5;i++){ const slot=new THREE.Mesh(new THREE.PlaneGeometry(.26,.12),M.bay); slot.rotation.y=s*Math.PI/2; add(slot,s*.503,-.06,-.6+i*.38); }
+      plate(-0.7,1.1,.02,.08,.02,.08,{x:s*.51,y:.12,mat:PL,ch:.1,greeble:false}); });
+    topPlate(-0.7,1.1,.56,.56,.25,M.deckTop); stripes(-0.7,1.1,.268,.2,.012);
+    for(let i=0;i<6;i++){ const m=new THREE.Mesh(new THREE.BoxGeometry(.06,.006,.02),ST); add(m,0,.268,-0.5+i*.3); }
+    plate(-0.35,0.25,.16,.26,.14,.2,{x:.38,y:.38,ch:.25,mat:H2}); windows(.38,.5,-.05,.4,5); dish(.38,.52,-.25,.1);
+    plate(1.2,1.62,1.0,.5,.86,.42,{ch:.22}); sidePlates(1.25,1.55,.98,.3,-.02);
+    const bb=new THREE.Mesh(new THREE.PlaneGeometry(.56,.2),M.bay); add(bb,0,-.03,1.625);
+    grille(1.625,.13,.5,.08);
+    pdc(.4,.27,.9,1); pdc(-.4,.27,.9,1); pdc(-.3,.27,-.3,1); pdc(.53,.1,-.8,1,'x'); pdc(-.53,.1,-.8,-1,'x'); pdc(.46,.1,1.4,1,'x'); pdc(-.46,.1,1.4,-1,'x'); pdc(0,-.27,.4,-1); pdc(.3,-.27,-.4,-1); pdc(-.3,-.27,-.4,-1);
+    number(idn,-.2,.27,.4,.12,'top'); number(idn,.52,.15,1.4,.08,'r'); number(idn,-.52,.15,1.4,.08,'l');
+    light(.5,.2,-1.2,nav); light(-.5,.2,-1.2,nav); light(.38,.52,.2,0xff3030); rcs(.5,.25,1.5); rcs(-.5,.25,1.5);
+  }
+  // greebles scattered over every armored deck
+  for(const d of decks){
+    const area=(d.z1-d.z0)*(d.w0+d.h0); const n=Math.round(area*40);
+    for(let i=0;i<n;i++){ const t=R(), z=lerp(d.z0,d.z1,t), w=lerp(d.w0,d.w1,t), h=lerp(d.h0,d.h1,t); const f=R();
+      const sx=0.015+R()*0.06, sy=0.006+R()*0.022, sz=0.015+R()*0.09; const bin = R()<0.55? greebles.dark : R()<0.6? greebles.hull : greebles.metal;
+      const insetW=w/2*(1-d.ch*1.6), insetH=h/2*(1-d.ch*1.6);
+      if(f<0.4) bin.push([d.x+(R()*2-1)*insetW, d.y+h/2+sy/2, z, sx,sy,sz]);
+      else if(f<0.6) bin.push([d.x+(R()*2-1)*insetW, d.y-h/2-sy/2, z, sx,sy,sz]);
+      else { const s=R()<0.5?-1:1; bin.push([d.x+s*(w/2+sy/2), d.y+(R()*2-1)*insetH, z, sy,sx,sz]); } }
+  }
+  const unit=new THREE.BoxGeometry(1,1,1), mtx=new THREE.Matrix4();
+  for(const [k,list] of Object.entries(greebles)){ if(!list.length) continue;
+    const mat=k==='dark'?M.dark:k==='metal'?M.metal:(P?M.hull2:M.hull); const im=new THREE.InstancedMesh(unit,mat,list.length);
+    list.forEach((a,i)=>{ mtx.makeScale(a[3],a[4],a[5]).setPosition(a[0],a[1],a[2]); im.setMatrixAt(i,mtx); }); body.add(im); }
+  // conduit runs along straight decks, plus a fine-detail layer (vents, valves, clamps) that only draws up close
+  const pipes=[], fine=[];
+  for(const d of decks){ const len=d.z1-d.z0; if(len<0.18) continue;
+    const straight=Math.abs(d.w0-d.w1)<0.05 && Math.abs(d.h0-d.h1)<0.05, w=Math.min(d.w0,d.w1), h=Math.min(d.h0,d.h1);
+    if(straight){ const np=1+Math.floor(R()*3);
+      for(let i=0;i<np;i++){ const r=0.006+R()*0.008, za=d.z0+len*R()*0.25, zb=d.z1-len*R()*0.25, top=R()<0.45, sd=R()<0.5?-1:1;
+        const x= top? d.x+(R()*2-1)*w*0.28 : d.x+sd*(w/2+r*0.6), y= top? d.y+h/2+r*0.6 : d.y+(R()*2-1)*h*0.25;
+        pipes.push([x,y,(za+zb)/2,r,zb-za]); const nc=Math.floor((zb-za)/0.06);
+        for(let k=1;k<nc;k++) fine.push([x,y,lerp(za,zb,k/nc), r*2.6,r*2.6,0.008]); } }
+    const n=Math.round(len*(d.w0+d.h0)*140);
+    for(let i=0;i<n;i++){ const t=R(), z=lerp(d.z0,d.z1,t), ww=lerp(d.w0,d.w1,t), hh=lerp(d.h0,d.h1,t), a=0.004+R()*0.012, b=0.003+R()*0.008, c=0.004+R()*0.02;
+      const iw=ww/2*(1-d.ch*1.7), ih=hh/2*(1-d.ch*1.7); if(R()<0.6) fine.push([d.x+(R()*2-1)*iw, d.y+hh/2+b/2, z, a,b,c]); else { const sd=R()<0.5?-1:1; fine.push([d.x+sd*(ww/2+b/2), d.y+(R()*2-1)*ih, z, b,a,c]); } }
+  }
+  if(pipes.length){ const pg=new THREE.CylinderGeometry(1,1,1,8); pg.rotateX(Math.PI/2); const im=new THREE.InstancedMesh(pg,M.metal,pipes.length);
+    pipes.forEach((a,i)=>{ mtx.makeScale(a[3],a[3],a[4]).setPosition(a[0],a[1],a[2]); im.setMatrixAt(i,mtx); }); body.add(im); }
+  let fineMesh=null;
+  if(fine.length){ fineMesh=new THREE.InstancedMesh(unit,M.dark,fine.length); fine.forEach((a,i)=>{ mtx.makeScale(a[3],a[4],a[5]).setPosition(a[0],a[1],a[2]); fineMesh.setMatrixAt(i,mtx); }); fineMesh.visible=false; body.add(fineMesh); }
+  // shield bubble
+  const shMat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    uniforms:{uColor:{value:new THREE.Color(COL.cyan)}, uFlash:{value:0}, uHit:{value:new THREE.Vector3(0,0,1)}, uTime:{value:0}},
+    vertexShader:`varying vec3 vN; varying vec3 vL; varying vec3 vW; void main(){ vL=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader:`varying vec3 vN; varying vec3 vL; varying vec3 vW; uniform vec3 uColor; uniform float uFlash; uniform vec3 uHit; uniform float uTime;
+      void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(max(1.0-abs(dot(vN,v)),0.0),2.2);   /* see the plume shader: pow of a negative is NaN, which bloom smears */ float h=pow(max(dot(vL,uHit),0.0),5.0);
+        float rip=0.5+0.5*sin(acos(clamp(dot(vL,uHit),-1.0,1.0))*18.0-uTime*14.0);
+        float a=(f*0.55+h*(0.8+rip*0.6))*uFlash; gl_FragColor=vec4(uColor*a,1.0); }`});
+  const shield=new THREE.Mesh(new THREE.SphereGeometry(1,32,20),shMat); shield.scale.set(L*0.36,L*0.26,L*0.62); shield.visible=false; g.add(shield);
+  const pickMesh=new THREE.Mesh(new THREE.SphereGeometry(L*0.5,8,6), new THREE.MeshBasicMaterial()); pickMesh.visible=false; g.add(pickMesh);
+  enableShadows(g);
+  mergeShipParts({group:g, body, engines, lights, shieldMesh:shield, pickMesh, fineMesh});
+  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh};
+}
+
