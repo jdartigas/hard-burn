@@ -128,8 +128,8 @@ swarm beats the gunline 65%. At 140 (3 Carriers, Destroyer, Frigate) it won 60% 
 Carrier sits on a sharp edge: whether the group can afford a Destroyer matters more than the
 price itself. Adjust by play.
 
-**Still open:** the AI doesn't play toward the limit (it could retreat to protect its value late
-on, or press when behind).
+~~**Still open:** the AI doesn't play toward the limit.~~ Done in v25: in the last three turns it
+protects a lead or presses when behind (`evalCell`).
 
 **Original note:**
 
@@ -170,6 +170,10 @@ origin (`jdartigas.github.io`), not to the file, so redeploying never touches
 it. What can lose scores is storage being cleared, a different device, or new
 code that can't read old records. Items 1–3 are one feature, best built
 together. Item 4 depends on them.
+
+**Items 1–3 done in v25.** Formula, storage and display are described in `CLAUDE.md` §4 and §2.
+One change from the plan below: a surrender forfeits the fleet (no fleet-kept points) instead of
+scoring half, because half still let a turn-1 surrender outscore fighting and losing.
 
 ### 1. Score formula
 

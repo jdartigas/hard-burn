@@ -28,7 +28,8 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
 - **Bump `GAME_VERSION`** (near the top of the script) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
-- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `hud` (which HUD drawers are open). Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `hud` (which HUD drawers are open), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- **Scores and records live in `hardburn.scores`, and losing them would lose Jon's history.** Never rename the key. The shape is `{format, games, bests}`; each game keeps the raw facts (fleets, difficulty, seed, result, turns, fleet values, damage) plus its score and `formula` version, so the formula can change and old games be rescored. If the format changes, bump `SCORES_FORMAT` and convert old data in `loadScores`, never drop it. `loadScores` validates everything it reads, because Import brings in files from outside; render record fields through `esc()`. Simulator battles are never recorded.
 
 ## 3. Code map (sections appear in this order in the script)
 
@@ -81,7 +82,9 @@ The script has almost no section banners, so find a section by grepping for one 
 
 **Surrender.** In the pause menu (two presses: the first arms it, the second within 4 s confirms). Ends the battle at once as a loss, with its own "Surrendered" end screen. Hidden when no battle is running. It is not withdrawal; that is a campaign mechanic still to design (`BACKLOG.md` item 11).
 
-**Turn limit.** A battle lasts at most `BATTLE_TURNS` (30) turns. If both fleets survive, the side with more fleet value left wins: each surviving ship's cost times its fraction of hull remaining (`fleetValue`). An exact tie is a stalemate. Without the limit, a standoff (two Carrier fleets, a last ship that keeps running) never ends. The AI doesn't yet play toward the limit.
+**Turn limit.** A battle lasts at most `BATTLE_TURNS` (30) turns. If both fleets survive, the side with more fleet value left wins: each surviving ship's cost times its fraction of hull remaining (`fleetValue`). An exact tie is a stalemate. Without the limit, a standoff (two Carrier fleets, a last ship that keeps running) never ends. In the last three turns the AI plays to it: a side ahead on value protects its lead (more caution), a side behind presses (more aggression, less caution), in `evalCell`.
+
+**Score** (`scoreBattle`, formula 1): victory 1000 + fleet value kept (0–1000) + enemy value destroyed (0–500) + 20 per unused turn on a win, times Easy 0.75 / Normal 1 / Hard 1.5. A surrender forfeits the fleet, so it earns no fleet-kept points. Shown on the end screen with its breakdown and a new-best badge; the menu's Records panel shows bests per difficulty, win rate, recent battles, and Export/Import (merges, skips duplicates).
 
 **Hit chance, direct fire (pulse, beam, rail).** `acc − max(0, dist − opt) × fall − target evasion`. Subtract 15 if the target is in debris and 20 if it's under ECM. Add the difficulty modifier (enemy −12 on Easy, +8 on Hard; player +5 on Easy). Clamp to 5–95. Direct fire needs line of sight, and asteroids block it.
 
