@@ -73,7 +73,7 @@ The script has almost no section banners, so find a section by grepping for one 
 |---|---|---|---|---|---|---|---|---|---|
 | Patrol craft | 20 | 45 | 1 | 15 (+8) | 7 | 32 | .20 | Pulse, missiles | ECM screen |
 | Corvette | 40 | 70 | 3 | 25 (+10) | 6 | 24 | .30 | Light railgun, missiles | Hard burn |
-| Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .45 (lends 90% of it within 2 hexes) | Beam, missiles | PD surge |
+| Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .45 (screens allies within 3 hexes with all of it) | Beam, missiles | PD surge |
 | Destroyer | 140 | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
 | Heavy cruiser | 250 | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
 | Fleet carrier | 150 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
@@ -91,7 +91,8 @@ The script has almost no section banners, so find a section by grepping for one 
 **Determinism.** A battle is fully determined by its seed (`board.seed`) plus the orders given. Everything that decides an outcome draws from `gameRand()`, seeded in `setupBattle`: hit and interception rolls, the ±15% damage roll, and the AI's deliberate noise. Everything cosmetic uses `Math.random()`/`rand()`. **Never call `gameRand()` from an effect, and never let an outcome depend on `Math.random()`**, or visuals will change results. `fireWeapon` resolves a volley's damage when it fires, shot by shot against a copy of the target, and each impact effect only applies its precomputed share, so the order effects land in cannot matter. Checked by running the same seeded battles with the simulator clock and with the frame loop both stepping: identical, down to every hull value. `HB.sim` results include a per-battle signature (`battles`) for this. The seed shows in the `?debug` overlay and is stored with every scored game.
 
 **Hit chance, guided (missiles, torpedoes, fighters).** `acc − evasion/2`, minus 5 in debris and 25 under ECM. Ignores range falloff and line of sight. Point defense can then intercept each hit: `pdc × pdcF`, capped at 0.8.
-- A ship's `pdc` is its own value or 90% of any Frigate within 2 hexes, whichever is higher.
+- A ship's point defense is its own `pdc` or the screen of any Frigate within `PD_NET.radius` (3) hexes at `PD_NET.share` (100%) of the Frigate's, whichever is higher (`pdCover`). An interception by a screen is drawn from the Frigate, logged as "by X's screen", and counted in the end screen's "Missiles and fighters stopped" row.
+- Known gap: the Frigate's 0.45 is below the Heavy cruiser's 0.50 and the Carrier's 0.55, so its screen never helps the capitals it's meant to escort. `PD_NET.stack` (combine both instead of taking the higher) fixes that but was measured too strong against missile fleets; see `BACKLOG.md`.
 - PD surge multiplies `pdc` by 1.6, capped at 0.85, before `pdcF` applies.
 
 **Damage.** Shields absorb first, scaled by the weapon's shield multiplier (`sh`). What gets through is multiplied by the weapon's hull multiplier (`hu`), and armor, reduced by pierce, is subtracted from it. Hull damage never drops below 15% of the hit after `hu`. Brace for impact doubles armor, then cuts the hull damage by 25%.

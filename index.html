@@ -398,7 +398,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);out
       <tr><td>Strike wing</td><td>Carrier fighters, huge reach, hard to intercept</td><td>Needs a turn to rearm</td></tr>
     </table>
     <h3>Terrain</h3>
-    <p>Large asteroids block movement and line of sight for direct-fire weapons, but they can be shot apart. Click one with a ship selected to fire on it; a shattered asteroid leaves a debris field behind. Debris fields cost double movement but give ships inside them cover. Destroyed ships break apart and leave a wreck field of the same kind. Frigates extend their point defense to nearby allies.</p>
+    <p>Large asteroids block movement and line of sight for direct-fire weapons, but they can be shot apart. Click one with a ship selected to fire on it; a shattered asteroid leaves a debris field behind. Debris fields cost double movement but give ships inside them cover. Destroyed ships break apart and leave a wreck field of the same kind. Frigates screen allies within 3 hexes with their full point defense: watch for the tracer fire from the escort when it knocks down a missile.</p>
     <h3>Keys</h3>
     <div class="keys">
       <kbd>Tab</kbd><span>Next ship with orders</span>
@@ -460,7 +460,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '27';
+const GAME_VERSION = '28';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -533,6 +533,11 @@ const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
 // each surviving ship's cost times its fraction of hull remaining. Without a limit a standoff never ends.
 const BATTLE_TURNS = 30;
+// The Frigate's escort screen: allies within `radius` hexes intercept with `share` of the Frigate's point defense
+// (if that beats their own). Classes with pdnet:true provide it.
+// stack: false = the stronger of own and screen counts; true = both fire at the incoming round (1-(1-a)(1-b)), so an
+// escort also helps ships whose own point defense beats it (the capitals)
+const PD_NET = { share:1.0, radius:3, stack:false };   // v28: share and radius were 0.9 and 2 (see BACKLOG.md, Frigate)
 // Fleet budgets in points; `cost` on each class is what a hull spends. Prices were measured with HB.sim, not
 // derived from stats: see BACKLOG.md item 0 for the method and results. The classic fleet costs 660.
 const BUDGETS = { skirmish:330, standard:660, large:1000 };
@@ -1624,12 +1629,17 @@ function hitCore(w, attSide, dist, tgt, tgtCell, los){
   return clamp(Math.round(p),5,95);
 }
 function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range) return 0; return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt)); }
-function interceptChance(tgt, w){
-  let p=tgt.pdc;
+// Whose point defense protects tgt: its own, or an escort's screen when that is stronger. `by` is the ship doing
+// the shooting, so the interception can be drawn from it and credited to it.
+function pdCover(tgt){
+  let p=tgt.pdc, by=tgt;
   if(tgt.fx.pdsurge) p=Math.min(0.85,p*1.6);
-  for(const a of alive(tgt.side)) if(a.C.pdnet && a!==tgt && hdist(a,tgt)<=2) p=Math.max(p, a.pdc*0.9);
-  return clamp(p*w.pdcF, 0, 0.8);
+  let best=null; for(const a of alive(tgt.side)) if(a.C.pdnet && a!==tgt && hdist(a,tgt)<=PD_NET.radius && (!best || a.pdc>best.pdc)) best=a;
+  if(best){ const sp=best.pdc*PD_NET.share;
+    if(PD_NET.stack){ p=1-(1-p)*(1-sp); by=best; } else if(sp>p){ p=sp; by=best; } }
+  return {p, by};
 }
+function interceptChance(tgt, w){ return clamp(pdCover(tgt).p*w.pdcF, 0, 0.8); }
 function applyDamage(t, w, dmg){
   let s=0, h=0;
   if(t.shield>0){ const sd=dmg*w.sh, ab=Math.min(t.shield, sd); t.shield-=ab; s=ab; dmg=(sd-ab)/w.sh; }
@@ -1748,7 +1758,7 @@ function fxPulse(att, tgt, outcomes, onEvent){
     });
   });
 }
-function fxGuided(att, tgt, outcomes, onEvent, kind, big){
+function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null){
   return new Promise(res=>{
     let left=outcomes.length;
     const fighter= kind==='fighter';
@@ -1772,7 +1782,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big){
             Particles.emit(p, new THREE.Vector3(rand(-.2,.2),rand(-.2,.2),rand(-.2,.2)), trailCol, big?0.45:0.3, fighter?0.25:0.5, 1, big?0.6:0.3);
             if(!fighter && Math.random()<0.4) Particles.emit(p, new THREE.Vector3(), C_SMOKE, 0.5, 1.2, 0.5, 0.8);
             if(o==='int' && !pdcStarted && e>cutK-0.22){ pdcStarted=true; Sound.pdc(); }
-            if(o==='int' && pdcStarted && e<cutK){ const src=tgt.group.position.clone().add(new THREE.Vector3(rand(-.4,.4),0.2,rand(-.4,.4)));
+            if(o==='int' && pdcStarted && e<cutK){ const src=(screen||tgt).group.position.clone().add(new THREE.Vector3(rand(-.4,.4),0.2,rand(-.4,.4)));   // a screening escort fires its own point defense
               const v=p.clone().sub(src); const dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src,v,new THREE.Color(1,.85,.4),0.12,dd/40,0); }
             if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); onEvent(i,o); return false; }
             if(e>=1){ if(o==='hit') onEvent(i,o); else onEvent(i,o); return false; }
@@ -1781,9 +1791,9 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big){
     });
   });
 }
-function playWeaponFx(w, att, tgt, outcomes, onEvent){
+function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null){
   switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent); case 'beam': return fxBeam(att,tgt,outcomes,onEvent);
-    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big); }
+    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen); }
 }
 /* ---------------- ship destruction: chained blasts, hull breakup, burning wrecks ---------------- */
 const wrecks=[];
@@ -2000,14 +2010,14 @@ async function explodeShip(s){
 }
 
 /* ---------------- combat ---------------- */
-function newStats(){ return {player:{dealt:0,taken:0,shots:0,hits:0,kills:0}, enemy:{dealt:0,taken:0,shots:0,hits:0,kills:0}}; }
+function newStats(){ const z=()=>({dealt:0,taken:0,shots:0,hits:0,kills:0,ints:0,screened:0}); return {player:z(), enemy:z()}; }
 async function fireWeapon(att, wi, tgt){
   const w=att.weapons[wi], d=w.def;
   if(!att.alive || !tgt.alive || !weaponReady(w)) return false;
   const p=hitChance(att,d,tgt); if(p<=0) return false;
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
-  const pInt=d.guided?interceptChance(tgt,d):0;
+  const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
   const outcomes=[], dmgRoll=[];
   for(let i=0;i<d.shots;i++){ let o=gameRand()*100<p?'hit':'miss'; if(o==='hit' && d.guided && gameRand()<pInt) o='int'; outcomes.push(o); dmgRoll.push(d.dmg*(0.85+gameRand()*0.3)); }
   // Resolve the volley now, shot by shot in order, against a copy of the target. The effects land in whatever order
@@ -2027,14 +2037,16 @@ async function fireWeapon(att, wi, tgt){
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
       if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; destroyShip(tgt, att); } }
       refreshTags(); updateHUD();
-    } else if(o==='int'){ ints++; if(ints===1) floatText(tgt,'Intercepted','int',0.4); }
+    } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++;
+      if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
     else { misses++; if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
   };
-  await playWeaponFx(d, att, tgt, outcomes, onEvent);
+  await playWeaponFx(d, att, tgt, outcomes, onEvent, screen);
   const cls= att.side==='player'?'p':'e';
   let msg=`${att.name} ${d.name.toLowerCase()} → ${tgt.name}: `;
-  if(hits===0) msg += ints? `${ints} intercepted` : 'missed';
-  else { msg += `${Math.round(S+H)} damage`; if(S>0.5 && H>0.5) msg+=` (${Math.round(S)} to shields)`; else if(H<0.5) msg+=' to shields'; if(ints) msg+=`, ${ints} intercepted`; if(d.shots>1) msg+=`, ${hits}/${d.shots} hit`; }
+  const byScr= screen? ` by ${screen.name}'s screen` : '';
+  if(hits===0) msg += ints? `${ints} intercepted${byScr}` : 'missed';
+  else { msg += `${Math.round(S+H)} damage`; if(S>0.5 && H>0.5) msg+=` (${Math.round(S)} to shields)`; else if(H<0.5) msg+=' to shields'; if(ints) msg+=`, ${ints} intercepted${byScr}`; if(d.shots>1) msg+=`, ${hits}/${d.shots} hit`; }
   log(msg, cls);
   updateHUD();
   return true;
@@ -2267,7 +2279,8 @@ function showEnd(win, byValue=null, surrendered=false){
     <span>Ships destroyed</span><b>${P.kills}</b><b>${E.kills}</b>
     <span>Damage dealt</span><b>${Math.round(P.dealt)}</b><b>${Math.round(E.dealt)}</b>
     <span>Shots fired</span><b>${P.shots}</b><b>${E.shots}</b>
-    <span>Accuracy</span><b>${acc(P)}</b><b>${acc(E)}</b>`;
+    <span>Accuracy</span><b>${acc(P)}</b><b>${acc(E)}</b>
+    <span>Missiles and fighters stopped</span><b>${P.ints}${P.screened?` (${P.screened} by escorts)`:''}</b><b>${E.ints}${E.screened?` (${E.screened} by escorts)`:''}</b>`;
   const rec=recordBattle(surrendered?'surrender': win?'win': draw?'draw':'loss');
   if(rec){ const {g,best}=rec, pt=g.parts;
     $('#end-score').innerHTML=`<div class="sc-top"><span>Score</span><b>${fmtN(g.score)}</b>${best?`<em>New best on ${DIFF_LABEL[g.diff]}</em>`:''}</div>
@@ -2945,7 +2958,7 @@ document.addEventListener('visibilitychange', ()=>{ clock.getDelta(); });
 
 // boot: menu backdrop battle
 setupBattle(4242); applyQuality(); warmUp(); cam.rGoal=46; cam.radius=70; cam.phi=1.12; frame();
-window.HB = {sim, simBattle, WEAPONS, CLASSES, ABIL, aiBuild, AI_PLANS, BUDGETS, PRESETS, wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
+window.HB = {sim, simBattle, WEAPONS, CLASSES, ABIL, PD_NET, aiBuild, AI_PLANS, BUDGETS, PRESETS, wrecks, explodeShip, destroyRock, Particles, render:()=>{ updateShadowFrustum(); composer.render(); }, applyQuality:(q)=>{ quality=q; applyQuality(); }, gtao, zoomTo, board, Sound, cam, fireWeapon, toScreen, hexToWorld, state, startGame, endPlayerTurn, runAITurn, beginSideTurn, alive, setTimeScale:v=>timeScale=v, startPlayerTurn, select, fireAll, playerMove, reachable};
 </script>
 </body>
 </html>

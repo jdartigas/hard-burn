@@ -164,6 +164,32 @@ before players can build anything they like.
 
 ---
 
+### 0b. The Frigate (v28)
+
+Jon felt Frigates were underpowered. Measured: priced fairly (about 10 match the 660-point Classic
+fleet), but thin one-on-one, and its escort job was invisible.
+
+**Variants, 40 battles each** (row fleet's win rate; ±8 points of noise):
+
+| Variant | 10 Frigates v Classic | Swarm v Wolfpack | Carrier grp v Wolfpack |
+|---|---|---|---|
+| v27 (screen 90%, radius 2) | 40 | 40 | 53 |
+| Full share | 33 | 45 | 57 |
+| **Full share + radius 3 (shipped)** | 43 | 53 | 60 |
+| Beam range 6 | 38 | 38 | 65 |
+| Radius 3 + beam range 6 | 40 | 48 | 73 |
+
+**Shipped in v28:** `PD_NET` share 100%, radius 3, plus visible screening (tracers from the Frigate,
+"by X's screen" in the log, an end-screen row). Preset round robin after it, average win rate:
+Carrier 53, Gunline 52, Swarm 52, Classic 49, Wolfpack 45, a tighter spread than v27 (45–57).
+
+**Open: the Frigate can't escort capitals.** Its point defense (0.45) is below the Heavy cruiser's
+(0.50) and the Carrier's (0.55), and a screen only counts when it beats a ship's own. Tested
+`PD_NET.stack` (both fire: 1-(1-own)(1-screen)): round robin Carrier 57, Swarm 56, Gunline 55,
+Classic 46, **Wolfpack 36**, and Carrier grp v Wolfpack 80%. Too hard on missile fleets. Options to
+try: stack at a lower share (say 50%), or raise the Frigate's own `pdc` to about 0.55 so its screen
+reaches the capitals under the current rule. Re-measure the presets either way.
+
 ## Scoring and records
 
 The goal: a score for every battle, kept on the device across every future
