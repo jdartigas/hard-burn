@@ -152,7 +152,11 @@ per fleet** on top of the budget.
    Measured with the balance simulator (`HB.sim`, see `CLAUDE.md` §7). Results below.
 3. ~~quick play presets~~ **Done in v18.** Five fleets in `PRESETS`, picked on the menu; the enemy
    can be Random or a chosen preset. Balanced with a full round robin (below).
-4. the custom builder
+4. ~~the custom builder~~ **Done in v27.** Custom fleets against a budget, and an "AI build" enemy
+   that spends the same budget (`AI_PLANS`). At Standard, the AI's five plans win 50-65% against
+   the Classic fleet (40 battles each), so none is broken. Two things to watch: the Carriers plan
+   buys a second Patrol craft with leftover points (the 8-ship group that dominated as a preset),
+   and at Large, Swarm and Wolfpack hit the 12-ship cap with 160-260 points unspent.
 5. per-ship loadouts
 
 Presets come before the builder so the engine is tested with fixed fleets

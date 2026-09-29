@@ -28,7 +28,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
 - **Bump `GAME_VERSION`** (near the top of the script) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
-- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `hud` (which HUD drawers are open), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `custom` (the builder's fleet), `hud` (which HUD drawers are open), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
 - **Scores and records live in `hardburn.scores`, and losing them would lose Jon's history.** Never rename the key. The shape is `{format, games, bests}`; each game keeps the raw facts (fleets, difficulty, seed, result, turns, fleet values, damage) plus its score and `formula` version, so the formula can change and old games be rescored. If the format changes, bump `SCORES_FORMAT` and convert old data in `loadScores`, never drop it. `loadScores` validates everything it reads, because Import brings in files from outside; render record fields through `esc()`. Simulator battles are never recorded.
 
 ## 3. Code map (sections appear in this order in the script)
@@ -65,7 +65,7 @@ The script has almost no section banners, so find a section by grepping for one 
 
 ## 4. Game design
 
-**Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. The menu's quick play pickers choose from `PRESETS` (five fleets within the Standard budget); the enemy defaults to Random, rolled again for each new battle but not for a restart. Choices persist as `hardburn.fleetYou` and `hardburn.fleetEnemy`. There is no custom fleet builder yet (see `BACKLOG.md` item 0). The player's fleet is on the west side, the enemy's on the east.
+**Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. The menu's pickers choose your fleet from `PRESETS` or **Custom** (the fleet builder), and the enemy from Random (any preset), a preset, or **AI build** (the AI spends your budget with one of the `AI_PLANS`, picked at random each battle). The builder lists every class in `CLASSES` with its cost, hull, shields, damage per turn and weapons, against a budget from `BUDGETS` (Skirmish 330, Standard 660, Large 1000) and the 12-ship cap. A custom fleet is stored as `hardburn.custom` = {budget, fleet}; if a price change later puts it over budget it's discarded and the pick falls back to Classic. Presets are Standard-budget fleets, so saving a custom fleet at another budget switches the enemy to AI build, and the menu warns if you pick a preset against it. Choices persist as `hardburn.fleetYou` and `hardburn.fleetEnemy`; scored games also keep both fleet lists and the budget.
 - **Deployment** (`deployFleet`): the first ship of each class takes its `DEPLOY` home cell, so the classic fleet lines up as it always has. Extra copies take the nearest free cell west of `DEPLOY_MAX_X`, keeping a one-hex gap where possible. The enemy's cells are mirrored through the centre, and terrain keeps every deployment cell clear.
 - **Duplicates** are named with numerals (Iron Vesper II) and carry hull numbers like 537-2.
 
@@ -109,6 +109,19 @@ The script has almost no section banners, so find a section by grepping for one 
 - When a direct-fire weapon has no clean shot, it blasts the asteroid blocking its line.
 
 **Difficulty** (`DIFF`) changes enemy accuracy, hull multiplier, caution, focus and noise.
+
+### Adding a new ship class
+
+The fleet builder, the class list and the HUD read `CLASSES`, so a new class appears in them on its own. Everything else a class touches:
+1. `CLASSES`: stats, `weapons` (keys into `WEAPONS`), `ability` (a key into `ABIL`), `len` and `y`, and a provisional `cost`.
+2. `ORDER`: where it sits, lightest to heaviest (turn order and list sorting).
+3. `DEPLOY`: a home cell on the player's side for the first ship of the class.
+4. `NAMES`: one name per side, and a hull number in the `idn` maps at the top of `buildShip`.
+5. `buildShip`: its model. This is the real work: a per-class builder in the same design language (drum drives, V-strut truss, tiled decks), with plumes via `makePlume`. Anything animated or transparent must go in `mergeShipParts`'s skip set.
+6. `breakUpShip`: how many sections it breaks into (`nSec`).
+7. AI: `targetValue` (how much the AI wants to kill it), and whether `evalCell` should keep it at stand-off range like the carrier and cruiser.
+8. Price it with `HB.sim`: exchange rate against the classic fleet, then equal-budget tests against the presets (`BACKLOG.md` item 0 has the method), and add it to any `AI_PLANS` wish lists that should use it.
+9. Check it in the warm-up (`warmUp` builds a Carrier wreck; a new class with new materials may need its own).
 
 ## 5. Visual design
 
