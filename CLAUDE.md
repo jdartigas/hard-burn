@@ -88,6 +88,8 @@ The script has almost no section banners, so find a section by grepping for one 
 
 **Hit chance, direct fire (pulse, beam, rail).** `acc − max(0, dist − opt) × fall − target evasion`. Subtract 15 if the target is in debris and 20 if it's under ECM. Add the difficulty modifier (enemy −12 on Easy, +8 on Hard; player +5 on Easy). Clamp to 5–95. Direct fire needs line of sight, and asteroids block it.
 
+**Determinism.** A battle is fully determined by its seed (`board.seed`) plus the orders given. Everything that decides an outcome draws from `gameRand()`, seeded in `setupBattle`: hit and interception rolls, the ±15% damage roll, and the AI's deliberate noise. Everything cosmetic uses `Math.random()`/`rand()`. **Never call `gameRand()` from an effect, and never let an outcome depend on `Math.random()`**, or visuals will change results. `fireWeapon` resolves a volley's damage when it fires, shot by shot against a copy of the target, and each impact effect only applies its precomputed share, so the order effects land in cannot matter. Checked by running the same seeded battles with the simulator clock and with the frame loop both stepping: identical, down to every hull value. `HB.sim` results include a per-battle signature (`battles`) for this. The seed shows in the `?debug` overlay and is stored with every scored game.
+
 **Hit chance, guided (missiles, torpedoes, fighters).** `acc − evasion/2`, minus 5 in debris and 25 under ECM. Ignores range falloff and line of sight. Point defense can then intercept each hit: `pdc × pdcF`, capped at 0.8.
 - A ship's `pdc` is its own value or 90% of any Frigate within 2 hexes, whichever is higher.
 - PD surge multiplies `pdc` by 1.6, capped at 0.85, before `pdcF` applies.

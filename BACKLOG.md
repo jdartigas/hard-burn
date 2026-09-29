@@ -261,13 +261,11 @@ one building on the one before:
    Firebase, PartyKit). This is the first real backend Hard Burn would have.
 
 **Things that constrain levels 2 and 3:**
-- **Combat isn't deterministic.** Terrain and ship details use seeded
-  `mulberry32`, but hit and interception rolls in `fireWeapon` use
-  `Math.random()`. So the two browsers can't each simulate a turn and trust
-  they got the same result. Either one side is the authority and sends
-  outcomes, or all combat rolls move to a seeded generator that both sides
-  share. The seeded route also makes replays and verified leaderboard scores
-  (item 4) possible, so it's worth doing first.
+- ~~**Combat isn't deterministic.**~~ **Done in v26.** Every outcome comes from
+  `gameRand()`, seeded from the battle seed; volleys resolve when fired, so
+  effect timing can't change results. Same seed plus the same orders gives the
+  same battle, verified across different frame timings (`CLAUDE.md` §4). What
+  online play still needs on top: exchanging the seed and each side's orders.
 - **Timing:** effects run on `tween`/`wait` scaled by `timeScale`. The remote
   player's turn has to play back as animation from received moves, not run
   live.
@@ -346,7 +344,7 @@ has to read weapons from each ship instead of from its class.
    the game, and one ~5,000-line `index.html` is hard to work on. Plain
    JavaScript modules served as separate files still need no build step and
    work on GitHub Pages.
-5. **Seeded combat rolls** (see item 5). Needed for the server to check a
+5. ~~**Seeded combat rolls**~~ **Done in v26.** Needed for the server to check a
    battle's result.
 6. **Save and restore the full battle state.**
 

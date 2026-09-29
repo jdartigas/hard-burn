@@ -427,7 +427,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-const GAME_VERSION = '25';
+const GAME_VERSION = '26';
 /* =====================================================================
    HARD BURN — turn-based 2.5D fleet engagement
    ===================================================================== */
@@ -441,6 +441,14 @@ const pick = arr => arr[Math.floor(Math.random()*arr.length)];
 const easeInOut = t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
 const easeOut = t => 1-Math.pow(1-t,3);
 const linear = t => t;
+// Two kinds of randomness. gameRand() decides outcomes (hits, interceptions, damage, the AI's deliberate noise) and
+// is seeded from the battle seed in setupBattle, so the same seed and the same orders replay the same battle, which
+// replays, bug reports, online play and a verifiable leaderboard all depend on. Math.random() and rand() are for
+// looks only (sparks, bobbing, sounds, effect paths): nothing cosmetic may ever call gameRand(), or how an
+// explosion looks would change who wins.
+let gameRng=null;
+function seedGameRand(seed){ gameRng=mulberry32(((seed>>>0) ^ 0x9E3779B9)>>>0); }
+function gameRand(){ if(!gameRng) seedGameRand(1); return gameRng(); }
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const store = {
   get(k,d){ try{ const v = localStorage.getItem('hardburn.'+k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
@@ -1947,17 +1955,24 @@ async function fireWeapon(att, wi, tgt){
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
   const pInt=d.guided?interceptChance(tgt,d):0;
-  const outcomes=[]; for(let i=0;i<d.shots;i++){ let o=Math.random()*100<p?'hit':'miss'; if(o==='hit' && d.guided && Math.random()<pInt) o='int'; outcomes.push(o); }
+  const outcomes=[], dmgRoll=[];
+  for(let i=0;i<d.shots;i++){ let o=gameRand()*100<p?'hit':'miss'; if(o==='hit' && d.guided && gameRand()<pInt) o='int'; outcomes.push(o); dmgRoll.push(d.dmg*(0.85+gameRand()*0.3)); }
+  // Resolve the volley now, shot by shot in order, against a copy of the target. The effects land in whatever order
+  // their (cosmetic) flight paths make them, so each impact only applies its precomputed share: subtraction is the
+  // same in any order, and the shot that kills is fixed here rather than by which effect arrives first.
+  const sim={shield:tgt.shield, hull:tgt.hull, armor:tgt.armor, fx:tgt.fx}; let killShot=-1;
+  const res=outcomes.map((o,i)=>{ if(o!=='hit' || killShot>=0) return {s:0,h:0}; const r=applyDamage(sim,d,dmgRoll[i]); if(sim.hull<=0.5) killShot=i; return r; });
   const st=state.stats[att.side]; st.shots+=d.shots;
   let S=0,H=0,hits=0,ints=0,misses=0, missShown=false;
   const onEvent=(i,o)=>{
     if(o==='hit'){ hits++; st.hits++;
+      const r=res[i]; S+=r.s; H+=r.h;
+      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; }
       if(!tgt.alive) return;
-      const dmg=d.dmg*rand(0.85,1.15); const r=applyDamage(tgt,d,dmg); S+=r.s; H+=r.h;
-      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; } else rockDamaged(tgt);
+      tgt.shield=Math.max(0,tgt.shield-r.s); tgt.hull-=r.h; if(tgt.isRock) rockDamaged(tgt);
       impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1);
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
-      if(tgt.hull<=0.5 && tgt.alive){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; destroyShip(tgt, att); } }
+      if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; destroyShip(tgt, att); } }
       refreshTags(); updateHUD();
     } else if(o==='int'){ ints++; if(ints===1) floatText(tgt,'Intercepted','int',0.4); }
     else { misses++; if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
@@ -2050,7 +2065,7 @@ function evalCell(s, cell, D){
   const near=foes.reduce((m,f)=>Math.min(m,hdist(f,cell)),99);
   if(s.cls==='carrier' || s.cls==='cruiser') score -= Math.max(0,5-near)*6*late;
   if(off===0) score -= near*1.8;
-  score += (Math.random()-0.5)*D.noise;
+  score += (gameRand()-0.5)*D.noise;
   return score;
 }
 async function aiShip(s){
@@ -2067,14 +2082,14 @@ async function aiShip(s){
   if(s.ability.key==='ecm' && abilityReady(s)){ const n=alive(s.side).filter(o=>hdist(o,s)<=2).length; if(n>=2 || threatAt(s,s)>30) await useAbility(s); }
   if(s.ability.key==='repair' && abilityReady(s)){ let tgt=null, miss=34; for(const o of alive(s.side)){ if(o!==s && hdist(o,s)<=3 && o.hullMax-o.hull>miss){ miss=o.hullMax-o.hull; tgt=o; } } if(tgt) await useAbility(s,tgt); }
   for(const i of firingOrder(s)){ if(state.over) return; const w=s.weapons[i]; if(!weaponReady(w)) continue;
-    let tgt=null, bv=0; for(const t of alive(other(s.side))){ const v=scoreAttack(s,w.def,t,s,D)*(1+(Math.random()-.5)*D.noise/40); if(v>bv){ bv=v; tgt=t; } }
+    let tgt=null, bv=0; for(const t of alive(other(s.side))){ const v=scoreAttack(s,w.def,t,s,D)*(1+(gameRand()-.5)*D.noise/40); if(v>bv){ bv=v; tgt=t; } }
     if(!tgt && !w.def.guided){ // no clean shot: blast an asteroid that blocks the line to the nearest enemy
       const foes=alive(other(s.side)); const foe=foes.sort((a,b)=>hdist(a,s)-hdist(b,s))[0];
       if(foe && hdist(s,foe)<=w.def.range+3){ const line=hexLine(s,foe); for(let k=1;k<line.length-1;k++){ const c=cellAt(line[k].q,line[k].r); if(c && c.t==='rock' && c.rock && c.rock.alive){ if(hitChance(s,w.def,c.rock)>0) tgt=c.rock; break; } } }
       if(tgt){ await fireWeapon(s,i,tgt); await wait(0.15); continue; }
     }
     // save guided ammo for worthwhile shots
-    if(tgt && w.ammo!==undefined && bv<8 && Math.random()<0.7) continue;
+    if(tgt && w.ammo!==undefined && bv<8 && gameRand()<0.7) continue;
     if(tgt){ state.hoverTarget=tgt; await fireWeapon(s,i,tgt); await wait(0.15); }
   }
   if(state.over) return;
@@ -2163,7 +2178,7 @@ function saveScores(d){ d.games=d.games.slice(-SCORES_KEEP); store.set('scores',
 let persistAsked=false;
 function requestPersist(){ if(persistAsked) return; persistAsked=true; try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){} }
 function recordBattle(result){
-  if(simRunning || state.recorded) return null; state.recorded=true;
+  if(simRunning || state.simulated || state.recorded) return null; state.recorded=true;
   const mine=state.ships.filter(s=>s.side==='player'), theirs=state.ships.filter(s=>s.side==='enemy');
   const cost=l=>l.reduce((a,s)=>a+s.C.cost,0);
   const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, limit:BATTLE_TURNS,
@@ -2610,7 +2625,7 @@ function deployFleet(list){
   return cells;
 }
 function setupBattle(seed, fleets={}){
-  clearBattle(); board.seed=seed;
+  clearBattle(); board.seed=seed; seedGameRand(seed);
   const lists={player:cleanFleet(fleets.player), enemy:cleanFleet(fleets.enemy)};
   const cells={player:deployFleet(lists.player), enemy:deployFleet(lists.enemy).map(([q,r])=>[-q,-r])};
   board.deploy=[...cells.player, ...cells.enemy];
@@ -2620,7 +2635,7 @@ function setupBattle(seed, fleets={}){
     lists[side].forEach((cls,i)=>{ const copy=n[cls]=(n[cls]??-1)+1; state.ships.push(createShip(cls, side, cells[side][i][0], cells[side][i][1], copy)); });
   }
   state.fleets=lists;
-  state.turn=0; state.over=false; state.result=null; state.surrendered=false; state.recorded=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
+  state.turn=0; state.over=false; state.result=null; state.surrendered=false; state.recorded=false; state.simulated=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
 }
 // fleets: {player:[...], enemy:[...]}. Leave it out to replay the last fleets (classic on the first game).
 let lastFleets={};
@@ -2700,7 +2715,7 @@ let simRunning=false;
 const simTick = (()=>{ const mc=new MessageChannel(); let res=null; mc.port1.onmessage=()=>{ const r=res; res=null; r&&r(); };
   return ()=>new Promise(r=>{ res=r; mc.port2.postMessage(0); }); })();   // a macrotask that background tabs don't throttle
 async function simBattle(fleets, seed){
-  setupBattle(seed, fleets); state.phase='starting';
+  setupBattle(seed, fleets); state.phase='starting'; state.simulated=true;   // never recorded as a real game
   let running=true;
   const pump=(async()=>{ while(running){ stepClock(SIM_DT); await simTick(); } })();
   const until=async f=>{ while(!f()) await simTick(); };
@@ -2714,20 +2729,21 @@ async function simBattle(fleets, seed){
   running=false; await pump;
   const side=sd=>{ const all=state.ships.filter(x=>x.side===sd), live=all.filter(x=>x.alive);
     return {left:live.length, of:all.length, hull:Math.round(live.reduce((a,x)=>a+x.hull,0)/all.reduce((a,x)=>a+x.hullMax,0)*100)}; };
-  return {winner: state.result==='player'?'west': state.result==='enemy'?'east':'draw', byValue: alive('player').length>0 && alive('enemy').length>0, turns:state.turn, west:side('player'), east:side('enemy')};
+  const sig=state.ships.map(x=>x.alive?Math.round(x.hull*10)/10:'x').join(',');
+  return {sig, winner: state.result==='player'?'west': state.result==='enemy'?'east':'draw', byValue: alive('player').length>0 && alive('enemy').length>0, turns:state.turn, west:side('player'), east:side('enemy')};
 }
 // HB.sim({west:[...], east:[...]}, n): n battles, fleets swapping sides each battle so the first-move advantage
 // cancels. Reports wins for the fleet passed as `west`.
 async function sim(fleets, n=20, seed0=1){
   const prevDiff=state.diff, prevScale=timeScale; state.diff='normal'; timeScale=1; simRunning=true; window.__norender=true;
-  const out={a:0, b:0, draw:0, byValue:0, turns:0, n, aLeft:0, bLeft:0};
+  const out={a:0, b:0, draw:0, byValue:0, turns:0, n, aLeft:0, bLeft:0, battles:[]};
   try{
     for(let i=0;i<n;i++){
       const swap=i%2===1, f= swap? {player:fleets.east, enemy:fleets.west} : {player:fleets.west, enemy:fleets.east};
       const r=await simBattle(f, seed0+i);
       const aWon= swap? r.winner==='east' : r.winner==='west', bWon= swap? r.winner==='west' : r.winner==='east';
       if(aWon) out.a++; else if(bWon) out.b++; else out.draw++;
-      if(r.byValue) out.byValue++; out.turns+=r.turns; out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
+      if(r.byValue) out.byValue++; out.turns+=r.turns; out.battles.push(`${seed0+i}:${r.winner}:${r.turns}:${r.sig}`); out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
     }
   } finally { simRunning=false; window.__norender=false; state.diff=prevDiff; timeScale=prevScale; toMenu(); }
   out.turns=+(out.turns/n).toFixed(1); out.aLeft=+(out.aLeft/n).toFixed(1); out.bLeft=+(out.bLeft/n).toFixed(1);
@@ -2801,7 +2817,7 @@ function debugTick(){
   if(!dbgEl){ dbgEl=document.createElement('pre'); dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;z-index:50;margin:0;padding:8px 10px;background:rgba(0,0,0,.85);color:#9fe;font:12px/1.4 monospace;pointer-events:none;white-space:pre-wrap;max-width:60vw';
     document.body.appendChild(dbgEl); const ext=gl.getExtension('WEBGL_debug_renderer_info'); dbgGpu= ext? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
   const r1=composer.renderTarget1;
-  dbgEl.textContent=`Version ${GAME_VERSION}\n${dbgPerf}\nGPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  smaa ${smaa.enabled?'on':'off'}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
+  dbgEl.textContent=`Version ${GAME_VERSION}  battle seed ${board.seed}\n${dbgPerf}\nGPU ${dbgGpu}\nquality ${quality}  devicePixelRatio ${window.devicePixelRatio}  render scale ${renderer.getPixelRatio()}\ncanvas ${canvas.width}x${canvas.height}  effect buffers ${r1.width}x${r1.height}  scene buffer ${scenePass.rt.width}x${scenePass.rt.height}\nshadows ${sun.castShadow?sun.shadow.mapSize.x:'off'}  smaa ${smaa.enabled?'on':'off'}  ao ${gtao.enabled?'on':'off'}\nGL errors ${Object.keys(dbgErr).length? Object.entries(dbgErr).map(([k,v])=>'0x'+(+k).toString(16)+' x'+v).join(', ') : 'none'}`;
 }
 const clock=new THREE.Clock();
 let lastAoR=1; const perfCheck={t:0,n:0,done:false};
