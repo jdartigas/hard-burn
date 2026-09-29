@@ -39,13 +39,17 @@ function pickAt(x,y){
 const pointers=new Map(); let drag=null, pinch=null;
 canvas.addEventListener('pointerdown', e=>{
   canvas.focus(); pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pointers.size===2){ const [a,b]=[...pointers.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y), r:cam.rGoal}; drag=null; return; }
-  drag={x:e.clientX,y:e.clientY,btn:e.button,moved:false,id:e.pointerId}; canvas.setPointerCapture(e.pointerId);
+  // two fingers: pinch zooms and dragging both pans, together, like a map app
+  if(pointers.size===2){ const [a,b]=[...pointers.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y), r:cam.rGoal, mx:(a.x+b.x)/2, my:(a.y+b.y)/2}; drag=null; hideTooltip(); return; }
+  drag={x:e.clientX,y:e.clientY,btn:e.button,moved:false,id:e.pointerId}; try{ canvas.setPointerCapture(e.pointerId); }catch(err){}   // throws if the pointer is already gone
 });
 canvas.addEventListener('pointermove', e=>{
   mouse.x=e.clientX; mouse.y=e.clientY;
   if(pointers.has(e.pointerId)) pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch && pointers.size===2){ const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); cam.rGoal=clamp(pinch.r*pinch.d/d,MIN_ZOOM,110); return; }
+  if(pinch && pointers.size===2){ const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); cam.rGoal=clamp(pinch.r*pinch.d/Math.max(d,1),MIN_ZOOM,110);
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2, k=cam.radius*0.0016;   // same pan rate as a mouse Shift-drag
+    if(!cam.menu && (mx!==pinch.mx || my!==pinch.my)){ cam.follow=null; panBy(-(mx-pinch.mx)*k, -(my-pinch.my)*k); }
+    pinch.mx=mx; pinch.my=my; return; }
   if(drag){ const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
     if(!drag.moved && Math.hypot(dx,dy)>6){ drag.moved=true; hideTooltip(); }
     if(drag.moved && !cam.menu){ if(drag.btn===0 && !e.shiftKey){ if(cam.thGoal==null){ cam.thGoal=cam.theta; cam.phGoal=cam.phi; } cam.thGoal-=dx*0.006; cam.phGoal=clamp(cam.phGoal-dy*0.004,0.3,cam.radius<20?1.5:1.3); } else { const k=cam.radius*0.0016; cam.follow=null; panBy(-dx*k, -dy*k); } drag.x=e.clientX; drag.y=e.clientY; }

@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '29';
+const GAME_VERSION = '30';
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
 </script>
 </head>
@@ -78,7 +78,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button>
       <button class="btn-ghost" id="btn-records">Records</button>
     </div>
-    <div class="foot">Drag to orbit the view, scroll to zoom. Best with sound on; music and effects can be muted separately.</div>
+    <div class="foot">Drag to orbit the view, scroll or pinch to zoom, two fingers to pan. Best with sound on; music and effects can be muted separately.</div>
     <div class="ver" id="ver-menu"></div>
   </div>
 </div>
@@ -139,6 +139,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <kbd>Space</kbd><span>End turn</span>
       <kbd>Esc</kbd><span>Cancel selection</span>
       <kbd>WASD</kbd><span>Pan the camera; drag to orbit, scroll to zoom, C to center</span>
+      <kbd>Touch</kbd><span>Drag one finger to orbit; pinch to zoom and drag two fingers to pan; double-tap a ship to follow it</span>
       <kbd>Z</kbd><span>Zoom in on the selected ship and follow it (or double-click any ship); press again to zoom out</span>
       <kbd>M</kbd><span>Toggle music</span>
       <kbd>N</kbd><span>Toggle sound effects</span>

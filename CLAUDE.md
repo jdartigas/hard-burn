@@ -231,6 +231,7 @@ Planned features with full context (scoring and records, multiplayer) live in `B
   - Click a ship to select it, a hex to move, and an enemy or asteroid to fire.
   - Right-click or Esc cancels.
   - Drag to orbit, Shift-drag to pan, scroll to zoom.
+- **Touch:** one finger drags to orbit; two fingers pinch to zoom and drag to pan at the same time; tap to select, move and fire; double-tap a ship to follow it.
   - Double-click a ship to zoom in and follow it.
 - **Keys:**
   - 1–3 select a single weapon, F selects all weapons.
