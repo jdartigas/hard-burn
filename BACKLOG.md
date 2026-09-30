@@ -260,6 +260,10 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   across the fracture ("a turd floating in front of the destroyed part"). Now seven small chunks are thrown out of the
   fracture along its normal and fan sideways, a fifth of the dust hangs just off the break, and the trail starts
   wider and thinner. Lesson: debris from a break should spray out of it, not line up in front of it.
+- **v40, done (Jon):** a far nebula near the horizon at azimuth 30°, steel-blue fading to dusty rose, and a small
+  galaxy low in the sky at 172°. Each is a camera-facing panel with its own shader. The camera never looks more than
+  about 16° above the horizon, so sky features must sit low or nobody sees them. About 0.5 ms at High when the
+  nebula fills a third of the screen.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
 ## Scoring and records

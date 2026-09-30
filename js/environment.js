@@ -1,6 +1,6 @@
 // Hard Burn: scenery beyond the board. A distant asteroid belt with a dust band, a midground layer of rocks,
 // large foreground rocks around the rim, micro-debris drifting past the camera, a shattered dwarf planet as a
-// landmark, and two small moons for the gas giant.
+// landmark, two small moons for the gas giant, and a far nebula and galaxy near the horizon.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -44,6 +44,12 @@ const ENV = {
   // two small moons beside the gas giant: offsets in its screen plane (right, up) and toward the viewer, and radius
   moons: [ { seed:38101, right:-300, up:75, toward:60, radius:11, color:[0.64,0.65,0.68] },
            { seed:38102, right:245, up:-95, toward:-30, radius:6.5, color:[0.52,0.44,0.37] } ],
+  // far nebula and galaxy: flat panels facing the board, each drawing its own shader, so they only cost the pixels
+  // they cover. The camera never looks more than about 16° above the horizon, so both sit low. Directions are given
+  // as azimuth (degrees, atan2 of z over x) and elevation, clear of the sun, the gas giant and the landmark.
+  nebula: { az:30, el:3, dist:1650, width:1250, roll:0.2, gain:0.4, stars:90, seed:40001,
+            steel:[0.32,0.46,0.60], rose:[0.62,0.44,0.46] },
+  galaxy: { az:172, el:7, dist:1650, width:130, tilt:0.5, gain:0.38, incline:2.4 },
   motes: { seed:37002, boxK:0.55, boxMin:6, boxMax:55, size:0.0014, drift:0.004, glint:0.03 },
 };
 
@@ -244,6 +250,59 @@ const Env = (() => {
       mesh.scale.setScalar(m.radius); mesh.rotation.set(m.seed%7, m.seed%5, 0); mesh.userData.noAO=true; mesh.userData.noShadow=true; scene.add(mesh); }
   }
 
+  const skyDir=(az,el)=>{ const a=az*Math.PI/180, e=el*Math.PI/180; return new THREE.Vector3(Math.cos(e)*Math.cos(a), Math.sin(e), Math.cos(e)*Math.sin(a)); };
+  const NOISE2=`float h2(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h2(i),h2(i+vec2(1,0)),f.x), mix(h2(i+vec2(0,1)),h2(i+vec2(1,1)),f.x), f.y); }
+    float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<5;i++){ v+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return v; }`;
+  const PANEL_VS=`varying vec2 vP; void main(){ vP=uv*2.0-1.0; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+  function skyPanel(C, mat){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(C.width, C.width), mat);
+    m.position.copy(skyDir(C.az, C.el).multiplyScalar(C.dist)); m.lookAt(0,0,0); m.rotateZ(C.roll||0);
+    m.frustumCulled=true; m.userData.noAO=true; m.userData.noShadow=true; m.renderOrder=-1; scene.add(m); m.updateMatrixWorld(true); return m;
+  }
+
+  // the nebula: domain-warped gas, steel-blue at the core fading to dusty rose at the edges, with dark dust lanes
+  // that dim the stars behind them (premultiplied blending: the colour adds, the alpha dims)
+  function nebulaLayer(){
+    const C=ENV.nebula, s=C.steel.join(','), r=C.rose.join(',');
+    const mat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.CustomBlending,
+      blendSrc:THREE.OneFactor, blendDst:THREE.OneMinusSrcAlphaFactor, uniforms:{ uGain:{value:C.gain} }, vertexShader:PANEL_VS,
+      fragmentShader:`varying vec2 vP; uniform float uGain; ${NOISE2}
+        void main(){ vec2 p=vP;
+          vec2 q=vec2(fbm(p*2.2+3.1), fbm(p*2.2+7.7));
+          float n=fbm(p*2.6+q*1.6);
+          float r=length(p*vec2(0.85,1.75))+(q.x-0.5)*0.6;      // wider than tall, with a ragged edge
+          float env=smoothstep(1.05,0.2,r)*smoothstep(1.0,0.7,max(abs(p.x),abs(p.y))), core=clamp(smoothstep(0.9,0.1,r)+(n-0.5)*1.2,0.0,1.0);   // noise breaks up the colour boundary
+          float gas=(smoothstep(0.28,0.78,n)*0.8+0.2)*env*mix(env,1.0,0.4);
+          vec3 tint=pow(mix(vec3(${r}), vec3(${s}), core), vec3(2.2));   // gamma on the colour only; the gas falls off linearly
+          float lanes=smoothstep(0.5,0.62,fbm(p*4.2+q*2.6+11.0))*env;
+          gl_FragColor=vec4(tint*gas*(1.0-lanes*0.65)*uGain, lanes*0.4*env); }` });
+    const panel=skyPanel(C, mat);
+    // a scatter of brighter young stars inside the cloud, drawn just in front of it
+    const Rs=mulberry32(C.seed), pos=new Float32Array(C.stars*3), col=new Float32Array(C.stars*3), v=new THREE.Vector3();
+    for(let i=0;i<C.stars;i++){ const g=()=>(Rs()+Rs()+Rs()-1.5)/1.5;
+      v.set(g()*C.width*0.32, g()*C.width*0.19, 20); panel.localToWorld(v); pos.set([v.x,v.y,v.z],i*3);
+      const b=0.35+Math.pow(Rs(),2)*0.6; col.set([b*0.86,b*0.93,b].map(toLinear),i*3); }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    const pts=new THREE.Points(g, new THREE.PointsMaterial({size:1.8, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; scene.add(pts);
+    return mat;
+  }
+
+  // the galaxy: a small inclined disc with a warm core and faint bluish spiral arms, far beyond everything else
+  function galaxyLayer(){
+    const C=ENV.galaxy;
+    const mat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, uniforms:{ uGain:{value:C.gain} }, vertexShader:PANEL_VS,
+      fragmentShader:`varying vec2 vP; uniform float uGain;
+        void main(){ vec2 d=vec2(vP.x, vP.y*${C.incline.toFixed(2)}); float r=length(d), th=atan(d.y,d.x);
+          float arms=0.5+0.5*sin(2.0*th-log(r+0.02)*5.0);
+          float disk=exp(-r*4.5)*(0.35+0.65*arms*smoothstep(0.05,0.25,r));
+          float core=exp(-r*r*140.0);
+          vec3 col=(vec3(0.72,0.78,0.95)*disk*0.6+vec3(1.0,0.9,0.72)*core)*smoothstep(1.0,0.7,length(vP));
+          gl_FragColor=vec4(pow(col,vec3(2.2))*uGain,1.0); }` });
+    skyPanel({...C, roll:C.tilt}, mat);
+    return mat;
+  }
+
   const top = QUALITY.high.env;
   const far = rockLayer(ENV.far, farSpin, 7001); far.build(top.far);
   const mid = rockLayer(ENV.mid, midSpin, 8001); mid.build(top.mid);
@@ -252,9 +311,10 @@ const Env = (() => {
   const motes = moteLayer(top.motes);
   const landmark = landmarkLayer(top.lmRocks, top.lmDust);
   moonLayer();
+  const nebula = nebulaLayer(), galaxy = galaxyLayer();
 
   return {
-    group: planeGroup, motes,
+    group: planeGroup, motes, nebula, galaxy,
     setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); near.setCount(c.near); motes.setCount(c.motes); landmark.setCount(c.lmRocks, c.lmDust); },
     update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; near.update(dt); motes.update(dt); landmark.update(dt); },
   };
