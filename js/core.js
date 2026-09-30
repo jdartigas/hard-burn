@@ -45,7 +45,8 @@ const WEAPONS = {
   torp:   {name:'Torpedo',       kind:'missile',range:10,acc:90, dmg:44, shots:1, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   torpH:  {name:'Torpedo bay',   kind:'missile',range:10,acc:90, dmg:36, shots:2, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   wing:   {name:'Strike wing',   kind:'fighter',range:12,acc:90, dmg:9,  shots:6, sh:1, hu:1.0, pierce:0.6, reload:2, guided:true, pdcF:0.45},
-  // v32: Fast Attack Ship
+  // v32: Fast Attack Ship; v34: Electronic warfare ship's self-defence beam
+  beamL:  {name:'Light beam',    kind:'beam',  range:5, opt:2, acc:95, fall:8, dmg:14, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
   strikeM:{name:'Strike missiles',kind:'missile',range:9, acc:92, dmg:32, shots:2, sh:1, hu:1.0, pierce:0.35,reload:1, ammo:2, guided:true, pdcF:0.7},
 };
 const ABIL = {
@@ -54,7 +55,10 @@ const ABIL = {
   overcharge:{name:'Shield overcharge',desc:'Restore 60% of maximum shields', reload:3},
   pdsurge:   {name:'Point defense surge', desc:'Allies within 2 hexes intercept missiles 60% better until your next turn', reload:3},
   brace:     {name:'Brace for impact', desc:'Double armor and 25% less hull damage until your next turn', reload:3},
-  repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, range:3, amount:45},
+  // targeted abilities: `target` says who they're aimed at, `range` how far
+  repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, target:'ally', range:3, amount:45, verb:'repair'},
+  resupply:  {name:'Resupply',         desc:'Ally within 2 hexes: restore 60 hull and half its shields, and reload one salvo in each missile launcher', reload:2, targeted:true, target:'ally', range:2, amount:60, verb:'resupply'},
+  blackout:  {name:'Sensor blackout',  desc:'Enemy within 8 hexes: no missiles or fighters, and -25 accuracy, until your next turn', reload:3, targeted:true, target:'enemy', range:8, verb:'black out'},
   ambush:    {name:'Ambush',           desc:'+2 movement, and missiles fired this turn are half as likely to be intercepted', reload:3},
 };
 const CLASSES = {
@@ -65,19 +69,26 @@ const CLASSES = {
   cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
   fastattack:{label:'Fast attack ship', role:'Ambush striker',      cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:34, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
   dreadnought:{label:'Dreadnought',  role:'Capital of the line',    cost:480, hull:400, armor:12,shield:120,regen:22, mp:2, ev:2,  pdc:0.60, weapons:['spinal','railL','railL','beamH','beamH','pulse'], ability:'brace', len:4.6, y:1.1},
+  // v34: support classes. `passive` is shown in the ship panel and builder; the effects live in the rules.
+  ewar:     {label:'Electronic warfare ship', role:'Jamming and targeting', cost:90, hull:60, armor:2, shield:30, regen:10, mp:5, ev:22, pdc:0.30, weapons:['beamL'], ability:'blackout', len:2.4, y:0.8, jam:true,
+             passive:'Jams enemies within 4 hexes (-10 accuracy, -15 with missiles) and gives allies within 3 hexes +8 accuracy'},
+  tender:   {label:'Repair tender', role:'Repair and resupply',    cost:110, hull:150, armor:3, shield:50, regen:12, mp:3, ev:8,  pdc:0.35, weapons:['pulse'], ability:'resupply', len:3.0, y:0.9, fieldRepair:10, fieldRange:2,
+             passive:'Field repairs: allies within 2 hexes regain 10 hull each turn'},
   carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:150, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };
-const ORDER = ['fastattack','patrol','corvette','frigate','destroyer','cruiser','carrier','dreadnought'];   // lightest to heaviest
+const ORDER = ['fastattack','patrol','corvette','ewar','frigate','destroyer','tender','cruiser','carrier','dreadnought'];   // lightest to heaviest
 // Each class's model seed. Fixed, so adding a class to ORDER never reshuffles how the existing ships look.
-const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7 };
+const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7, tender:8, ewar:9 };
+// Electronic warfare: enemy jamming field, and the targeting uplink for allies (see accAdj in rules.js)
+const JAM = { range:4, direct:10, guided:15, uplink:3, boost:8, blackout:25 };
 const NAMES = {
-  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath'},
-  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle', fastattack:'Hook', dreadnought:'Iron Tithe'},
+  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath', tender:'Patient Hands', ewar:'Quiet Choir'},
+  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle', fastattack:'Hook', dreadnought:'Iron Tithe', tender:'Scrapmother', ewar:'Hiss'},
 };
 // Home cell per class on the player's side; the enemy's are mirrored through the centre. The first ship of each
 // class deploys here, so the classic one-of-each fleet lines up exactly as it always has. Extra copies take the
 // nearest free cell to their class's home (see deployFleet).
-const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5], fastattack:[-1,-6], dreadnought:[-6,-3] };
+const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5], fastattack:[-1,-6], dreadnought:[-6,-3], tender:[-8,2], ewar:[-4,1] };
 const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
 const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
@@ -116,6 +127,7 @@ const AI_PLANS = {
   wolfpack:{label:'Wolfpack', wish:['destroyer','corvette','corvette','destroyer','corvette','patrol']},
   dreadnought:{label:'Dreadnought', wish:['dreadnought','frigate','frigate','corvette','patrol']},   // v32; below 480 it builds escorts only
   raiders: {label:'Raiders',  wish:['fastattack','fastattack','destroyer','fastattack','fastattack','corvette']},
+  support: {label:'Support',  wish:['cruiser','tender','destroyer','ewar','frigate','corvette','patrol']},   // v34
 };
 function aiBuild(budget, plan){
   const wish=AI_PLANS[plan].wish, f=[]; let left=budget, added=true;

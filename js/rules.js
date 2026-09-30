@@ -39,16 +39,30 @@ function abilityReady(s){ return s.ability.wait===0; }
 /* ---------------- rules ---------------- */
 function hasLOS(a,b){ const line=hexLine(a,b); for(let i=1;i<line.length-1;i++){ const c=cellAt(line[i].q,line[i].r); if(c && c.t==='rock') return false; } return true; }
 function accMod(side){ return side==='enemy'? DIFF[state.diff].acc : (state.diff==='easy'?5:0); }
-function hitCore(w, attSide, dist, tgt, tgtCell, los){
+function hitCore(w, attSide, dist, tgt, tgtCell, los, adj=0){
   if(dist>w.range || dist<1) return 0;
   if(!w.guided && !los) return 0;
   let p = w.guided ? w.acc - tgt.ev*0.5 : w.acc - Math.max(0,dist-w.opt)*w.fall - tgt.ev;
   const c=cellAt(tgtCell.q,tgtCell.r); if(c && c.t==='debris') p -= w.guided?5:15;
   if(tgt.fx.ecm) p -= w.guided?25:20;
-  p += accMod(attSide);
+  p += accMod(attSide) + adj;
   return clamp(Math.round(p),5,95);
 }
-function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range) return 0; return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt)); }
+// Accuracy changes that depend on the firing ship: sensor blackout on it, an enemy jamming field around where it
+// fires from, and a friendly targeting uplink. Fields don't stack: one jammer or one uplink in range is enough.
+function accAdj(att, w, from=att){
+  let a=0;
+  if(att.blackout) a-=JAM.blackout;
+  if(alive(other(att.side)).some(e=>e.C.jam && hdist(e,from)<=JAM.range)) a-= w.guided? JAM.guided : JAM.direct;
+  if(alive(att.side).some(e=>e.C.jam && hdist(e,from)<=JAM.uplink)) a+=JAM.boost;
+  return a;
+}
+function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range) return 0;
+  if(att.blackout && w.guided) return 0;   // no missile locks under a sensor blackout
+  return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt), accAdj(att,w,from)); }
+// who a targeted ability can be used on, right now
+function abilityTargets(s){ const d=s.ability.def; if(!d.targeted) return [];
+  return d.target==='enemy'? alive(other(s.side)).filter(o=>hdist(o,s)<=d.range) : alive(s.side).filter(o=>o!==s && hdist(o,s)<=d.range); }
 // Whose point defense protects tgt: its own, or an escort's screen when that is stronger. `by` is the ship doing
 // the shooting, so the interception can be drawn from it and credited to it.
 function pdCover(tgt){

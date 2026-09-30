@@ -80,7 +80,7 @@ function renderBuilder(){
   const classes=Object.keys(CLASSES).sort((a,b)=>CLASSES[b].cost-CLASSES[a].cost);
   $('#bl-rows').innerHTML=classes.map(c=>{ const C=CLASSES[c], k=count(c);
     return `<div class="bl-row${k?' has':''}"><div><b>${C.label}</b><span class="r">${C.role}</span>
-      <div class="st">Hull ${C.hull} · Shields ${C.shield} · ${Math.round(classDpt(c))} damage/turn · Move ${C.mp} · ${C.weapons.map(w=>WEAPONS[w].name).join(', ')}</div></div>
+      <div class="st">Hull ${C.hull} · Shields ${C.shield} · ${Math.round(classDpt(c))} damage/turn · Move ${C.mp} · ${C.weapons.map(w=>WEAPONS[w].name).join(', ')} · ${ABIL[C.ability].name}${C.passive?`<br>${C.passive}`:''}</div></div>
       <span class="c">${C.cost} pts</span>
       <div class="bl-step"><button data-c="${c}" data-d="-1" aria-label="One fewer ${C.label}" ${k?'':'disabled'}>−</button><span>${k}</span><button data-c="${c}" data-d="1" aria-label="One more ${C.label}" ${spent+C.cost<=B && n<MAX_FLEET?'':'disabled'}>+</button></div></div>`; }).join('');
   const over=spent>B; $('.bl-meter').classList.toggle('over',over);

@@ -72,6 +72,11 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 
 ## 4. Game design
 
+**Support classes (v35).**
+- **Electronic warfare ship** (`jam:true`): enemies within `JAM.range` (4) hexes of it fire at −10 accuracy (−15 with missiles and fighters); allies within `JAM.uplink` (3) get +8. Fields don't stack. **Sensor blackout** (enemy within 8): that ship can't fire missiles or fighters and has −25 accuracy until the jammer's side begins its next turn (`ship.blackout` holds that side). All of it goes through `accAdj` in `hitChance`, so every hit percentage shown includes it. The AI treats it as the top-priority target.
+- **Repair tender**: field repairs give allies within `fieldRange` (2) hexes `fieldRepair` (10) hull at the start of each of its side's turns. **Resupply** (ally within 2): +60 hull, half its shields, one salvo back in each missile launcher, the only way to rearm mid-battle.
+- Targeted abilities share one mode (`state.mode==='target'`): `ABIL[k].target` is `'ally'` or `'enemy'`, and `abilityTargets(s)` lists who's in range. A class's `passive` text shows in the fleet builder.
+
 **Ambush** (Fast attack ship): +2 movement, and its missiles are half as likely to be intercepted that turn (`fx.ambush` in `fireWeapon`). The AI uses it when loaded missiles can reach an enemy.
 
 **Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. The menu's pickers choose your fleet from `PRESETS` or **Custom** (the fleet builder), and the enemy from Random (any preset), a preset, or **AI build** (the AI spends your budget with one of the `AI_PLANS`, picked at random each battle). The builder lists every class in `CLASSES` with its cost, hull, shields, damage per turn and weapons, against a budget from `BUDGETS` (Skirmish 330, Standard 660, Large 1000) and the 12-ship cap. A custom fleet is stored as `hardburn.custom` = {budget, fleet}; if a price change later puts it over budget it's discarded and the pick falls back to Classic. Presets are Standard-budget fleets, so saving a custom fleet at another budget switches the enemy to AI build, and the menu warns if you pick a preset against it. Choices persist as `hardburn.fleetYou` and `hardburn.fleetEnemy`; scored games also keep both fleet lists and the budget.
@@ -88,6 +93,8 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 | Fleet carrier | 150 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
 | Fast attack ship | 50 | 55 | 1 | 16 (+6) | 8 | 34 | .15 | Strike missiles (2×32, range 9, 2 salvos, harder to intercept), pulse | Ambush |
 | Dreadnought | 480 | 400 | 12 | 120 (+22) | 2 | 2 | .60 | Spinal railgun, 2 light railguns, 2 heavy beams, pulse | Brace for impact |
+| Electronic warfare ship | 90 | 60 | 2 | 30 (+10) | 5 | 22 | .30 | Light beam | Sensor blackout |
+| Repair tender | 110 | 150 | 3 | 50 (+12) | 3 | 8 | .35 | Pulse | Resupply |
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
 

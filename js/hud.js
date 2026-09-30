@@ -96,7 +96,7 @@ function recomputeHighlights(){
   const map=new Map(); const s=state.selected;
   state.reach=null;
   if(s && state.phase==='player' && !state.busy){
-    if(state.mode==='repair'){ for(const o of alive('player')) if(o!==s && hdist(o,s)<=ABIL.repair.range) map.set(cellAt(o.q,o.r).idx,new THREE.Color(0x3b8a30)); }
+    if(state.mode==='target'){ const col=new THREE.Color(s.ability.def.target==='enemy'?0x5a2a7a:0x3b8a30); for(const o of abilityTargets(s)) map.set(cellAt(o.q,o.r).idx,col); }
     else {
       if(state.weaponSel!=='all'){ const w=s.weapons[state.weaponSel].def; for(const c of board.list){ const d=hdist(c,s); if(d>0 && d<=w.range && c.t!=='rock') map.set(c.idx,new THREE.Color(0x3a1410)); } }
       if(s.mp>0){ state.reach=reachable(s); for(const [,c] of state.reach){ if(c.cost===0||c.blocked) continue; const cell=cellAt(c.q,c.r); const k=c.cost/s.mp; map.set(cell.idx,new THREE.Color(0x6a4812).multiplyScalar(1.15-k*0.45)); } }
@@ -133,7 +133,7 @@ async function playerMove(k){
 async function playerAbility(){
   const s=state.selected; if(!s || state.busy || state.phase!=='player') return;
   if(!abilityReady(s)){ Sound.deny(); return; }
-  if(s.ability.def.targeted){ if(state.mode==='repair'){ state.mode=null; } else { const any=alive('player').some(o=>o!==s&&hdist(o,s)<=3); if(!any){ Sound.deny(); log('No ally within 3 hexes to repair','sys'); return; } state.mode='repair'; Sound.ui(); } recomputeHighlights(); updateHUD(); return; }
+  if(s.ability.def.targeted){ const d=s.ability.def; if(state.mode==='target'){ state.mode=null; } else { if(!abilityTargets(s).length){ Sound.deny(); log(`No ${d.target==='enemy'?'enemy':'ally'} within ${d.range} hexes to ${d.verb}`,'sys'); return; } state.mode='target'; Sound.ui(); } recomputeHighlights(); updateHUD(); return; }
   state.busy=true; await useAbility(s); state.busy=false; recomputeHighlights(); updateHUD();
 }
 function setWeapon(i){
@@ -152,7 +152,7 @@ function nextShip(){
 function log(msg, cls=''){ const d=document.createElement('div'); d.className=cls; d.textContent=msg; const b=$('#logbody'); b.prepend(d); while(b.children.length>50) b.lastChild.remove(); }
 function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
 function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
-  const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); s.tagFx.textContent=fx.join(', '); } }
+  const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); s.tagFx.textContent=fx.join(', '); } }
 function weaponStatus(w){ if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 function updateHUD(){
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${BATTLE_TURNS}`;
@@ -183,7 +183,7 @@ function updateHUD(){
   $('#sp-empty').style.display= s?'none':'block'; $('#sp-body').style.display= s?'flex':'none';
   $('#sp-empty').textContent = state.phase==='enemy' ? 'The enemy is maneuvering. Stand by.' : 'Select one of your ships to give it orders.';
   if(s){
-    $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`;
+    $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`; $('#sp-class').title=s.C.passive||'';
     $('#sp-stats').innerHTML=`<div class="sr"><span>Hull</span><b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
       <div class="sr" title="Regenerates ${s.regen} a turn"><span>Shields</span><b>${Math.round(s.shield)} / ${s.shieldMax}</b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
       <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>`;
@@ -194,8 +194,8 @@ function updateHUD(){
     const ab=document.createElement('button'); ab.className='wbtn'+(state.weaponSel==='all'?' on':''); ab.disabled=state.busy||state.phase!=='player'||!s.weapons.some(weaponReady);
     ab.innerHTML=`<span class="k">F</span><span class="wn">All weapons</span><span class="wd">Fire everything in reach</span><span class="ws">${s.weapons.filter(weaponReady).length} ready</span>`; ab.onclick=()=>setWeapon('all'); wc.appendChild(ab);
     const bot=$('#sp-bottom'); bot.innerHTML=''; const a=s.ability;
-    const bb=document.createElement('button'); bb.id='abil'; bb.className='wbtn'+(state.mode==='repair'?' on':''); bb.disabled=!abilityReady(s)||state.busy||state.phase!=='player'; bb.title=a.def.desc;
-    bb.innerHTML=`<span class="k">Q</span><span class="wn">${a.def.name}</span><span class="wd">${state.mode==='repair'?'Click an ally to repair':'Ability'}</span><span class="ws">${state.mode==='repair'?'Q to cancel': a.wait?`Recharging, ${a.wait} turn${a.wait>1?'s':''}`:'Ready'}</span>`;
+    const bb=document.createElement('button'); bb.id='abil'; bb.className='wbtn'+(state.mode==='target'?' on':''); bb.disabled=!abilityReady(s)||state.busy||state.phase!=='player'; bb.title=a.def.desc;
+    bb.innerHTML=`<span class="k">Q</span><span class="wn">${a.def.name}</span><span class="wd">${state.mode==='target'?`Click ${a.def.target==='enemy'?'an enemy':'an ally'} to ${a.def.verb}`:'Ability'}</span><span class="ws">${state.mode==='target'?'Q to cancel': a.wait?`Recharging, ${a.wait} turn${a.wait>1?'s':''}`:'Ready'}</span>`;
     bb.onclick=playerAbility; bot.appendChild(bb);
   }
   const et=$('#endturn'); et.disabled= state.phase!=='player'||state.busy;
@@ -222,6 +222,7 @@ function updateHover(){
     tgtRing.visible=true; tgtRing.position.copy(hexToWorld(h.q,h.r,0.04));
     let html= h.isRock ? `<h4>Asteroid</h4><div class="tr"><span>Blocks movement and line of sight</span></div><div class="tr"><span>Integrity</span><b>${Math.ceil(h.hull)} / ${h.hullMax}</b></div>`
       : `<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Hull <b>${Math.ceil(h.hull)}</b> Shields <b>${Math.round(h.shield)}</b></span></div>`;
+    if(s && state.mode==='target' && s.ability.def.target==='enemy' && !h.isRock) html+= abilityTargets(s).includes(h)? (h.blackout?`<div class="hint">Already blacked out</div>`:`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`) : `<div class="hint">Out of range</div>`;
     if(s && state.phase==='player' && !state.mode){
       html+=`<div style="height:5px"></div>`; let tot=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
       for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p;
@@ -236,7 +237,7 @@ function updateHover(){
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
-    if(state.mode==='repair' && s && h!==s) html+= hdist(s,h)<=3?`<div class="sum">Click to repair up to ${Math.min(ABIL.repair.amount,Math.ceil(h.hullMax-h.hull))} hull</div>`:`<div class="hint">Out of repair range</div>`;
+    if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) html+= abilityTargets(s).includes(h)?`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`:`<div class="hint">Out of range</div>`;
     showTooltip(html);
   }
 }

@@ -215,7 +215,24 @@ plan 83% (6 battles): a fast missile swarm is its counter, as intended.
 **Watch:** the Dreadnought group is strong against Classic and Carrier (80–90%). Re-run the full
 preset round robin once release 2 lands, with all ten classes.
 
-**Release 2: Repair tender and Electronic warfare ship.** Designs agreed (see the chat of v32):
+**Release 2 (v35): Repair tender and Electronic warfare ship.** Shipped with the agreed designs, except
+the Tender's field repairs (10 hull within 2 hexes, was 5 adjacent) and Resupply (60 hull, was 40).
+
+What adding one ship to the Classic fleet is worth (Classic+X v Classic, 40 battles): Patrol 48,
+Corvette 45, Frigate 65, **Tender 78, EW ship 85**, Destroyer 88. As additions both are strong.
+
+Equal budget, swapping the Carrier (150) for support plus an escort, average against the presets
+(30 battles each): EW + Frigate 33%, stronger jamming (−15/−20, +12) 34% (no change, so the effect
+size isn't the limit); Tender + Corvette 37%, **stronger Tender 47%**, level with Classic (46%).
+
+Reading: the EW ship multiplies a fleet's firepower, so it's worth nearly a Destroyer on top of a
+fleet but less than a Carrier in place of one. Kept at 90 with the original effects; watch it at the
+Large budget, where it has more to multiply. AI plan Support (Heavy cruiser, Tender, Destroyer, EW,
+Frigate) plays Classic even, 50%. The AI uses Resupply and Sensor blackout on its own.
+
+**Still to do:** a full round robin with all ten classes, now that every class exists.
+
+Original designs:
 - Repair tender: 150/50 (+12), armor 3, move 3, ev 8, PD 0.35, pulse cannons. Ability Resupply
   (ally within 2: +40 hull, half shields, +1 salvo per missile launcher; recharge 2). Passive field
   repairs: adjacent allies +5 hull a turn. About 110.

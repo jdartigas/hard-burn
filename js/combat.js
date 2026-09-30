@@ -70,6 +70,17 @@ async function useAbility(s, target=null){
   else if(k==='pdsurge'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.pdsurge=1; Particles.burst(o.group.position,26,{speed:3,color:new THREE.Color(1,.85,.4),size:0.28,life:0.7}); } Sound.pdc(); Sound.power(); floatText(s,'PD surge','heal'); }
   else if(k==='ambush'){ s.mp+=2; s.fx.ambush=1; Sound.power(); s.engines.forEach(e=>e.boost=1.5); floatText(s,'Ambush','heal'); }
   else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
+  else if(k==='resupply'){ if(!target) return false;
+    const hull=Math.min(a.def.amount, target.hullMax-target.hull), sh=Math.min(target.shieldMax/2, target.shieldMax-target.shield); let salvos=0;
+    target.hull+=hull; target.shield+=sh; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } });
+    const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
+    for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.55,.9,1),0.3,0.7,0.5); }); }
+    Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
+    floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
+  else if(k==='blackout'){ if(!target) return false; target.blackout=s.side;   // lasts until this side's next turn begins
+    const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
+    for(let i=0;i<30;i++){ after(i*0.02,()=>{ const p=a0.clone().lerp(b0,i/30); Particles.emit(p.setY(p.y+0.3),new THREE.Vector3().randomDirection().multiplyScalar(0.6),new THREE.Color(.75,.5,1),0.22,0.5,0.4); }); }
+    Particles.burst(b0,40,{speed:3,color:new THREE.Color(.75,.5,1),size:0.3,life:0.8}); floatText(target,'Blackout','int'); }
   else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; Sound.power();
     const a0=s.group.position.clone(), b0=target.group.position.clone();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.5,1,.5),0.3,0.7,0.5); }); }
@@ -94,7 +105,7 @@ async function moveShip(s, path){
 }
 
 /* ---------------- AI ---------------- */
-function targetValue(t){ return {dreadnought:1.3, carrier:1.25, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85, fastattack:0.85}[t.cls]||1; }
+function targetValue(t){ return {ewar:1.4, dreadnought:1.3, carrier:1.25, tender:1.2, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85, fastattack:0.85}[t.cls]||1; }
 function scoreAttack(att, w, tgt, from, D){
   const e=expected(att,w,tgt,from); if(!e.p) return 0;
   let v=(e.hull + (e.dmg-e.hull)*0.5)*targetValue(tgt);
@@ -123,7 +134,11 @@ function evalCell(s, cell, D){
   const c=cellAt(cell.q,cell.r); if(c.t==='debris') score+=4;
   // stand-off preference for fragile artillery, closing pressure for everyone else
   const near=foes.reduce((m,f)=>Math.min(m,hdist(f,cell)),99);
-  if(s.cls==='carrier' || s.cls==='cruiser' || s.cls==='dreadnought') score -= Math.max(0,5-near)*6*late;
+  if(s.cls==='carrier' || s.cls==='cruiser' || s.cls==='dreadnought' || s.cls==='tender') score -= Math.max(0,5-near)*6*late;
+  // support ships position for their passives: the tender near damaged allies, the jammer with enemies inside its
+  // field and allies inside its uplink
+  if(s.C.fieldRepair){ for(const o of alive(s.side)) if(o!==s && hdist(o,cell)<=2) score += (1-o.hull/o.hullMax)*14; }
+  if(s.C.jam){ score += foes.filter(f=>hdist(f,cell)<=JAM.range).length*5 + alive(s.side).filter(o=>o!==s && hdist(o,cell)<=JAM.uplink).length*3; }
   if(off===0) score -= near*1.8;
   score += (gameRand()-0.5)*D.noise;
   return score;
@@ -142,6 +157,14 @@ async function aiShip(s){
   if(state.over) return;
   if(s.ability.key==='pdsurge' && abilityReady(s)){ const n=alive(s.side).filter(o=>hdist(o,s)<=2).length; const missiles=alive(other(s.side)).some(e=>e.weapons.some(w=>w.def.guided && w.ammo!==0)); if(missiles && (n>=2 || threatAt(s,s)>30)) await useAbility(s); }
   if(s.ability.key==='ecm' && abilityReady(s)){ const n=alive(s.side).filter(o=>hdist(o,s)<=2).length; if(n>=2 || threatAt(s,s)>30) await useAbility(s); }
+  // resupply whichever ally needs it most: hull, shields, and above all empty launchers
+  if(s.ability.key==='resupply' && abilityReady(s)){ let tgt=null, best=30;
+    for(const o of abilityTargets(s)){ const v=(o.hullMax-o.hull) + (o.shieldMax-o.shield)*0.4 + o.weapons.filter(w=>w.ammo!==undefined && w.ammo<w.def.ammo).length*25; if(v>best){ best=v; tgt=o; } }
+    if(tgt) await useAbility(s,tgt); }
+  // black out the enemy that would hurt most this turn, preferring ships that still carry missiles or fighters
+  if(s.ability.key==='blackout' && abilityReady(s)){ let tgt=null, best=0;
+    for(const o of abilityTargets(s)){ if(o.blackout) continue; const v=classDpt(o.cls)*(o.weapons.some(w=>w.def.guided && w.ammo!==0)?1.4:1); if(v>best){ best=v; tgt=o; } }
+    if(tgt) await useAbility(s,tgt); }
   if(s.ability.key==='repair' && abilityReady(s)){ let tgt=null, miss=34; for(const o of alive(s.side)){ if(o!==s && hdist(o,s)<=3 && o.hullMax-o.hull>miss){ miss=o.hullMax-o.hull; tgt=o; } } if(tgt) await useAbility(s,tgt); }
   for(const i of firingOrder(s)){ if(state.over) return; const w=s.weapons[i]; if(!weaponReady(w)) continue;
     let tgt=null, bv=0; for(const t of alive(other(s.side))){ const v=scoreAttack(s,w.def,t,s,D)*(1+(gameRand()-.5)*D.noise/40); if(v>bv){ bv=v; tgt=t; } }
@@ -169,6 +192,11 @@ async function runAITurn(side){
 function beginSideTurn(side){
   for(const s of alive(side)){ s.shield=Math.min(s.shieldMax, s.shield+s.regen); s.fx={}; s.mp=s.mpMax; s.moved=false; s.engines.forEach(e=>e.boost=0);
     s.weapons.forEach(w=>w.wait=Math.max(0,w.wait-1)); s.ability.wait=Math.max(0,s.ability.wait-1); }
+  // a blackout this side cast runs out now that its enemy has had its turn
+  for(const e of state.ships) if(e.blackout===side) e.blackout=null;
+  // field repairs: a Repair tender patches up every ally within its field range
+  for(const t of alive(side)) if(t.C.fieldRepair) for(const o of alive(side)) if(o!==t && hdist(o,t)<=(t.C.fieldRange||1) && o.hull<o.hullMax){
+    const add=Math.min(t.C.fieldRepair, o.hullMax-o.hull); o.hull+=add; if(add>=1) floatText(o,`+${Math.round(add)}`,'heal'); }
   refreshTags();
 }
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }

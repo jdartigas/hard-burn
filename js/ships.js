@@ -265,7 +265,7 @@ function buildShip(cls, side, copy=0){
   // --- per-class hulls, modeled from the reference miniatures ---
   // shared Expanse vocabulary: drum-housed drive at the stern, V-strut truss to an octagonal engineering section,
   // brick-tiled armor decks forward, livery plates, stripes, hull numbers, PDC turrets everywhere
-  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702',fastattack:'109',dreadnought:'901'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870',fastattack:'88',dreadnought:'899'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
+  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702',fastattack:'109',dreadnought:'901',tender:'740',ewar:'322'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870',fastattack:'88',dreadnought:'899',tender:'874',ewar:'833'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
   const HULL=M.hull, H2=M.hull2, PL=M.plate, ST=M.stripe;
   function drum(r,len,zf,x=0,y=0){ // drive housing: open drum, ribbed, crenellated rim, bell and plume inside
     const zb=zf-len;
@@ -435,6 +435,38 @@ function buildShip(cls, side, copy=0){
     pdc(0,-.33,-0.4,-1); pdc(0,-.33,.8,-1); pdc(0,-.2,1.7,-1);
     number(idn,0,.335,.3,.14,'top'); number(idn,.52,.05,1.35,.1,'r'); number(idn,-.52,.05,1.35,.1,'l');
     light(.6,.25,-1.7,nav); light(-.6,.25,-1.7,nav); light(0,.64,-.2,0xffffff); rcs(.4,.3,2.0); rcs(-.4,.3,2.0); rcs(.6,.3,-1.0); rcs(-.6,.3,-1.0);
+  } else if(cls==='tender'){
+    // a working yard ship: two drives, a boxy cargo spine lined with pods, gantry cranes over an open repair bay
+    drum(.2,.3,-1.35,.26,0); drum(.2,.3,-1.35,-.26,0);
+    struts(-1.35,-1.2,.3,.34,0,0,8);
+    plate(-1.2,-0.7,.8,.5,.8,.5,{mat:H2}); sidePlates(-1.15,-0.75,.8,.34);
+    plate(-0.7,0.9,.9,.44,.9,.44,{ch:.12});
+    [-1,1].forEach(s=>{ for(let i=0;i<4;i++) tank(s*.52,.02,-0.5+i*.36,.12,.16,H2); });
+    const bay=new THREE.Mesh(new THREE.PlaneGeometry(.6,.7),M.bay); bay.rotation.x=-Math.PI/2; add(bay,0,.226,.2);
+    [-.1,.5].forEach(z=>{ [-1,1].forEach(s=>rod(new THREE.Vector3(s*.34,.22,z),new THREE.Vector3(s*.34,.54,z),.016,M.metal));
+      rod(new THREE.Vector3(-.34,.54,z),new THREE.Vector3(.34,.54,z),.016,M.metal); rod(new THREE.Vector3(.1,.54,z),new THREE.Vector3(.1,.47,z),.005,M.dark);
+      const hook=new THREE.Mesh(new THREE.BoxGeometry(.06,.05,.06),PL); add(hook,.1,.45,z); });
+    plate(-0.6,-0.1,.3,.2,.26,.16,{y:.32,ch:.28,mat:H2}); windows(0,.42,-.35,.4,5); dish(.2,.42,-.6,.1);
+    plate(0.9,1.45,.9,.44,.6,.32,{ch:.24}); sidePlates(0.95,1.35,.86,.26,-.02); grille(1.45,0,.44,.18);
+    stripes(0.95,1.4,.225,.28,.02); chevron(1.3,.23,.5);
+    pdc(.3,.24,-.9,1); pdc(-.3,.24,-.9,1); pdc(0,-.23,.3,-1); pdc(.46,0,1.1,1,'x'); pdc(-.46,0,1.1,-1,'x');
+    number(idn,-.25,.225,-.45,.09,'top'); number(idn,.458,.05,1.15,.07,'r'); number(idn,-.458,.05,1.15,.07,'l');
+    light(.42,.2,-1.1,nav); light(-.42,.2,-1.1,nav); light(0,.57,.2,0x7fff9f); rcs(.4,.2,1.3); rcs(-.4,.2,1.3);
+  } else if(cls==='ewar'){
+    // a slim sensor hull bristling with arrays: dishes, lattice masts with emitter bars, a long spike antenna forward
+    drum(.17,.26,-1.05);
+    struts(-1.05,-0.92,.15,.2,0,0,6);
+    plate(-0.92,0.5,.34,.3,.34,.3,{ch:.2});
+    plate(0.5,1.05,.34,.3,.1,.1,{ch:.35}); topPlate(-0.8,0.45,.2,.2,.15,PL); stripes(-0.8,0.45,.16,.12,.014);
+    dish(0,.3,-.55,.16); dish(.16,.24,0.05,.11); dish(-.16,.24,0.3,.09);
+    [-1,1].forEach(s=>{
+      rod(new THREE.Vector3(s*.17,.1,-0.2),new THREE.Vector3(s*.45,.42,-0.2),.012,M.metal);
+      rod(new THREE.Vector3(s*.45,.42,-0.2),new THREE.Vector3(s*.45,.42,0.25),.012,M.metal);
+      for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(.03,.09,.03),M.dark); add(b,s*.45,.42,-0.15+i*.12); }
+      const fin=plate(-0.8,-0.4,.012,.26,.012,.08,{x:s*.19,y:-.18,mat:H2,ch:.2,greeble:false}); fin.rotation.z=-s*0.35; });
+    rod(new THREE.Vector3(0,.02,1.05),new THREE.Vector3(0,.02,1.55),.012,M.metal);
+    pdc(0,-.15,.2,-1); windows(0,.155,.65,.3,4); number(idn,0,.152,-.2,.06,'top');
+    light(.2,0,-.85,nav); light(-.2,0,-.85,nav); light(0,.02,1.57,0xb88cff); light(0,.52,-.55,0xb88cff); rcs(.18,.1,.9); rcs(-.18,.1,.9);
   }
   // greebles scattered over every armored deck
   for(const d of decks){

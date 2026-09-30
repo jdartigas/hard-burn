@@ -83,8 +83,8 @@ function onClick(x,y){
   if(state.phase!=='player' || state.busy) return;
   const {cell, ship}=pickAt(x,y); if(!cell) return;
   const s=state.selected;
-  if(state.mode==='repair' && s){
-    if(ship && ship.side==='player' && ship!==s && hdist(ship,s)<=3){ state.mode=null; state.busy=true; useAbility(s,ship).then(()=>{ state.busy=false; recomputeHighlights(); updateHUD(); }); }
+  if(state.mode==='target' && s){
+    if(ship && abilityTargets(s).includes(ship)){ state.mode=null; state.busy=true; useAbility(s,ship).then(()=>{ state.busy=false; recomputeHighlights(); updateHUD(); }); }
     else { state.mode=null; recomputeHighlights(); updateHUD(); }
     return;
   }
