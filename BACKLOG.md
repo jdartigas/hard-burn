@@ -256,6 +256,10 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   in three tiers from a fixed seed, the faint one crowding the nebula band. Placement lessons: the landmark first sat
   at -23°, behind the board in tilted views, so it is lifted to -6°; and its fracture has to sit across the sunlit
   limb, or the lit side is all fracture and it reads as a potato. Adds about 50 ms at load, nothing measurable a frame.
+- **v39, fix (Jon):** the ten chunks sat packed along the trail, big to small, and read as one lumpy chain lying
+  across the fracture ("a turd floating in front of the destroyed part"). Now seven small chunks are thrown out of the
+  fracture along its normal and fan sideways, a fifth of the dust hangs just off the break, and the trail starts
+  wider and thinner. Lesson: debris from a break should spray out of it, not line up in front of it.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
 ## Scoring and records

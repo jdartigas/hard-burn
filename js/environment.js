@@ -37,8 +37,10 @@ const ENV = {
   // `elevation` degrees: the belt is low on that side, and anything much below the horizon lands behind the board
   // in tilted views, where it crowds the ships. At about the gas giant's height it sits past the board's far edge.
   landmark: { seed:38001, toward:[-0.5,0,0.8], elevation:-6, ringR:1090, radius:74, detail:30, color:[0.60,0.58,0.55],
-    trail:{ start:0.075, span:0.46, sink:100, spread:[10,75], size:[0.9,5.5], detail:2, variants:5, color:[0.40,0.40,0.42] },
-    chunks:10, chunkSize:[5,21], haze:{ near:500, far:2200, max:0.32 } },
+    trail:{ start:0.1, span:0.46, sink:100, spread:[34,80], size:[0.9,5.5], detail:2, variants:5, color:[0.40,0.40,0.42] },
+    // chunks: a loose spray thrown off the fracture, well separated. Big ones packed along the trail read as one
+    // lumpy chain lying across the break (Jon, v38), so they stay small and scatter sideways as they fly out.
+    chunks:7, chunkSize:[2.5,9], chunkStep:0.5, chunkSpread:0.5, haze:{ near:500, far:2200, max:0.32 } },
   // two small moons beside the gas giant: offsets in its screen plane (right, up) and toward the viewer, and radius
   moons: [ { seed:38101, right:-300, up:75, toward:60, radius:11, color:[0.64,0.65,0.68] },
            { seed:38102, right:245, up:-95, toward:-30, radius:6.5, color:[0.52,0.44,0.37] } ],
@@ -201,22 +203,29 @@ const Env = (() => {
     const toView=cw.clone().negate().normalize(), sunSide=sunDir.clone().addScaledVector(toView,-sunDir.dot(toView)).normalize();
     const across=new THREE.Vector3().crossVectors(toView, sunSide); if(across.dot(tw)<0) across.negate();
     body.lookAt(cw.clone().add(across.multiplyScalar(0.85).addScaledVector(toView,0.4).addScaledVector(sunSide,0.25)));
-    // broken-off chunks close behind the body, largest first
-    const chunkMat=makeMat(L.color, false, L.haze), chunks=[];
-    for(let i=0;i<L.chunks;i++){ const t=0.01+i*0.022+Rl()*0.015, m=new THREE.Mesh(makeRockGeometry(L.seed+50+i*7, 8, true), chunkMat);
-      m.position.copy(trailPoint(t, 0.5)); m.scale.setScalar(L.chunkSize[1]-(L.chunkSize[1]-L.chunkSize[0])*(i/(L.chunks-1))*(0.7+Rl()*0.3));
+    // broken-off chunks, flung out of the fracture along its normal and fanning sideways, bending toward the trail
+    const chunkMat=makeMat(L.color, false, L.haze), chunks=[], out=new THREE.Vector3(0,0,1).applyQuaternion(body.quaternion);
+    const side1=new THREE.Vector3().crossVectors(out, new THREE.Vector3(0,1,0)).normalize(), side2=new THREE.Vector3().crossVectors(out, side1);
+    for(let i=0;i<L.chunks;i++){ const m=new THREE.Mesh(makeRockGeometry(L.seed+50+i*7, 8, true), chunkMat), k=(i+1)/L.chunks;
+      const a=Rl()*Math.PI*2, lat=L.radius*L.chunkSpread*(0.3+k)*(0.5+Rl()*0.5);
+      const p=center.clone().addScaledVector(out, L.radius*(1.25+i*L.chunkStep+Rl()*0.25)).addScaledVector(side1, Math.cos(a)*lat).addScaledVector(side2, Math.sin(a)*lat);
+      m.position.copy(p.lerp(trailPoint(0.05+k*0.12, 0.6), k*0.45));
+      m.scale.setScalar(L.chunkSize[0]+(L.chunkSize[1]-L.chunkSize[0])*Math.pow(Rl(),1.5));
       m.rotation.set(Rl()*6.3,Rl()*6.3,Rl()*6.3); m.userData.spin=new THREE.Vector3(Rl()-0.5,Rl()-0.5,Rl()-0.5).multiplyScalar(0.006); group.add(m); chunks.push(m); }
     // the fragment trail: instanced rock thinning out along the ring into the belt
     const geos=[...Array(T.variants)].map((_,i)=>makeRockGeometry(L.seed+200+i*13, T.detail, false)), mat=makeMat(T.color), per=Math.ceil(maxRocks/T.variants), ims=[];
     const M4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler(), s=new THREE.Vector3();
     geos.forEach(gm=>{ const im=new THREE.InstancedMesh(gm, mat, per);
-      for(let k=0;k<per;k++){ const t=Math.pow(Rl(),1.7), size=T.size[0]+(T.size[1]-T.size[0])*Math.pow(Rl(),2.5)*(1-t*0.6);
+      for(let k=0;k<per;k++){ const t=Math.pow(Rl(),1.15), size=T.size[0]+(T.size[1]-T.size[0])*Math.pow(Rl(),2.5)*(1-t*0.6);
         e.set(Rl()*6.3,Rl()*6.3,Rl()*6.3); q.setFromEuler(e); s.set(size*(0.8+Rl()*0.4),size*(0.8+Rl()*0.4),size*(0.8+Rl()*0.4));
         im.setMatrixAt(k, M4.compose(trailPoint(t,1),q,s)); }
       im.frustumCulled=false; group.add(im); ims.push(im); });
     // and a dust plume along the same path, one draw call
     const dp=new Float32Array(maxDust*3), dc=new Float32Array(maxDust*3);
-    for(let i=0;i<maxDust;i++){ const t=Math.pow(Rl(),1.3), p=trailPoint(t,1.6); dp.set([p.x,p.y,p.z],i*3);
+    for(let i=0;i<maxDust;i++){ const t=Math.pow(Rl(),1.3), p=trailPoint(t,1.6);
+      // one in five specks hangs just off the fracture, so the break visibly feeds the spray
+      if(i%5===0){ const a=Rl()*Math.PI*2, lat=L.radius*0.55*Math.sqrt(Rl()); p.copy(center).addScaledVector(out, L.radius*(0.95+Rl()*0.9)).addScaledVector(side1, Math.cos(a)*lat).addScaledVector(side2, Math.sin(a)*lat); }
+      dp.set([p.x,p.y,p.z],i*3);
       const b=(0.1+Math.pow(Rl(),2)*0.22)*(1-t*0.5); dc.set([b,b*0.9,b*0.8].map(toLinear),i*3); }
     const dg=new THREE.BufferGeometry(); dg.setAttribute('position',new THREE.BufferAttribute(dp,3)); dg.setAttribute('color',new THREE.BufferAttribute(dc,3));
     const dust=new THREE.Points(dg, new THREE.PointsMaterial({size:1.6, sizeAttenuation:false, vertexColors:true, depthWrite:false})); dust.frustumCulled=false; group.add(dust);
