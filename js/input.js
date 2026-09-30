@@ -115,7 +115,7 @@ addEventListener('keydown', e=>{
   else if(k==='escape'){ onCancel(); }
   else if(k==='f'){ setWeapon('all'); }
   else if(k==='q'){ playerAbility(); }
-  else if(['1','2','3'].includes(k)){ setWeapon(parseInt(k)-1); }
+  else if(k>='1' && k<='9'){ setWeapon(parseInt(k)-1); }   // the Dreadnought carries six
 });
 addEventListener('keyup', e=>keys.delete(e.key.toLowerCase()));
 addEventListener('blur', ()=>keys.clear());

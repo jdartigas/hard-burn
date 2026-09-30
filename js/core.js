@@ -45,6 +45,8 @@ const WEAPONS = {
   torp:   {name:'Torpedo',       kind:'missile',range:10,acc:90, dmg:44, shots:1, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   torpH:  {name:'Torpedo bay',   kind:'missile',range:10,acc:90, dmg:36, shots:2, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   wing:   {name:'Strike wing',   kind:'fighter',range:12,acc:90, dmg:9,  shots:6, sh:1, hu:1.0, pierce:0.6, reload:2, guided:true, pdcF:0.45},
+  // v32: Fast Attack Ship
+  strikeM:{name:'Strike missiles',kind:'missile',range:9, acc:92, dmg:32, shots:2, sh:1, hu:1.0, pierce:0.35,reload:1, ammo:2, guided:true, pdcF:0.7},
 };
 const ABIL = {
   burn:      {name:'Hard burn',        desc:'+3 movement this turn', reload:3},
@@ -53,6 +55,7 @@ const ABIL = {
   pdsurge:   {name:'Point defense surge', desc:'Allies within 2 hexes intercept missiles 60% better until your next turn', reload:3},
   brace:     {name:'Brace for impact', desc:'Double armor and 25% less hull damage until your next turn', reload:3},
   repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, range:3, amount:45},
+  ambush:    {name:'Ambush',           desc:'+2 movement, and missiles fired this turn are half as likely to be intercepted', reload:3},
 };
 const CLASSES = {
   patrol:   {label:'Patrol craft',  role:'Stealth hunter',         cost:20, hull:45,  armor:1, shield:15, regen:8,  mp:7, ev:32, pdc:0.20, weapons:['pulse','missL'],        ability:'ecm',        len:1.8, y:0.7},
@@ -60,17 +63,21 @@ const CLASSES = {
   frigate:  {label:'Frigate',       role:'Escort, point defense',  cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.45, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
   destroyer:{label:'Destroyer',     role:'Line combatant',         cost:140, hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
   cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
+  fastattack:{label:'Fast attack ship', role:'Ambush striker',      cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:34, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
+  dreadnought:{label:'Dreadnought',  role:'Capital of the line',    cost:480, hull:400, armor:12,shield:120,regen:22, mp:2, ev:2,  pdc:0.60, weapons:['spinal','railL','railL','beamH','beamH','pulse'], ability:'brace', len:4.6, y:1.1},
   carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:150, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };
-const ORDER = ['patrol','corvette','frigate','destroyer','cruiser','carrier'];
+const ORDER = ['fastattack','patrol','corvette','frigate','destroyer','cruiser','carrier','dreadnought'];   // lightest to heaviest
+// Each class's model seed. Fixed, so adding a class to ORDER never reshuffles how the existing ships look.
+const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7 };
 const NAMES = {
-  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel'},
-  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle'},
+  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath'},
+  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle', fastattack:'Hook', dreadnought:'Iron Tithe'},
 };
 // Home cell per class on the player's side; the enemy's are mirrored through the centre. The first ship of each
 // class deploys here, so the classic one-of-each fleet lines up exactly as it always has. Extra copies take the
 // nearest free cell to their class's home (see deployFleet).
-const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5] };
+const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5], fastattack:[-1,-6], dreadnought:[-6,-3] };
 const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
 const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
@@ -107,6 +114,8 @@ const AI_PLANS = {
   swarm:   {label:'Swarm',    wish:['destroyer','frigate','frigate','corvette','corvette','corvette','patrol']},
   carrier: {label:'Carriers', wish:['carrier','carrier','frigate','carrier','corvette','frigate','patrol']},
   wolfpack:{label:'Wolfpack', wish:['destroyer','corvette','corvette','destroyer','corvette','patrol']},
+  dreadnought:{label:'Dreadnought', wish:['dreadnought','frigate','frigate','corvette','patrol']},   // v32; below 480 it builds escorts only
+  raiders: {label:'Raiders',  wish:['fastattack','fastattack','destroyer','fastattack','fastattack','corvette']},
 };
 function aiBuild(budget, plan){
   const wish=AI_PLANS[plan].wish, f=[]; let left=budget, added=true;
@@ -123,7 +132,7 @@ function fleetSummary(list){
   const n={}; list.forEach(c=>n[c]=(n[c]||0)+1);
   return Object.keys(n).sort((a,b)=>ORDER.indexOf(b)-ORDER.indexOf(a)).map(c=>CLASSES[c].label+(n[c]>1?' ×'+n[c]:'')).join(', ');
 }        // ships per side; the zone holds 73 cells, but spacing and the board read poorly past this
-const CLASSIC_FLEET = ORDER.slice();   // one of each, the original game
+const CLASSIC_FLEET = ['patrol','corvette','frigate','destroyer','cruiser','carrier'];   // one of each original class, the original game
 const DIFF = {
   easy:  {acc:-12, hull:0.9,  caution:0.15, aggr:1.0, focus:0.0, noise:28},
   normal:{acc:0,   hull:1.0,  caution:0.45, aggr:1.0, focus:0.7, noise:5},

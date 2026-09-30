@@ -11,7 +11,7 @@ async function fireWeapon(att, wi, tgt){
   const p=hitChance(att,d,tgt); if(p<=0) return false;
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
-  const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
+  const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8)*(att.fx.ambush?0.5:1) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
   const outcomes=[], dmgRoll=[];
   for(let i=0;i<d.shots;i++){ let o=gameRand()*100<p?'hit':'miss'; if(o==='hit' && d.guided && gameRand()<pInt) o='int'; outcomes.push(o); dmgRoll.push(d.dmg*(0.85+gameRand()*0.3)); }
   // Resolve the volley now, shot by shot in order, against a copy of the target. The effects land in whatever order
@@ -68,6 +68,7 @@ async function useAbility(s, target=null){
     addFx({t:0,update(dt){ this.t+=dt; const k=this.t/1; ring.scale.setScalar(1+k*HEX*2.6*1.6); ring.material.opacity=0.8*(1-k); return k<1; }, dispose(){ disposeMesh(ring); }}); }
   else if(k==='overcharge'){ const add=Math.min(s.shieldMax-s.shield, s.shieldMax*0.6); s.shield+=add; shieldFlash(s, s.group.position.clone().add(new THREE.Vector3(0,3,0))); s.shMat.uniforms.uFlash.value=2; Sound.shield(); Sound.power(); floatText(s,`+${Math.round(add)} shields`,'sh'); }
   else if(k==='pdsurge'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.pdsurge=1; Particles.burst(o.group.position,26,{speed:3,color:new THREE.Color(1,.85,.4),size:0.28,life:0.7}); } Sound.pdc(); Sound.power(); floatText(s,'PD surge','heal'); }
+  else if(k==='ambush'){ s.mp+=2; s.fx.ambush=1; Sound.power(); s.engines.forEach(e=>e.boost=1.5); floatText(s,'Ambush','heal'); }
   else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
   else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; Sound.power();
     const a0=s.group.position.clone(), b0=target.group.position.clone();
@@ -93,7 +94,7 @@ async function moveShip(s, path){
 }
 
 /* ---------------- AI ---------------- */
-function targetValue(t){ return {carrier:1.25, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85}[t.cls]||1; }
+function targetValue(t){ return {dreadnought:1.3, carrier:1.25, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85, fastattack:0.85}[t.cls]||1; }
 function scoreAttack(att, w, tgt, from, D){
   const e=expected(att,w,tgt,from); if(!e.p) return 0;
   let v=(e.hull + (e.dmg-e.hull)*0.5)*targetValue(tgt);
@@ -122,7 +123,7 @@ function evalCell(s, cell, D){
   const c=cellAt(cell.q,cell.r); if(c.t==='debris') score+=4;
   // stand-off preference for fragile artillery, closing pressure for everyone else
   const near=foes.reduce((m,f)=>Math.min(m,hdist(f,cell)),99);
-  if(s.cls==='carrier' || s.cls==='cruiser') score -= Math.max(0,5-near)*6*late;
+  if(s.cls==='carrier' || s.cls==='cruiser' || s.cls==='dreadnought') score -= Math.max(0,5-near)*6*late;
   if(off===0) score -= near*1.8;
   score += (gameRand()-0.5)*D.noise;
   return score;
@@ -133,6 +134,8 @@ async function aiShip(s){
   let reach=reachable(s);
   const bestOffense = r => { let b=0; for(const [,c] of r){ if(c.blocked) continue; for(const w of s.weapons){ if(!weaponReady(w)) continue; for(const t of alive(other(s.side))) if(hitChance(s,w.def,t,c)>0) b=1; } if(b) break; } return b; };
   if(s.ability.key==='burn' && abilityReady(s) && !bestOffense(reach)){ await useAbility(s); reach=reachable(s); }
+  // ambush when its missiles are loaded and an enemy is (or will be, with the extra speed) inside their reach
+  if(s.ability.key==='ambush' && abilityReady(s) && s.weapons.some(w=>w.def.guided && weaponReady(w)) && alive(other(s.side)).some(t=>hdist(s,t)<=s.weapons.find(w=>w.def.guided).def.range+s.mp+2)){ await useAbility(s); reach=reachable(s); }
   let best=null, bestScore=-1e9;
   for(const [k,c] of reach){ if(c.blocked) continue; const sc=evalCell(s,c,D) + (k===key(s.q,s.r)?2:0) - c.cost*0.3; if(sc>bestScore){ bestScore=sc; best=k; } }
   if(best && best!==key(s.q,s.r)){ await moveShip(s, pathTo(reach,best)); await wait(0.1); }

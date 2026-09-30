@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '31';
+const GAME_VERSION = '33';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -135,7 +135,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <h3>Keys</h3>
     <div class="keys">
       <kbd>Tab</kbd><span>Next ship with orders</span>
-      <kbd>1 2 3</kbd><span>Select a single weapon</span>
+      <kbd>1–9</kbd><span>Select a single weapon</span>
       <kbd>F</kbd><span>Use all weapons</span>
       <kbd>Q</kbd><span>Special ability</span>
       <kbd>Space</kbd><span>End turn</span>

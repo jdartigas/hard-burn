@@ -161,7 +161,7 @@ function mergeStatic(body, skip, keepOriginals){
 }
 function buildShip(cls, side, copy=0){
   const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
-  const P=side==='player', R=mulberry32((P?1000:2000)+ORDER.indexOf(cls)*77);
+  const P=side==='player', R=mulberry32((P?1000:2000)+MODEL_SEED[cls]*77);
   const engines=[], lights=[], greebles={dark:[], hull:[], metal:[]}, decks=[];
   const nav=P?0xffcf80:0xff6a50;
   const CH = 0.2;
@@ -265,7 +265,7 @@ function buildShip(cls, side, copy=0){
   // --- per-class hulls, modeled from the reference miniatures ---
   // shared Expanse vocabulary: drum-housed drive at the stern, V-strut truss to an octagonal engineering section,
   // brick-tiled armor decks forward, livery plates, stripes, hull numbers, PDC turrets everywhere
-  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
+  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702',fastattack:'109',dreadnought:'901'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870',fastattack:'88',dreadnought:'899'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
   const HULL=M.hull, H2=M.hull2, PL=M.plate, ST=M.stripe;
   function drum(r,len,zf,x=0,y=0){ // drive housing: open drum, ribbed, crenellated rim, bell and plume inside
     const zb=zf-len;
@@ -400,6 +400,41 @@ function buildShip(cls, side, copy=0){
     pdc(.4,.27,.9,1); pdc(-.4,.27,.9,1); pdc(-.3,.27,-.3,1); pdc(.53,.1,-.8,1,'x'); pdc(-.53,.1,-.8,-1,'x'); pdc(.46,.1,1.4,1,'x'); pdc(-.46,.1,1.4,-1,'x'); pdc(0,-.27,.4,-1); pdc(.3,-.27,-.4,-1); pdc(-.3,-.27,-.4,-1);
     number(idn,-.2,.27,.4,.12,'top'); number(idn,.52,.15,1.4,.08,'r'); number(idn,-.52,.15,1.4,.08,'l');
     light(.5,.2,-1.2,nav); light(-.5,.2,-1.2,nav); light(.38,.52,.2,0xff3030); rcs(.5,.25,1.5); rcs(-.5,.25,1.5);
+  } else if(cls==='fastattack'){
+    // a needle hull bolted to an oversized drive: nearly all engine, two missile pods, very little armor
+    drum(.18,.34,-0.6);
+    struts(-0.6,-0.44,.16,.12,0,0,6);
+    plate(-0.44,0.22,.2,.17,.2,.17,{mat:H2}); topPlate(-0.36,0.18,.12,.12,.085,PL);
+    plate(0.22,0.95,.2,.17,.03,.04,{ch:.42}); stripes(-0.3,0.7,.1,.045,.012); chevron(0.7,.07,.12);
+    [-1,1].forEach(s=>{ plate(-0.3,0.42,.1,.11,.1,.09,{x:s*.17,y:-.02,mat:M.dark,ch:.25});   // missile pods, two tubes each
+      [.026,-.026].forEach(dy=>{ const t=new THREE.Mesh(new THREE.CircleGeometry(.024,12),M.metal); add(t,s*.17,-.02+dy,.422); });
+      const fin=plate(-0.55,-0.25,.012,.16,.012,.05,{x:s*.14,y:.12,mat:H2,ch:.2,greeble:false}); fin.rotation.z=s*0.5; });
+    pdc(0,.1,-.15,1); windows(0,.09,.6,.14,3); number(idn,0,.087,-.05,.05,'top');
+    light(.26,0,-.5,nav); light(-.26,0,-.5,nav); rcs(.12,.08,.5); rcs(-.12,.08,.5);
+  } else if(cls==='dreadnought'){
+    // the largest hull afloat: six drives, armored belts, a bridge tower, a spinal railgun running the length of
+    // a thick armored prow, light railguns on its flanks and two heavy beam emitters
+    [[-1,1],[0,1],[1,1],[-1,-1],[0,-1],[1,-1]].forEach(([sx,sy])=>drum(.17,.34,-1.95,sx*.34,sy*.2));
+    struts(-1.95,-1.8,.5,.5,0,0,10);
+    plate(-1.8,-1.1,1.2,.72,1.16,.7,{mat:H2}); sidePlates(-1.72,-1.2,1.2,.46);
+    collar(-1.1,-1.02,.9,.6);
+    plate(-1.02,0.9,1.1,.66,1.06,.62);
+    [-1,1].forEach(s=>plate(-0.95,0.85,.12,.5,.12,.46,{x:s*.6,y:-.02,mat:PL,ch:.2}));   // armor belts
+    topPlate(-0.95,0.85,.7,.66,.31,PL); stripes(-0.9,0.8,.325,.3,.02);
+    plate(-0.8,0.1,.4,.3,.34,.24,{y:.46,ch:.28,mat:H2}); windows(0,.62,-.35,.5,7); dish(.2,.6,-.65,.12); dish(-.2,.6,-.2,.09);   // bridge tower
+    plate(0.9,2.2,1.06,.62,.5,.34,{ch:.26}); sidePlates(1.0,2.0,1.0,.36,-.02); chevron(1.9,.2,.6); chevron(2.05,.16,.46);   // armored prow
+    tube(.1,-0.6,2.45,0,.43,M.dark,20);   // spinal railgun
+    for(let i=0;i<15;i++){ const c=new THREE.Mesh(new THREE.TorusGeometry(.105,.016,6,20),M.metal); add(c,0,.43,-0.5+i*.2); }
+    { const mz=new THREE.Mesh(new THREE.CylinderGeometry(.085,.12,.12,20),M.metal); mz.rotation.x=Math.PI/2; add(mz,0,.43,2.5);
+      const bore=new THREE.Mesh(new THREE.CircleGeometry(.045,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,.43,2.562); }
+    barrels([-.44,.44],.1,1.3,2.25,.018);   // light railguns along the prow flanks
+    [-1,1].forEach(s=>{ plate(0.95,1.35,.2,.1,.18,.08,{x:s*.36,y:.36,mat:H2,ch:.3,greeble:false});   // heavy beam emitters
+      tube(.045,1.3,1.62,s*.36,.42,M.metal,16); const lens=new THREE.Mesh(new THREE.CircleGeometry(.032,16),new THREE.MeshBasicMaterial({color:P?0xffb44a:0xff5a3a})); add(lens,s*.36,.42,1.625); });
+    [[.45,.33,-0.8],[-.45,.33,-0.8],[.45,.33,.6],[-.45,.33,.6],[.35,.2,1.5],[-.35,.2,1.5]].forEach(([x,y,z])=>pdc(x,y,z,1));
+    [[.66,0,-0.3],[.66,0,.5],[.6,0,1.3]].forEach(([x,y,z])=>{ pdc(x,y,z,1,'x'); pdc(-x,y,z,-1,'x'); });
+    pdc(0,-.33,-0.4,-1); pdc(0,-.33,.8,-1); pdc(0,-.2,1.7,-1);
+    number(idn,0,.335,.3,.14,'top'); number(idn,.52,.05,1.35,.1,'r'); number(idn,-.52,.05,1.35,.1,'l');
+    light(.6,.25,-1.7,nav); light(-.6,.25,-1.7,nav); light(0,.64,-.2,0xffffff); rcs(.4,.3,2.0); rcs(-.4,.3,2.0); rcs(.6,.3,-1.0); rcs(-.6,.3,-1.0);
   }
   // greebles scattered over every armored deck
   for(const d of decks){

@@ -190,6 +190,40 @@ Classic 46, **Wolfpack 36**, and Carrier grp v Wolfpack 80%. Too hard on missile
 try: stack at a lower share (say 50%), or raise the Frigate's own `pdc` to about 0.55 so its screen
 reaches the capitals under the current rule. Re-measure the presets either way.
 
+### 0c. New ship classes (Jon, v33 onwards)
+
+Four classes designed with Jon: Fast attack ship, Dreadnought, Repair tender, Electronic warfare ship.
+Numbers are starting points, to tweak in play.
+
+**Release 1 (v33): Fast attack ship and Dreadnought.** Measured against the five presets, 40
+battles each, row fleet's win rate:
+
+| Fleet (Standard budget) | Classic | Gunline | Swarm | Carrier | Wolfpack |
+|---|---|---|---|---|---|
+| Dreadnought group, first spec (450; spinal ×2, heavy beam, 2-salvo torpedoes) | 8 | 0 | 3 | 0 | 3 |
+| Dreadnought group, Jon's loadout (spinal, 2 light rails, 2 heavy beams, pulse, PD 0.6) at 450 | 70 | 68 | 55 | 95 | 33 |
+| **Same at 480** (Dreadnought, 2 Frigates, Corvette, Patrol) | 80 | 57 | 40 | 90 | 20 |
+| Raiders, first spec (8 FAS at 45 + 2 Destroyers) | 8 | 15 | 3 | 0 | 8 |
+| Raiders, missiles 32 and pdcF 0.7 | 50 | 60 | 25 | – | 28 |
+| **Raiders, plus hull 55 and shields 16** (shipped at 50 points) | 68 | 57 | 53 | – | 60 |
+
+Jon chose to keep the Dreadnought expensive and make it hit harder rather than cut its price. The
+Fast attack ship couldn't be fixed by price: the 12-ship cap stops a cheaper class buying more hulls.
+AI plans added: Dreadnought (Standard: the tested group) and Raiders. Raiders beat the Dreadnought
+plan 83% (6 battles): a fast missile swarm is its counter, as intended.
+
+**Watch:** the Dreadnought group is strong against Classic and Carrier (80–90%). Re-run the full
+preset round robin once release 2 lands, with all ten classes.
+
+**Release 2: Repair tender and Electronic warfare ship.** Designs agreed (see the chat of v32):
+- Repair tender: 150/50 (+12), armor 3, move 3, ev 8, PD 0.35, pulse cannons. Ability Resupply
+  (ally within 2: +40 hull, half shields, +1 salvo per missile launcher; recharge 2). Passive field
+  repairs: adjacent allies +5 hull a turn. About 110.
+- Electronic warfare ship: 60/30 (+10), armor 2, move 5, ev 22, PD 0.30, light beam. Passive jamming
+  (enemies within 4: −10 direct, −15 guided accuracy) and targeting uplink (allies within 3: +8).
+  Ability Sensor blackout (enemy within 8: no guided fire, −25 accuracy until its next turn;
+  recharge 3). AI treats it as a priority target. About 90.
+
 ## Scoring and records
 
 The goal: a score for every battle, kept on the device across every future

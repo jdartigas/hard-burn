@@ -72,6 +72,8 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 
 ## 4. Game design
 
+**Ambush** (Fast attack ship): +2 movement, and its missiles are half as likely to be intercepted that turn (`fx.ambush` in `fireWeapon`). The AI uses it when loaded missiles can reach an enemy.
+
 **Fleets.** A fleet is a list of class keys, duplicates allowed, up to `MAX_FLEET` (12) per side, and the two sides can differ. `startGame({player:[...], enemy:[...]})` starts one; with no argument it replays the last fleets, and the default is the classic one of each class. The menu's pickers choose your fleet from `PRESETS` or **Custom** (the fleet builder), and the enemy from Random (any preset), a preset, or **AI build** (the AI spends your budget with one of the `AI_PLANS`, picked at random each battle). The builder lists every class in `CLASSES` with its cost, hull, shields, damage per turn and weapons, against a budget from `BUDGETS` (Skirmish 330, Standard 660, Large 1000) and the 12-ship cap. A custom fleet is stored as `hardburn.custom` = {budget, fleet}; if a price change later puts it over budget it's discarded and the pick falls back to Classic. Presets are Standard-budget fleets, so saving a custom fleet at another budget switches the enemy to AI build, and the menu warns if you pick a preset against it. Choices persist as `hardburn.fleetYou` and `hardburn.fleetEnemy`; scored games also keep both fleet lists and the budget.
 - **Deployment** (`deployFleet`): the first ship of each class takes its `DEPLOY` home cell, so the classic fleet lines up as it always has. Extra copies take the nearest free cell west of `DEPLOY_MAX_X`, keeping a one-hex gap where possible. The enemy's cells are mirrored through the centre, and terrain keeps every deployment cell clear.
 - **Duplicates** are named with numerals (Iron Vesper II) and carry hull numbers like 537-2.
@@ -84,6 +86,8 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 | Destroyer | 140 | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
 | Heavy cruiser | 250 | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
 | Fleet carrier | 150 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
+| Fast attack ship | 50 | 55 | 1 | 16 (+6) | 8 | 34 | .15 | Strike missiles (2×32, range 9, 2 salvos, harder to intercept), pulse | Ambush |
+| Dreadnought | 480 | 400 | 12 | 120 (+22) | 2 | 2 | .60 | Spinal railgun, 2 light railguns, 2 heavy beams, pulse | Brace for impact |
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
 
@@ -122,7 +126,7 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 
 The fleet builder, the class list and the HUD read `CLASSES`, so a new class appears in them on its own. Everything else a class touches:
 1. `CLASSES`: stats, `weapons` (keys into `WEAPONS`), `ability` (a key into `ABIL`), `len` and `y`, and a provisional `cost`.
-2. `ORDER`: where it sits, lightest to heaviest (turn order and list sorting).
+2. `ORDER`: where it sits, lightest to heaviest (turn order and list sorting), and a new, unused number in `MODEL_SEED`. Never derive the model seed from `ORDER`: inserting a class would reshuffle every existing model.
 3. `DEPLOY`: a home cell on the player's side for the first ship of the class.
 4. `NAMES`: one name per side, and a hull number in the `idn` maps at the top of `buildShip`.
 5. `buildShip`: its model. This is the real work: a per-class builder in the same design language (drum drives, V-strut truss, tiled decks), with plumes via `makePlume`. Anything animated or transparent must go in `mergeShipParts`'s skip set.

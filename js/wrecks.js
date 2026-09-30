@@ -82,7 +82,7 @@ function breakUpShip(s){
   const decks=body.children.filter(c=>c.isMesh && c.userData.chunk && c.geometry.boundingBox!==undefined);
   let zmin=1e9, zmax=-1e9; const ends=[];
   body.children.forEach(c=>{ if(skip.has(c)) return; if(c.isMesh && c.userData.chunk){ c.geometry.computeBoundingBox(); const bb=c.geometry.boundingBox; const a=c.position.z+bb.min.z, b=c.position.z+bb.max.z; zmin=Math.min(zmin,a); zmax=Math.max(zmax,b); ends.push(b); } });
-  const len=zmax-zmin, nSec={patrol:2,corvette:2,frigate:3,destroyer:3,cruiser:4,carrier:3}[s.cls]||3;
+  const len=zmax-zmin, nSec={patrol:2,corvette:2,frigate:3,destroyer:3,cruiser:4,carrier:3,fastattack:2,dreadnought:5}[s.cls]||3;
   const cuts=[]; for(let i=1;i<nSec;i++){ const ideal=zmin+len*i/nSec; let best=ideal, bd=1e9; for(const e of ends){ const d=Math.abs(e-ideal); if(d<bd && e>zmin+len*0.12 && e<zmax-len*0.12 && !cuts.some(c=>Math.abs(c-e)<len*0.12)){ bd=d; best=e; } } cuts.push(bd<len*0.2?best:ideal+rand(-0.05,0.05)); }
   cuts.sort((a,b)=>a-b);
   const bounds=[zmin-1,...cuts,zmax+1];
