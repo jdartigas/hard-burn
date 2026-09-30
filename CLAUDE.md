@@ -14,7 +14,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **No build step, no package.json, no bundler.** Split into files in v29:
   - `index.html`: the markup, `GAME_VERSION`, the three.js import map and a small module that loads three.js and then the game.
   - `css/hard-burn.css`: all styles.
-  - `js/*.js`: the game, **plain scripts (not modules) sharing one global scope**, loaded in this order by `index.html`: `core` (utilities, all game data, hex maths), `audio`, `render`, `board`, `ships`, `rules`, `wrecks`, `combat`, `hud`, `input`, `menus`, `main`. Each file's header says what it holds.
+  - `js/*.js`: the game, **plain scripts (not modules) sharing one global scope**, loaded in this order by `index.html`: `core` (utilities, all game data, hex maths), `audio`, `render`, `board`, `environment`, `ships`, `rules`, `wrecks`, `combat`, `hud`, `input`, `menus`, `main`. Each file's header says what it holds.
   - **Load order matters:** code that runs at load time (not inside a function called later) can only use names from earlier files or earlier in the same file. Function calls at runtime can go anywhere. A new file must be added to the list in `index.html`.
   - Every top-level name is global, so it must not collide with a browser global (`open`, `close`, `name`, `status`, `top`...). Checked for all 287 names in v29; check new ones the same way.
   - Globals are reachable from the browser console (`state`, `CLASSES`, `createShip`...), which makes debugging much easier. `window.HB` still exposes the test hooks.
@@ -52,6 +52,7 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 | particles (`render`) | `Particles`: one additive `Points` pool of 6,000 with `emit`/`burst`/`update` |
 | timing (`render`) | `tween`, `wait`, `after`, `addFx`. All scaled by `timeScale` and driven by the frame loop, not `setTimeout` |
 | board (`board`) | Hex cells, grid lines, highlight tiles (`InstancedMesh`), selection rings, path line |
+| scenery (`environment`) | `ENV` layout constants and `Env`: a distant asteroid belt tilted under the board with a dust band, and a midground slab of rock deep below it. Instanced, flat-shaded, distance-hazed, fixed seed; no shadows, no AO, never picked. `QUALITY[q].env` sets how many instances each layer draws (`Env.setQuality`, called by `applyQuality`) |
 | asteroids (`board`) | `RockNoise`, `makeRockGeometry` (about 12.5k triangles, craters, fractures), `rockMat` with shader micro-detail, `makeRockTarget`, `destroyRock`, `generateTerrain` |
 | ship models (`ships`) | `armorTextures` (generated color, normal and packed AO/rough/metal maps), `shipMaterials`, `deckGeometry`, `buildShip` (per-class builders, greebles, conduits, close-up detail layer) |
 | game state (`rules`) | `state`, `createShip`, `shipAt`, `weaponReady` |

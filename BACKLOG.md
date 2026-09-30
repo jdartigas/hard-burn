@@ -241,6 +241,19 @@ Original designs:
   Ability Sensor blackout (enemy within 8: no guided fire, −25 accuracy until its next turn;
   recharge 3). AI treats it as a priority target. About 90.
 
+## Environment pass (v36 onwards)
+
+Depth and scale around the board, from a ChatGPT spec Jon brought in. Scenery only: no gameplay, AI, UI or board
+changes. Everything lives in `js/environment.js` and draws a fixed number of instances per quality preset.
+
+- **v36, done:** distant belt (tilted ring below the board, gaps, clusters, a radial gap, dust band) and the
+  midground slab under the board. Cost measured at High: +13 draw calls, +0.44M triangles, no measurable frame time.
+- **v37:** large foreground rocks seen mainly in tilted and close views, and micro-debris as a small particle box
+  that travels with the camera (tiny, dim, a few specks catching the sun; must not read as snow).
+- **v38:** the landmark, a shattered dwarf planet on the opposite side of the sky from the gas giant, with a debris
+  trail into the belt; two small moons for the gas giant (ring only if Jon wants it after seeing the rest); stars split
+  into a faint layer and a small bright layer with subtle tints, denser along the nebula band.
+
 ## Scoring and records
 
 The goal: a score for every battle, kept on the device across every future

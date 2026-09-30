@@ -203,6 +203,7 @@ function frame(){
   updateWrecks(dt);
   board.rocks.forEach(m=>{ const sp=m.userData.spin; if(sp){ m.rotation.x+=sp.x*dt; m.rotation.y+=sp.y*dt; m.rotation.z+=sp.z*dt; } });
   if(window.__planet) window.__planet.rotation.y+=dt*0.004;
+  Env.update(dt);
   // rings
   const sel=state.selected; selRing.visible=!!sel && state.phase==='player';
   if(sel){ selRing.position.copy(hexToWorld(sel.q,sel.r,0.04)).lerp(new THREE.Vector3(sel.group.position.x,0.04,sel.group.position.z),1); selRing.material.opacity=0.6+Math.sin(elapsed*4)*0.3; }
@@ -252,6 +253,7 @@ function applyQuality(){
   if(on && sun.shadow.mapSize.x!==Q.shadow){ sun.shadow.mapSize.set(Q.shadow,Q.shadow); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; } sun.shadow.camera.right=-1; }
   gtao.enabled=Q.ao && URLQ.get('ao')!=='0'; lastAoR=1;
   scenePass.setSamples(0); smaa.enabled = Q.aa && URLQ.get('aa')!=='0';
+  Env.setQuality(quality);
   document.querySelectorAll('.btn-gfx').forEach(b=>b.textContent='Graphics: '+Q.label);
   onResize();
 }
