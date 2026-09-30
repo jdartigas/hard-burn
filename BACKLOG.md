@@ -248,8 +248,9 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
 
 - **v36, done:** distant belt (tilted ring below the board, gaps, clusters, a radial gap, dust band) and the
   midground slab under the board. Cost measured at High: +13 draw calls, +0.44M triangles, no measurable frame time.
-- **v37:** large foreground rocks seen mainly in tilted and close views, and micro-debris as a small particle box
-  that travels with the camera (tiny, dim, a few specks catching the sun; must not read as snow).
+- **v37, done:** large rocks on the horizon (230 to 340 out, level with the board: first placed below the plane,
+  where tilted views projected them onto the cells), and micro-debris wrapped around the camera with the box scaled to
+  zoom. Cost measured: +1 draw call for the debris, the rocks mostly culled; well under a millisecond at every preset.
 - **v38:** the landmark, a shattered dwarf planet on the opposite side of the sky from the gas giant, with a debris
   trail into the belt; two small moons for the gas giant (ring only if Jon wants it after seeing the rest); stars split
   into a faint layer and a small bright layer with subtle tints, denser along the nebula band.

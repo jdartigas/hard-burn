@@ -61,9 +61,9 @@ function updateShadowFrustum(){
 function enableShadows(obj, cast=true, receive=true){ obj.traverse(o=>{ if(o.isMesh && !o.userData.noShadow){ const m=o.material; if(m && (m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial)) return; o.castShadow=cast; o.receiveShadow=receive; } }); }
 // graphics quality presets
 // env: how many scenery instances each layer draws (js/environment.js); the layers are built once at the High count
-const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true, env:{far:1800, mid:240, dust:16000}},
-  medium:{label:'Medium', pr:1, shadow:2048, ao:false, aa:true, env:{far:1100, mid:150, dust:10000}},
-  low:{label:'Low', pr:1, shadow:0, ao:false, aa:false, env:{far:500, mid:70, dust:5000}} };
+const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true, env:{far:1800, mid:240, dust:16000, near:16, motes:12000}},
+  medium:{label:'Medium', pr:1, shadow:2048, ao:false, aa:true, env:{far:1100, mid:150, dust:10000, near:12, motes:8000}},
+  low:{label:'Low', pr:1, shadow:0, ao:false, aa:false, env:{far:500, mid:70, dust:5000, near:8, motes:4000}} };
 // diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?aa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
 const URLQ = new URLSearchParams(location.search);
 const DEBUG = URLQ.has('debug');

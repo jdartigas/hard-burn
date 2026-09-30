@@ -1,4 +1,5 @@
-// Hard Burn: scenery beyond the board. A distant asteroid belt with a dust band, and a midground layer of rocks.
+// Hard Burn: scenery beyond the board. A distant asteroid belt with a dust band, a midground layer of rocks,
+// large foreground rocks around the rim, and micro-debris drifting past the camera.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -22,6 +23,15 @@ const ENV = {
   // angular structure shared by the belt: gaps where almost nothing is, clusters where rocks crowd
   gaps: [{a:1.15, w:0.20}, {a:4.05, w:0.14}],
   clusters: 18, clusterShare: 0.35,
+  // large rocks in a loose ring well outside the board, level with its plane: silhouettes on the horizon in tilted
+  // and close views. Anything below the plane on the far side projects onto the cells in a tilted view, so these sit
+  // high enough to always land beyond the board's far edge on screen, and far enough out that the camera can't reach one.
+  near: { seed:37001, rMin:230, rMax:340, yMin:-6, ySpan:24, size:[5,14], detail:12, variants:5, color:[0.46,0.45,0.44], spin:0.01,
+          haze:{ near:80, far:400, max:0.68 } },
+  // micro-debris: a box of specks that wraps around the camera, so there is always some near it wherever it goes.
+  // The box scales with zoom (boxK × camera distance), so about the same number sits in view close in or far out.
+  // Tiny and dim; only a few catch the sun, and they fade out near the lens and at the box edge so nothing pops.
+  motes: { seed:37002, boxK:0.55, boxMin:6, boxMax:55, size:0.0014, drift:0.004, glint:0.03 },
 };
 
 const Env = (() => {
@@ -49,8 +59,8 @@ const Env = (() => {
     return new THREE.Vector3(Math.cos(a)*r, y, Math.sin(a)*r);
   }
 
-  function makeMat(c){
-    const m=new THREE.MeshStandardMaterial({vertexColors:true, flatShading:true, roughness:1, metalness:0, envMapIntensity:0.2, color:new THREE.Color(...c)}), H=ENV.haze;
+  function makeMat(c, flat=true, haze={}){
+    const m=new THREE.MeshStandardMaterial({vertexColors:true, flatShading:flat, roughness:1, metalness:0, envMapIntensity:0.2, color:new THREE.Color(...c)}), H={...ENV.haze, ...haze};
     m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
       `gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${H.color.join(',')}), smoothstep(${H.near.toFixed(1)}, ${H.far.toFixed(1)}, length(vViewPosition))*${H.max});\n#include <fog_fragment>`); };
     return m; }
@@ -89,15 +99,57 @@ const Env = (() => {
     return {setCount(n){ g.setDrawRange(0, Math.min(n,max)); }};
   }
 
+  // large foreground rocks: separate meshes (a handful), each tumbling slowly on its own axis
+  function nearLayer(){
+    const L=ENV.near, Rn=mulberry32(L.seed), mat=makeMat(L.color, false, L.haze), group=new THREE.Group(), rocks=[];
+    const geos=[...Array(L.variants)].map((_,i)=>makeRockGeometry(L.seed+i*37, L.detail, true));
+    for(let i=0;i<QUALITY.high.env.near;i++){
+      // golden-angle spacing, so any leading subset (what lower presets draw) is still spread all the way round
+      const a=i*2.39996+Rn()*0.5, r=L.rMin+(L.rMax-L.rMin)*Rn(), size=L.size[0]+(L.size[1]-L.size[0])*Math.pow(Rn(),1.6);
+      const m=new THREE.Mesh(geos[i%L.variants], mat);
+      m.position.set(Math.cos(a)*r, Math.max(L.yMin+Rn()*L.ySpan, size*0.8-16), Math.sin(a)*r); m.scale.setScalar(size); m.rotation.set(Rn()*6.3,Rn()*6.3,Rn()*6.3);
+      m.userData.spin=new THREE.Vector3(Rn()-0.5,Rn()-0.5,Rn()-0.5).multiplyScalar(L.spin); m.userData.noAO=true; m.userData.noShadow=true;
+      group.add(m); rocks.push(m); }
+    scene.add(group);
+    return { setCount(n){ rocks.forEach((m,i)=>m.visible=i<n); },
+      update(dt){ for(const m of rocks) if(m.visible){ const s=m.userData.spin; m.rotation.x+=s.x*dt; m.rotation.y+=s.y*dt; m.rotation.z+=s.z*dt; } } };
+  }
+
+  // micro-debris: positions live in a box that the vertex shader wraps around the camera
+  function moteLayer(max){
+    const M=ENV.motes, Rm=mulberry32(M.seed), pos=new Float32Array(max*3), seed=new Float32Array(max);
+    for(let i=0;i<max;i++){ pos.set([Rm(), Rm(), Rm()], i*3); seed[i]=Rm(); }   // unit box, scaled in the shader
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('seed',new THREE.BufferAttribute(seed,1));
+    const mat=new THREE.ShaderMaterial({ transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+      uniforms:{ uCam:{value:camera.position}, uTime:{value:0}, uScale:{value:600}, uGain:{value:1}, uBox:{value:40} },
+      vertexShader:`attribute float seed; uniform vec3 uCam; uniform float uTime; uniform float uScale; uniform float uGain; uniform float uBox; varying float vB;
+        void main(){
+          vec3 drift=vec3(sin(seed*40.0), cos(seed*23.0)*0.4, cos(seed*57.0))*${M.drift.toFixed(4)}*uTime;
+          vec3 p=(fract(position+drift-uCam/uBox+0.5)-0.5)*uBox+uCam;
+          vec4 mv=modelViewMatrix*vec4(p,1.0); float d=-mv.z;
+          float fade=smoothstep(uBox*0.04,uBox*0.12,d)*(1.0-smoothstep(uBox*0.3,uBox*0.48,length(p-uCam)));
+          // a few specks tumble into the sun and glint; the rest are barely there
+          float glint=step(${(1-M.glint).toFixed(3)},seed)*pow(max(sin(uTime*(0.6+seed*2.0)+seed*90.0),0.0),8.0);
+          vB=fade*uGain*(0.05+0.04*fract(seed*13.7)+glint*0.9);
+          gl_PointSize=clamp(${M.size.toFixed(4)}*uBox*uScale/max(d,0.01), 1.0, 2.5);
+          gl_Position=projectionMatrix*mv; }`,
+      fragmentShader:`varying float vB; void main(){ vec2 c=gl_PointCoord-0.5; float a=smoothstep(0.5,0.1,length(c)); gl_FragColor=vec4(vec3(1.0,0.93,0.84)*vB*a,1.0); }` });
+    const pts=new THREE.Points(g, mat); pts.frustumCulled=false; pts.userData.noAO=true; scene.add(pts);
+    return { mat, setCount(n){ g.setDrawRange(0, Math.min(n,max)); },
+      update(dt){ const u=mat.uniforms; u.uTime.value+=dt; u.uScale.value=Particles.mat.uniforms.uScale.value; u.uBox.value=clamp(cam.radius*M.boxK, M.boxMin, M.boxMax); } };
+  }
+
   const top = QUALITY.high.env;
   const far = rockLayer(ENV.far, farSpin, 7001); far.build(top.far);
   const mid = rockLayer(ENV.mid, midSpin, 8001); mid.build(top.mid);
   const dust = dustLayer(top.dust);
+  const near = nearLayer();
+  const motes = moteLayer(top.motes);
 
   return {
-    group: planeGroup,
-    setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); },
-    update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; },
+    group: planeGroup, motes,
+    setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); near.setCount(c.near); motes.setCount(c.motes); },
+    update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; near.update(dt); motes.update(dt); },
   };
 })();
 Env.setQuality(quality);
