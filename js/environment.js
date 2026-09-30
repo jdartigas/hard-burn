@@ -1,5 +1,6 @@
 // Hard Burn: scenery beyond the board. A distant asteroid belt with a dust band, a midground layer of rocks,
-// large foreground rocks around the rim, and micro-debris drifting past the camera.
+// large foreground rocks around the rim, micro-debris drifting past the camera, a shattered dwarf planet as a
+// landmark, and two small moons for the gas giant.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -31,6 +32,16 @@ const ENV = {
   // micro-debris: a box of specks that wraps around the camera, so there is always some near it wherever it goes.
   // The box scales with zoom (boxK × camera distance), so about the same number sits in view close in or far out.
   // Tiny and dim; only a few catch the sun, and they fade out near the lens and at the box edge so nothing pops.
+  // the landmark: a dwarf planet broken open, on the far side of the sky from the gas giant, bleeding a trail of
+  // fragments and dust down into the belt. Placed in the belt's frame at the azimuth given by `toward`, then lifted to
+  // `elevation` degrees: the belt is low on that side, and anything much below the horizon lands behind the board
+  // in tilted views, where it crowds the ships. At about the gas giant's height it sits past the board's far edge.
+  landmark: { seed:38001, toward:[-0.5,0,0.8], elevation:-6, ringR:1090, radius:74, detail:30, color:[0.60,0.58,0.55],
+    trail:{ start:0.075, span:0.46, sink:100, spread:[10,75], size:[0.9,5.5], detail:2, variants:5, color:[0.40,0.40,0.42] },
+    chunks:10, chunkSize:[5,21], haze:{ near:500, far:2200, max:0.32 } },
+  // two small moons beside the gas giant: offsets in its screen plane (right, up) and toward the viewer, and radius
+  moons: [ { seed:38101, right:-300, up:75, toward:60, radius:11, color:[0.64,0.65,0.68] },
+           { seed:38102, right:245, up:-95, toward:-30, radius:6.5, color:[0.52,0.44,0.37] } ],
   motes: { seed:37002, boxK:0.55, boxMin:6, boxMax:55, size:0.0014, drift:0.004, glint:0.03 },
 };
 
@@ -139,17 +150,104 @@ const Env = (() => {
       update(dt){ const u=mat.uniforms; u.uTime.value+=dt; u.uScale.value=Particles.mat.uniforms.uScale.value; u.uBox.value=clamp(cam.radius*M.boxK, M.boxMin, M.boxMax); } };
   }
 
+  // a round body with relief and craters; with a shatter normal, everything beyond the cut plane is pushed back
+  // into a scooped, jagged fracture face in lighter exposed rock. Built with +z as the shatter direction.
+  function bodyGeometry(seed, detail, shatter){
+    const Rb=mulberry32(seed), N=RockNoise, g=icoSphere(detail), pos=g.attributes.position, col=new Float32Array(pos.count*3), v=new THREE.Vector3();
+    const rdir=()=>new THREE.Vector3(Rb()*2-1,Rb()*2-1,Rb()*2-1).normalize();
+    const craters=[...Array(28)].map(()=>({c:rdir(), r:0.04+Math.pow(Rb(),2)*0.3, d:0.015+Rb()*0.035}));
+    const cuts=shatter?[{n:new THREE.Vector3(0,0,1), o:0.4, scoop:0.3}, {n:new THREE.Vector3(0.62,0.35,0.7).normalize(), o:0.72, scoop:0.1}]:[];
+    for(let i=0;i<pos.count;i++){
+      v.fromBufferAttribute(pos,i).normalize(); const u=v.clone();
+      let h=1+N.fbm(u.x*2,u.y*2,u.z*2,seed,4)*0.05+N.ridged(u.x*5,u.y*5,u.z*5,seed+3,3)*0.02, cr=0;
+      for(const c of craters){ const a=Math.acos(clamp(u.dot(c.c),-1,1))/c.r; if(a<1){ const b=1-a*a; h-=c.d*b; cr=Math.max(cr,b); } else h+=c.d*0.35*Math.exp(-Math.pow((a-1)/0.2,2)); }
+      v.multiplyScalar(h);
+      let face=0;
+      for(const c of cuts){ const d=v.dot(c.n); if(d>c.o){ const off=v.clone().addScaledVector(c.n,-d), rr=Math.min(1,off.length());
+          const jag=N.ridged(u.x*7,u.y*7,u.z*7,seed+9,4)*0.09+N.fbm(u.x*16,u.y*16,u.z*16,seed+11,3)*0.03;
+          v.addScaledVector(c.n, -(d-c.o) - c.scoop*(1-rr*rr) + jag); face=Math.max(face, clamp((d-c.o)*6,0,1)); } }
+      pos.setXYZ(i,v.x,v.y,v.z);
+      const maria=clamp((N.fbm(u.x*1.4,u.y*1.4,u.z*1.4,seed+7,4)-0.02)*5,0,1);   // broad dark plains, for contrast at a distance
+      let shade=0.46+N.fbm(u.x*3,u.y*3,u.z*3,seed+5,4)*0.14-maria*0.13-cr*0.07+(Rb()-0.5)*0.02;
+      // the fracture face: paler, warmer rock with dark seams, so the break reads from across the sky
+      const seam=Math.max(0,N.ridged(u.x*9,u.y*9,u.z*9,seed+13,3)-0.55);
+      const fr=[0.58-seam*0.5, 0.52-seam*0.5, 0.44-seam*0.45];
+      col[i*3]=toLinear(shade+(fr[0]-shade)*face); col[i*3+1]=toLinear(shade*0.97+(fr[1]-shade*0.97)*face); col[i*3+2]=toLinear(shade*0.93+(fr[2]-shade*0.93)*face);
+    }
+    g.setAttribute('color',new THREE.BufferAttribute(col,3)); g.computeVertexNormals(); g.computeBoundingSphere(); return g;
+  }
+
+  // the shattered dwarf planet, its broken-off chunks, and the fragment trail it sheds into the belt
+  function landmarkLayer(maxRocks, maxDust){
+    const L=ENV.landmark, T=L.trail, Rl=mulberry32(L.seed), group=new THREE.Group(); planeGroup.add(group);
+    // pick the angle on the belt ring whose world direction best matches the chosen side of the sky
+    planeGroup.updateMatrixWorld(true);
+    const want=new THREE.Vector3(...L.toward).setY(0).normalize(), w=new THREE.Vector3(); let aL=0, best=-2;
+    for(let a=0;a<Math.PI*2;a+=0.005){ w.set(Math.cos(a)*L.ringR, 0, Math.sin(a)*L.ringR); planeGroup.localToWorld(w); const d=w.setY(0).normalize().dot(want); if(d>best){ best=d; aL=a; } }
+    // then find the height off the belt plane that puts it at the chosen elevation
+    let lift=0; for(let i=0;i<30;i++){ w.set(Math.cos(aL)*L.ringR, lift, Math.sin(aL)*L.ringR); planeGroup.localToWorld(w);
+      const el=Math.atan2(w.y, Math.hypot(w.x,w.z))*180/Math.PI; lift+=(L.elevation-el)*Math.PI/180*L.ringR*0.9; }
+    const dir = Math.sin(aL+0.3)>0 ? 1 : -1;   // which way along the ring the trail runs
+    const trailPoint=(t, spread)=>{ const a=aL+dir*(T.start+T.span*t), r=L.ringR-T.sink*t;
+      const s=(T.spread[0]+(T.spread[1]-T.spread[0])*t)*spread;
+      return new THREE.Vector3(Math.cos(a)*r+(Rl()+Rl()-1)*s, lift*(1-t)*(1-t*0.3)+(Rl()+Rl()-1)*s*0.45, Math.sin(a)*r+(Rl()+Rl()-1)*s); };
+    const center=new THREE.Vector3(Math.cos(aL)*L.ringR, lift, Math.sin(aL)*L.ringR);
+    // the body. Its fracture sits on the limb across the sunlit side (so the round, lit surface still reads as a world),
+    // on the side the trail leaves from, tipped toward the board and a little into the sun so the break face is lit
+    const body=new THREE.Mesh(bodyGeometry(L.seed, L.detail, true), makeMat(L.color, false, L.haze));
+    body.scale.setScalar(L.radius); body.position.copy(center); group.add(body);
+    planeGroup.updateMatrixWorld(true);
+    const cw=planeGroup.localToWorld(center.clone()), tw=planeGroup.localToWorld(center.clone().add(new THREE.Vector3(-Math.sin(aL)*dir, 0, Math.cos(aL)*dir))).sub(cw);
+    const toView=cw.clone().negate().normalize(), sunSide=sunDir.clone().addScaledVector(toView,-sunDir.dot(toView)).normalize();
+    const across=new THREE.Vector3().crossVectors(toView, sunSide); if(across.dot(tw)<0) across.negate();
+    body.lookAt(cw.clone().add(across.multiplyScalar(0.85).addScaledVector(toView,0.4).addScaledVector(sunSide,0.25)));
+    // broken-off chunks close behind the body, largest first
+    const chunkMat=makeMat(L.color, false, L.haze), chunks=[];
+    for(let i=0;i<L.chunks;i++){ const t=0.01+i*0.022+Rl()*0.015, m=new THREE.Mesh(makeRockGeometry(L.seed+50+i*7, 8, true), chunkMat);
+      m.position.copy(trailPoint(t, 0.5)); m.scale.setScalar(L.chunkSize[1]-(L.chunkSize[1]-L.chunkSize[0])*(i/(L.chunks-1))*(0.7+Rl()*0.3));
+      m.rotation.set(Rl()*6.3,Rl()*6.3,Rl()*6.3); m.userData.spin=new THREE.Vector3(Rl()-0.5,Rl()-0.5,Rl()-0.5).multiplyScalar(0.006); group.add(m); chunks.push(m); }
+    // the fragment trail: instanced rock thinning out along the ring into the belt
+    const geos=[...Array(T.variants)].map((_,i)=>makeRockGeometry(L.seed+200+i*13, T.detail, false)), mat=makeMat(T.color), per=Math.ceil(maxRocks/T.variants), ims=[];
+    const M4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler(), s=new THREE.Vector3();
+    geos.forEach(gm=>{ const im=new THREE.InstancedMesh(gm, mat, per);
+      for(let k=0;k<per;k++){ const t=Math.pow(Rl(),1.7), size=T.size[0]+(T.size[1]-T.size[0])*Math.pow(Rl(),2.5)*(1-t*0.6);
+        e.set(Rl()*6.3,Rl()*6.3,Rl()*6.3); q.setFromEuler(e); s.set(size*(0.8+Rl()*0.4),size*(0.8+Rl()*0.4),size*(0.8+Rl()*0.4));
+        im.setMatrixAt(k, M4.compose(trailPoint(t,1),q,s)); }
+      im.frustumCulled=false; group.add(im); ims.push(im); });
+    // and a dust plume along the same path, one draw call
+    const dp=new Float32Array(maxDust*3), dc=new Float32Array(maxDust*3);
+    for(let i=0;i<maxDust;i++){ const t=Math.pow(Rl(),1.3), p=trailPoint(t,1.6); dp.set([p.x,p.y,p.z],i*3);
+      const b=(0.1+Math.pow(Rl(),2)*0.22)*(1-t*0.5); dc.set([b,b*0.9,b*0.8].map(toLinear),i*3); }
+    const dg=new THREE.BufferGeometry(); dg.setAttribute('position',new THREE.BufferAttribute(dp,3)); dg.setAttribute('color',new THREE.BufferAttribute(dc,3));
+    const dust=new THREE.Points(dg, new THREE.PointsMaterial({size:1.6, sizeAttenuation:false, vertexColors:true, depthWrite:false})); dust.frustumCulled=false; group.add(dust);
+    group.traverse(o=>{ o.userData.noAO=true; o.userData.noShadow=true; });
+    return { setCount(n, nd){ ims.forEach(im=>im.count=Math.min(per, Math.ceil(n/T.variants))); dg.setDrawRange(0, Math.min(nd,maxDust)); },
+      update(dt){ body.rotateZ(dt*0.0015); for(const m of chunks){ const sp=m.userData.spin; m.rotation.x+=sp.x*dt; m.rotation.y+=sp.y*dt; m.rotation.z+=sp.z*dt; } } };
+  }
+
+  // the gas giant's moons: small cratered spheres placed around it as seen from the board
+  function moonLayer(){
+    const P=window.__planet; if(!P) return;
+    const view=P.position.clone().normalize(), right=new THREE.Vector3().crossVectors(view, new THREE.Vector3(0,1,0)).normalize(), up=new THREE.Vector3().crossVectors(right, view);
+    for(const m of ENV.moons){
+      const mesh=new THREE.Mesh(bodyGeometry(m.seed, 12, false), new THREE.MeshStandardMaterial({vertexColors:true, roughness:1, metalness:0, envMapIntensity:0.15, color:new THREE.Color(...m.color)}));
+      mesh.position.copy(P.position).addScaledVector(right,m.right).addScaledVector(up,m.up).addScaledVector(view,-m.toward);
+      mesh.scale.setScalar(m.radius); mesh.rotation.set(m.seed%7, m.seed%5, 0); mesh.userData.noAO=true; mesh.userData.noShadow=true; scene.add(mesh); }
+  }
+
   const top = QUALITY.high.env;
   const far = rockLayer(ENV.far, farSpin, 7001); far.build(top.far);
   const mid = rockLayer(ENV.mid, midSpin, 8001); mid.build(top.mid);
   const dust = dustLayer(top.dust);
   const near = nearLayer();
   const motes = moteLayer(top.motes);
+  const landmark = landmarkLayer(top.lmRocks, top.lmDust);
+  moonLayer();
 
   return {
     group: planeGroup, motes,
-    setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); near.setCount(c.near); motes.setCount(c.motes); },
-    update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; near.update(dt); motes.update(dt); },
+    setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); near.setCount(c.near); motes.setCount(c.motes); landmark.setCount(c.lmRocks, c.lmDust); },
+    update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; near.update(dt); motes.update(dt); landmark.update(dt); },
   };
 })();
 Env.setQuality(quality);

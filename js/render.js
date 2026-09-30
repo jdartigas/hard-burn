@@ -61,9 +61,9 @@ function updateShadowFrustum(){
 function enableShadows(obj, cast=true, receive=true){ obj.traverse(o=>{ if(o.isMesh && !o.userData.noShadow){ const m=o.material; if(m && (m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial)) return; o.castShadow=cast; o.receiveShadow=receive; } }); }
 // graphics quality presets
 // env: how many scenery instances each layer draws (js/environment.js); the layers are built once at the High count
-const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true, env:{far:1800, mid:240, dust:16000, near:16, motes:12000}},
-  medium:{label:'Medium', pr:1, shadow:2048, ao:false, aa:true, env:{far:1100, mid:150, dust:10000, near:12, motes:8000}},
-  low:{label:'Low', pr:1, shadow:0, ao:false, aa:false, env:{far:500, mid:70, dust:5000, near:8, motes:4000}} };
+const QUALITY = { high:{label:'High', pr:2, shadow:4096, ao:true, aa:true, env:{far:1800, mid:240, dust:16000, near:16, motes:12000, lmRocks:400, lmDust:4000}},
+  medium:{label:'Medium', pr:1, shadow:2048, ao:false, aa:true, env:{far:1100, mid:150, dust:10000, near:12, motes:8000, lmRocks:250, lmDust:2500}},
+  low:{label:'Low', pr:1, shadow:0, ao:false, aa:false, env:{far:500, mid:70, dust:5000, near:8, motes:4000, lmRocks:120, lmDust:1200}} };
 // diagnostics: ?debug shows GPU info and errors; ?shadows=0 ?aa=0 ?ao=0 ?pr=1 switch single features off to isolate driver problems
 const URLQ = new URLSearchParams(location.search);
 const DEBUG = URLQ.has('debug');
@@ -118,12 +118,23 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
         gl_FragColor=vec4(lin,1.0); }`
   }));
   neb.userData.noAO=true; scene.add(neb);
-  // stars
-  const N=6000, pos=new Float32Array(N*3), col=new Float32Array(N*3);
-  for(let i=0;i<N;i++){ const v=new THREE.Vector3().randomDirection().multiplyScalar(1500); pos.set([v.x,v.y,v.z],i*3);
-    const b=Math.pow(Math.random(),3)*0.9+0.1, tint=Math.random(); col.set([b*(tint<.2?0.8:1), b*(tint<.2?0.9:0.95), b*(tint<.2?1:0.88)].map(toLinear), i*3); }
-  const sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(pos,3)); sg.setAttribute('color',new THREE.BufferAttribute(col,3));
-  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({size:1.6, sizeAttenuation:false, vertexColors:true, depthWrite:false})));
+  // stars, in two tiers from a fixed seed: a faint field that crowds along the nebula's band, and a sparse bright
+  // layer. Tints are subtle: mostly neutral, some warm, some cool.
+  const SR=mulberry32(5150), TINTS=[[1,0.97,0.93],[1,0.86,0.70],[0.78,0.87,1]];
+  const band=v=>Math.max(0, 1-Math.abs(v.y+0.15*Math.sin(v.x*3))/0.45);   // the same band the nebula shader draws
+  function starTier(n, size, bright, bandBias){
+    const pos=new Float32Array(n*3), col=new Float32Array(n*3), v=new THREE.Vector3();
+    for(let i=0;i<n;i++){
+      do { v.set(SR()*2-1,SR()*2-1,SR()*2-1); } while(v.lengthSq()>1 || v.lengthSq()<1e-4 || SR()>1-bandBias+bandBias*band(v.normalize()));
+      v.normalize().multiplyScalar(1500); pos.set([v.x,v.y,v.z],i*3);
+      const b=bright[0]+(bright[1]-bright[0])*Math.pow(SR(),2.2), r=SR(), t=TINTS[r<0.62?0:r<0.8?1:2];
+      col.set([b*t[0],b*t[1],b*t[2]].map(toLinear), i*3); }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    const pts=new THREE.Points(g, new THREE.PointsMaterial({size, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; scene.add(pts);
+  }
+  starTier(7000, 1.3, [0.08,0.5], 0.6);
+  starTier(420, 2.2, [0.45,1.0], 0.25);
+  starTier(28, 3.2, [0.85,1.0], 0);
   // sun glow
   const sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffd9a8, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true}));
   sunSpr.position.copy(sunDir).multiplyScalar(1400); sunSpr.scale.setScalar(260); scene.add(sunSpr);

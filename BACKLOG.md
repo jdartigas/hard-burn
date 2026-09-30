@@ -251,9 +251,12 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
 - **v37, done:** large rocks on the horizon (230 to 340 out, level with the board: first placed below the plane,
   where tilted views projected them onto the cells), and micro-debris wrapped around the camera with the box scaled to
   zoom. Cost measured: +1 draw call for the debris, the rocks mostly culled; well under a millisecond at every preset.
-- **v38:** the landmark, a shattered dwarf planet on the opposite side of the sky from the gas giant, with a debris
-  trail into the belt; two small moons for the gas giant (ring only if Jon wants it after seeing the rest); stars split
-  into a faint layer and a small bright layer with subtle tints, denser along the nebula band.
+- **v38, done:** the landmark, a shattered dwarf planet on the far side of the sky from the gas giant, with ten
+  broken-off chunks and a fragment and dust trail descending into the belt; two small moons beside the gas giant; stars
+  in three tiers from a fixed seed, the faint one crowding the nebula band. Placement lessons: the landmark first sat
+  at -23°, behind the board in tilted views, so it is lifted to -6°; and its fracture has to sit across the sunlit
+  limb, or the lit side is all fracture and it reads as a potato. Adds about 50 ms at load, nothing measurable a frame.
+- **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
 ## Scoring and records
 
