@@ -1,4 +1,6 @@
-# Hard Burn — project guide for Claude Code
+# Orion's Spur — project guide for Claude Code
+
+The game was called Hard Burn until v44. The repo, the Pages URL, the `css/hard-burn.css` file name and the `hardburn.` storage prefix keep the old name on purpose: renaming the repo moves the live URL, and renaming the prefix would lose every saved score.
 
 Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. The player commands six ships against an AI fleet of six on a hex grid strewn with destructible asteroids. The ship designs follow The Expanse, modeled on the owner's painted 3D-printed miniatures.
 
@@ -23,7 +25,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
   - `three/addons/` → `.../three@0.169.0/examples/jsm/`
   - Addons used: `EffectComposer`, `RenderPass`, `UnrealBloomPass`, `GTAOPass`, `OutputPass`, `Pass`/`FullScreenQuad`, `CopyShader`, `SMAAPass`, `mergeGeometries`.
   - Everything is spread into a single `THREE` object: `const THREE = { ...THREE_NS, EffectComposer, ... }`. Code calls `THREE.GTAOPass` and so on, and `window.THREE` is set for debugging.
-- **Fonts:** Google Fonts, Saira Extra Condensed and Saira Semi Condensed.
+- **Fonts:** Google Fonts. Michroma (wide, technical) for the title, headings and button labels in caps; Rajdhani for everything else, with `font-size-adjust:0.5` on the body because its x-height is small.
 - **Deploy:** commit to `main`. GitHub Pages serves the repo root, so **pushing to `main` updates the live site.**
 - **No assets on disk.** Every texture, model, sound and piece of music is generated procedurally at runtime.
 - Keep it build-free and static-hostable.
@@ -65,7 +67,7 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 | player actions and HUD (`hud`) | `select`, `recomputeHighlights`, `playerAttack`, `playerMove`, `updateHUD`, `updateHover`. Layout: the fleet lists are drawers that slide off the sides (`#tg-roster`, `#tg-enemies`), the selected ship's orders run along one command bar at the bottom with End turn beside it, and the log shows its last two lines until expanded. `measureHud` sets `--hud-bottom` so the log and lists sit above the bar however it wraps |
 | scores and records (`hud`) | `scoreBattle`, `loadScores`/`saveScores`, `recordBattle`, `considerBest`, `fleetName`, `esc` |
 | camera and input (`input`) | Orbit camera `cam`, `MIN_ZOOM=3.5`, follow and zoom (`zoomTo`, the Z key, double-click), pointer, pinch and keys. `focusShip` centers the camera on every selection, whichever way it was made |
-| screens and menus (`menus`) | Menu fleet pickers (`chosenFleets`, `renderPicks`), fleet builder (`openBuilder`, `renderBuilder`), records panel, import/export, pause and surrender, HUD drawers (`applyHudPrefs`, `measureHud`) |
+| screens and menus (`menus`) | Menu: difficulty segmented control (`showDiff`), fleet pickers as list popovers (`PICKERS`, `openPicker`, listbox keys; a bottom sheet on phones), `chosenFleets`, `renderPicks`; Settings sheet (music and effects volume, `hardburn.musicVol`/`fxVol`, graphics), fleet builder (`openBuilder`, `renderBuilder`), records panel, import/export, pause and surrender, HUD drawers (`applyHudPrefs`, `measureHud`) |
 | setup (`main`) | `clearBattle`, `setupBattle`, `startGame`, `toMenu` |
 | main loop (`main`) | `frame()`, `debugTick`, `onResize`, `applyQuality`, `cycleQuality` |
 
@@ -159,7 +161,7 @@ The fleet builder, the class list and the HUD read `CLASSES`, so a new class app
 - **Drive plumes** have three shader layers (a core with shock diamonds, a turbulent sheath and an outer glow), plus a nozzle flare and sparks. Throttle is `engine.boost`.
 - **Destruction:** a chain of internal blasts, then the main blast. The hull splits at deck boundaries into 2–4 sections with glowing torn edges, venting and fires. Long parts are cut at the breaks. About 56 detailed debris pieces from `DebrisKit` persist. Sections drift and tumble for the rest of the battle.
 - **Camera:** pan, zoom and drag-rotation all ease toward a goal each frame. Wheel zoom scales with the wheel's actual delta (trackpads send many small ones), not a fixed step per event.
-- **UI palette:** amber `#E9A53B`, red `#E0533F`, cyan `#62C9E6`, ink `#DCE2E6`. Panels are solid rgba with **no `backdrop-filter`** (see §6).
+- **UI palette (v44, holographic):** accent light blue `--accent #6FD0FF` (interface and the player's side), `--accent-hi #BDEBFF`, red `--red` for the enemy, teal `--cyan #4FE3CC` for shields, ink `#D9F0FF`. Rounded corners (`--r` 8px, `--r-sm` 6px), thin lit edges and a soft glow. Panels are dark rgba glass with **no `backdrop-filter`** (see §6). `COL.player` is the same blue for board highlights; player ships keep their amber livery and amber weapon fire.
 
 ## 6. Rendering pipeline and hard-won lessons (read before changing graphics)
 

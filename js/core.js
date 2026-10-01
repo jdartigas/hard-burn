@@ -1,10 +1,10 @@
-// Hard Burn: utilities, all game data (weapons, abilities, classes, fleets, budgets, presets, AI plans), hex maths.
+// Orion's Spur: utilities, all game data (weapons, abilities, classes, fleets, budgets, presets, AI plans), hex maths.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
 
 /* =====================================================================
-   HARD BURN — turn-based 2.5D fleet engagement
+   ORION'S SPUR — turn-based 2.5D fleet engagement
    ===================================================================== */
 
 
@@ -151,7 +151,8 @@ const DIFF = {
   hard:  {acc:8,   hull:1.15, caution:0.7,  aggr:1.1, focus:1.3, noise:0},
 };
 const SHIP_SCALE = 1.25;
-const COL = { player:0xE9A53B, enemy:0xE0533F, cyan:0x62C9E6, green:0x8FD17A };
+// player is the interface accent (v44 holographic blue); ships keep their own amber livery in shipMaterials
+const COL = { player:0x6FD0FF, enemy:0xE0533F, cyan:0x62C9E6, green:0x8FD17A };
 
 /* ---------------- hex math (axial, pointy-top) ---------------- */
 const HEX = 1.9, SQ3 = Math.sqrt(3), MAP_R = 9, MAP_ROWS = 6;

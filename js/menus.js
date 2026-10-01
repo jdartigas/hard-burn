@@ -1,4 +1,4 @@
-// Hard Burn: screens and buttons: menu pickers, fleet builder, records, pause, surrender, HUD drawers.
+// Orion's Spur: screens and buttons: menu pickers, fleet builder, records, settings, pause, surrender, HUD drawers.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -9,8 +9,10 @@ function closeScreen(){ document.querySelectorAll('.screen').forEach(s=>{ if(s.i
   if(state.phase==='end') $('#end').classList.add('on');   // the battle is over: closing pause or help returns to the result, not a dead board
   canvas.focus(); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ Sound.ui(); closeScreen(); });
-document.querySelectorAll('.diff').forEach(b=>{ b.setAttribute('aria-checked', b.dataset.d===state.diff); b.classList.toggle('on', b.dataset.d===state.diff);
-  b.onclick=()=>{ Sound.init(); Sound.ui(); state.diff=b.dataset.d; store.set('diff',state.diff); document.querySelectorAll('.diff').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); }; });
+const DIFF_DESC={easy:'Loose enemy formation, poor gunnery.', normal:'A capable commander who focuses fire.', hard:'Tougher hulls, sharper guns, no mercy.'};
+function showDiff(){ document.querySelectorAll('.diff').forEach(x=>{ const on=x.dataset.d===state.diff; x.classList.toggle('on',on); x.setAttribute('aria-checked',on); }); $('#diff-desc').textContent=DIFF_DESC[state.diff]; }
+document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); state.diff=b.dataset.d; store.set('diff',state.diff); showDiff(); });
+showDiff();
 $('#btn-start').onclick=()=>startGame(chosenFleets());
 // ---- records panel ----
 function renderRecords(){
@@ -24,14 +26,14 @@ function renderRecords(){
 }
 $('#btn-records').onclick=()=>{ Sound.init(); Sound.ui(); $('#rec-msg').textContent=''; renderRecords(); showScreen('records'); };
 $('#btn-export').onclick=()=>{ const d=loadScores(); const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,1)],{type:'application/json'})); a.download=`hard-burn-records-${new Date().toISOString().slice(0,10)}.json`;
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,1)],{type:'application/json'})); a.download=`orions-spur-records-${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); $('#rec-msg').textContent=`Exported ${d.games.length} game${d.games.length!==1?'s':''}.`; };
 $('#btn-import').onclick=()=>$('#rec-file').click();
 $('#rec-file').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; $('#rec-msg').textContent=importScores(await f.text()); renderRecords(); };
 // merge a records file into what's stored: games already present are skipped, bests keep the higher score
 function importScores(text){
-  let inc; try{ inc=JSON.parse(text); }catch(e){ return "That file isn't a Hard Burn records file."; }
-  if(!inc || typeof inc!=='object' || !Array.isArray(inc.games)) return "That file isn't a Hard Burn records file.";
+  let inc; try{ inc=JSON.parse(text); }catch(e){ return "That file isn't an Orion's Spur records file."; }
+  if(!inc || typeof inc!=='object' || !Array.isArray(inc.games)) return "That file isn't an Orion's Spur records file.";
   const d=loadScores(), key=g=>g.date+'|'+g.seed+'|'+g.score, have=new Set(d.games.map(key)); let added=0;
   for(const g of inc.games){ if(!validGame(g)) continue; const f=fillGame(g); if(have.has(key(f))) continue; d.games.push(f); have.add(key(f)); considerBest(d,f); added++; }
   if(inc.bests && typeof inc.bests==='object') for(const b of Object.values(inc.bests)) if(validGame(b)) considerBest(d, fillGame(b));
@@ -54,20 +56,49 @@ function chosenFleets(){
   const en= pickEnemy==='random'? PRESETS[Math.floor(Math.random()*PRESETS.length)] : PRESETS.find(p=>p.id===pickEnemy);
   return {player:you.fleet, enemy:en.fleet, enemyName:en.name, youId:you.id, enemyId:en.id, budget:yourBudget()};
 }
+// Fleet pickers (v44): each is one button that opens a list, a popover beside it on wide screens and a sheet from
+// the bottom on phones. Chip grids for 7 and 8 options pushed Begin below the fold on iPad; a native <select> can't
+// show what's in each fleet. The list follows the listbox pattern: arrows move, Enter or Space picks, Escape closes.
+function youOptions(){ return PRESETS.map(p=>({id:p.id, name:p.name, sub:`${p.fleet.length} ships`, info:fleetSummary(p.fleet)}))
+  .concat([{id:'custom', name:'Custom', sub: custom? `${custom.fleet.length} ships` : 'Build your own', info: custom? `${fleetSummary(custom.fleet)}. Edit in the fleet builder.` : 'Choose hulls against a point budget.'}]); }
+function enemyOptions(){ return [{id:'random', name:'Random', sub:'Any preset', info:'A different preset fleet every battle.'}]
+  .concat(PRESETS.map(p=>({id:p.id, name:p.name, sub:`${p.fleet.length} ships`, info:fleetSummary(p.fleet)})))
+  .concat([{id:'aibuild', name:'AI build', sub:`Spends ${BUDGETS[yourBudget()]}`, info:'The AI builds its own fleet to your budget.'}]); }
+const PICKERS={ you:{btn:'#pk-you', options:youOptions, get:()=>pickYou, set:id=>{ if(id==='custom'){ openBuilder(); return; } pickYou=id; store.set('fleetYou',pickYou); } },
+  enemy:{btn:'#pk-enemy', options:enemyOptions, get:()=>pickEnemy, set:id=>{ pickEnemy=id; store.set('fleetEnemy',pickEnemy); } } };
+let openPk=null, pkFocus=0;
 function renderPicks(){
-  const chip=(p,on,sub)=>`<button class="fchip${on?' on':''}" role="radio" aria-checked="${on}" data-id="${p.id}"><b>${p.name}</b><span>${sub}</span></button>`;
-  $('#pick-you').innerHTML=PRESETS.map(p=>chip(p, p.id===pickYou, `${p.fleet.length} ships`)).join('')
-    + chip({id:'custom',name:'Custom'}, pickYou==='custom', custom? `${custom.fleet.length} ships, edit` : 'Build your own');
-  $('#pick-enemy').innerHTML=chip({id:'random',name:'Random'}, pickEnemy==='random', 'Any preset')+PRESETS.map(p=>chip(p, p.id===pickEnemy, `${p.fleet.length} ships`)).join('')
-    + chip({id:'aibuild',name:'AI build'}, pickEnemy==='aibuild', `Spends ${BUDGETS[yourBudget()]}`);
+  for(const k of Object.keys(PICKERS)){ const P=PICKERS[k], o=P.options().find(x=>x.id===P.get()) || P.options()[0];
+    $(P.btn).innerHTML=`<b>${o.name}</b><span>${o.sub}</span><i aria-hidden="true"></i>`; }
   if(pickYou==='custom') $('#pick-desc').innerHTML=`Your own fleet, ${fleetCost(custom.fleet)} of the ${BUDGET_LABEL[custom.budget]} budget (${BUDGETS[custom.budget]}). <i>${fleetSummary(custom.fleet)}.</i>`
       + (custom.budget!=='standard' && pickEnemy!=='aibuild'? ` <b style="color:var(--red);font-weight:600">The enemy presets are built to the Standard budget (660), so this won't be an even fight.</b>` : '');
   else { const you=PRESETS.find(p=>p.id===pickYou); $('#pick-desc').innerHTML=`${you.desc} <i>${fleetSummary(you.fleet)}.</i>`; }
-  $('#pick-you').querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui();
-    if(b.dataset.id==='custom'){ openBuilder(); return; }
-    pickYou=b.dataset.id; store.set('fleetYou',pickYou); renderPicks(); });
-  $('#pick-enemy').querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); pickEnemy=b.dataset.id; store.set('fleetEnemy',pickEnemy); renderPicks(); });
 }
+function openPicker(k){
+  if(openPk===k){ closePicker(); return; } Sound.init(); Sound.ui(); openPk=k;
+  const P=PICKERS[k], opts=P.options(), list=$('#pk-list'), btn=$(P.btn);
+  pkFocus=Math.max(0, opts.findIndex(o=>o.id===P.get()));
+  list.innerHTML=opts.map((o,i)=>`<div class="pk-opt${o.id===P.get()?' on':''}" role="option" id="pko-${i}" data-id="${o.id}" aria-selected="${o.id===P.get()}"><b>${o.name}</b><span class="n">${o.sub}</span><span class="i">${o.info}</span></div>`).join('');
+  list.setAttribute('aria-label', k==='you'?'Your fleet':'Enemy fleet');
+  // beside the button on wide screens, so the rest of the setup stays readable; a bottom sheet on phones (CSS)
+  // beside the button when there's room (landscape), otherwise below it, or above it if below would run off the screen
+  list.hidden=false; const r=btn.getBoundingClientRect(), w=list.offsetWidth, h=list.offsetHeight;
+  if(r.right+12+w <= innerWidth-12){ list.style.left=Math.round(r.right+12)+'px'; list.style.top=Math.round(clamp(r.top-60, 12, innerHeight-12-h))+'px'; }
+  else { list.style.left=Math.round(clamp(r.right-w, 12, innerWidth-12-w))+'px'; list.style.top=Math.round(r.bottom+6+h <= innerHeight-12 ? r.bottom+6 : Math.max(12, r.top-6-h))+'px'; } btn.setAttribute('aria-expanded','true'); list.querySelectorAll('.pk-opt').forEach((el,i)=>el.onclick=()=>pickOption(i));
+  focusOpt(pkFocus); list.focus();
+}
+function focusOpt(i){ const els=$('#pk-list').querySelectorAll('.pk-opt'); if(!els.length) return; pkFocus=(i+els.length)%els.length;
+  els.forEach((el,j)=>el.classList.toggle('focus', j===pkFocus)); $('#pk-list').setAttribute('aria-activedescendant','pko-'+pkFocus); els[pkFocus].scrollIntoView({block:'nearest'}); }
+function pickOption(i){ const k=openPk, P=PICKERS[k], o=P.options()[i]; closePicker(); Sound.ui(); P.set(o.id); renderPicks(); }
+function closePicker(){ if(!openPk) return; $(PICKERS[openPk].btn).setAttribute('aria-expanded','false'); $('#pk-list').hidden=true; const b=$(PICKERS[openPk].btn); openPk=null; b.focus(); }
+$('#pk-you').onclick=()=>openPicker('you'); $('#pk-enemy').onclick=()=>openPicker('enemy');
+$('#pk-list').addEventListener('keydown', e=>{ if(!openPk) return; const k=e.key;
+  if(k==='ArrowDown'){ focusOpt(pkFocus+1); e.preventDefault(); } else if(k==='ArrowUp'){ focusOpt(pkFocus-1); e.preventDefault(); }
+  else if(k==='Home'){ focusOpt(0); e.preventDefault(); } else if(k==='End'){ focusOpt(-1); e.preventDefault(); }
+  else if(k==='Enter'||k===' '){ pickOption(pkFocus); e.preventDefault(); } else if(k==='Escape'||k==='Tab'){ closePicker(); e.preventDefault(); }
+  e.stopPropagation(); });
+document.addEventListener('pointerdown', e=>{ if(openPk && !e.target.closest('#pk-list') && !e.target.closest('.picker')) closePicker(); }, true);
+addEventListener('resize', ()=>closePicker());
 // ---- fleet builder: every class in CLASSES shows up here, so a new ship class needs no builder changes ----
 let draft=null;
 function openBuilder(){
@@ -140,6 +171,15 @@ $('#endturn').onclick=()=>endPlayerTurn();
 $('#ver-menu').textContent=`Version ${GAME_VERSION}`; $('#ver-pause').textContent=`Version ${GAME_VERSION}`;
 function toggleSound(){ Sound.init(); const on=Sound.toggle(); $('#btn-sound').textContent= on?'Effects on':'Effects off'; $('#btn-sound').setAttribute('aria-pressed',on); }
 function toggleMusic(){ Sound.init(); const on=Sound.toggleMusic(); $('#btn-music').textContent= on?'Music on':'Music off'; $('#btn-music').setAttribute('aria-pressed',on); }
+// settings sheet (v44): music and effects volume, graphics. Opened from the menu or from pause, and returns there.
+let settingsFrom='menu';
+function syncVol(){ for(const [id,v] of [['music',Sound.musicLevel],['fx',Sound.fxLevel]]){ $('#vol-'+id).value=Math.round(v*100); $('#vol-'+id+'-v').textContent=Math.round(v*100)+'%';
+  $('#vol-'+id).style.setProperty('--fill', Math.round(v*100)+'%'); } }
+document.querySelectorAll('.btn-settings').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); settingsFrom= $('#pause').classList.contains('on')? 'pause' : 'menu'; syncVol(); showScreen('settings'); });
+$('#vol-music').oninput=e=>{ Sound.init(); Sound.setMusicLevel(e.target.value/100); syncVol(); };
+$('#vol-fx').oninput=e=>{ Sound.init(); Sound.setFxLevel(e.target.value/100); syncVol(); };
+$('#vol-fx').onchange=()=>Sound.ui();   // a sample at the new level
+$('#settings [data-close]').onclick=()=>{ Sound.ui(); if(settingsFrom==='pause') showScreen('pause'); else closeScreen(); };
 $('#btn-sound').onclick=toggleSound; $('#btn-sound').textContent= Sound.on?'Effects on':'Effects off';
 $('#btn-music').onclick=toggleMusic; $('#btn-music').textContent= Sound.musicOn?'Music on':'Music off';
 

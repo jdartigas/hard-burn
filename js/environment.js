@@ -1,4 +1,4 @@
-// Hard Burn: scenery beyond the board. A distant asteroid belt with a dust band, a midground layer of rocks,
+// Orion's Spur: scenery beyond the board. A distant asteroid belt with a dust band, a midground layer of rocks,
 // large foreground rocks around the rim, micro-debris drifting past the camera, a shattered dwarf planet as a
 // landmark, two small moons for the gas giant, and a far nebula and galaxy near the horizon.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,

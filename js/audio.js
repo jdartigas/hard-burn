@@ -1,4 +1,4 @@
-// Hard Burn: synthesized sound effects and the generative score.
+// Orion's Spur: synthesized sound effects and the generative score.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -6,14 +6,16 @@
 /* ---------------- audio ---------------- */
 const Sound = (() => {
   let ctx=null, master, sfx, music, noiseBuf, on = store.get('sound', true), musicOn = store.get('music', true), musicNodes=null, mood='menu', pendingJump=null;
-  const MUSIC_VOL=0.42;
-  function duck(level,hold){ if(!ctx||!musicOn) return; const t=ctx.currentTime; music.gain.cancelScheduledValues(t); music.gain.setTargetAtTime(MUSIC_VOL*level,t,0.03); music.gain.setTargetAtTime(MUSIC_VOL,t+hold,0.5); }
+  // volumes (v44): the Settings sliders scale the music and the effects, 0 to 1, remembered across visits
+  let musicLevel=clamp(+store.get('musicVol',0.8)||0,0,1), fxLevel=clamp(+store.get('fxVol',1)||0,0,1);
+  const mv=()=>0.42*musicLevel*1.25, fv=()=>0.9*fxLevel;
+  function duck(level,hold){ if(!ctx||!musicOn) return; const t=ctx.currentTime; music.gain.cancelScheduledValues(t); music.gain.setTargetAtTime(mv()*level,t,0.03); music.gain.setTargetAtTime(mv(),t+hold,0.5); }
   function init(){
     if(ctx) { if(ctx.state==='suspended') ctx.resume(); return; }
     try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
     master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; comp.connect(master);
-    sfx = ctx.createGain(); sfx.gain.value=on?0.9:0; sfx.connect(comp);
+    sfx = ctx.createGain(); sfx.gain.value=on?fv():0; sfx.connect(comp);
     music = ctx.createGain(); music.gain.value=0.0; music.connect(comp);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
     const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
@@ -38,8 +40,11 @@ const Sound = (() => {
     get on(){ return on; },
     get musicOn(){ return musicOn; },
     _dbg(){ return {ctx, music, sfx}; },
-    toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?0.9:0, now(), 0.05); return on; },
-    toggleMusic(){ musicOn=!musicOn; store.set('music',musicOn); if(music) music.gain.setTargetAtTime(musicOn?MUSIC_VOL:0, now(), musicOn?0.8:0.15); return musicOn; },
+    toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?fv():0, now(), 0.05); return on; },
+    get musicLevel(){ return musicLevel; }, get fxLevel(){ return fxLevel; },
+    setMusicLevel(v){ musicLevel=clamp(v,0,1); store.set('musicVol',musicLevel); if(music && musicOn) music.gain.setTargetAtTime(mv(), now(), 0.08); },
+    setFxLevel(v){ fxLevel=clamp(v,0,1); store.set('fxVol',fxLevel); if(sfx && on) sfx.gain.setTargetAtTime(fv(), now(), 0.05); },
+    toggleMusic(){ musicOn=!musicOn; store.set('music',musicOn); if(music) music.gain.setTargetAtTime(musicOn?mv():0, now(), musicOn?0.8:0.15); return musicOn; },
     setMood(m){ if(m===mood) return; if(m==='battle' && mood==='menu') pendingJump=8; mood=m; },
     ui(){ tone(0.06,{type:'triangle',f0:1300,f1:900,gain:0.08}); },
     select(){ tone(0.09,{type:'triangle',f0:660,f1:990,gain:0.1}); tone(0.07,{type:'sine',f0:1320,gain:0.05,delay:0.05}); },
@@ -151,7 +156,7 @@ const Sound = (() => {
         step++; nextT+=STEP;
       }
     }, 40);
-    music.gain.setTargetAtTime(musicOn?MUSIC_VOL:0, ctx.currentTime, 1.5);
+    music.gain.setTargetAtTime(musicOn?mv():0, ctx.currentTime, 1.5);
   }
   return S;
 })();

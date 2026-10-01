@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hard Burn — fleet engagement</title>
+<title>Orion's Spur — fleet engagement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@500;700;800&family=Saira+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '43';
+const GAME_VERSION = '44';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -22,7 +22,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="hud">
   <header id="topbar">
-    <div id="brand">Hard Burn</div>
+    <div id="brand">Orion's Spur</div>
     <div id="turninfo"><b id="ti-turn">Turn 1</b><span id="ti-phase">Your orders</span></div>
     <div id="strength">
       <span class="lbl">Your fleet</span>
@@ -62,26 +62,37 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="menu" class="screen on">
   <div class="inner">
-    <h1 id="title">Hard<span>Burn</span></h1>
+    <h1 id="title">Orion's<span>Spur</span></h1>
     <p class="lede">Choose your fleet and theirs. Close the distance, strip their shields and break their line before they break yours.</p>
-    <div class="diffs" role="radiogroup" aria-label="Difficulty">
-      <button class="diff" data-d="easy" role="radio"><b>Easy</b><span>Loose enemy formation, poor gunnery.</span></button>
-      <button class="diff on" data-d="normal" role="radio"><b>Normal</b><span>A capable commander who focuses fire.</span></button>
-      <button class="diff" data-d="hard" role="radio"><b>Hard</b><span>Tougher hulls, sharper guns, no mercy.</span></button>
+    <div class="setup">
+      <div class="srow"><span class="slabel" id="lb-diff">Difficulty</span>
+        <div class="seg" role="radiogroup" aria-labelledby="lb-diff">
+          <button class="diff" data-d="easy" role="radio">Easy</button><button class="diff on" data-d="normal" role="radio">Normal</button><button class="diff" data-d="hard" role="radio">Hard</button>
+        </div></div>
+      <p class="sdesc" id="diff-desc"></p>
+      <div class="srow"><span class="slabel" id="lb-you">Your fleet</span><button class="picker" id="pk-you" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-you pk-you"></button></div>
+      <div class="srow"><span class="slabel" id="lb-enemy">Enemy fleet</span><button class="picker" id="pk-enemy" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-enemy pk-enemy"></button></div>
+      <p class="sdesc fleet-desc" id="pick-desc"></p>
     </div>
-    <div class="pick-h">Your fleet</div>
-    <div class="fleets" id="pick-you" role="radiogroup" aria-label="Your fleet"></div>
-    <p class="fleet-desc" id="pick-desc"></p>
-    <div class="pick-h">Enemy fleet</div>
-    <div class="fleets" id="pick-enemy" role="radiogroup" aria-label="Enemy fleet"></div>
     <div class="cta">
       <button class="btn-primary" id="btn-start">Begin engagement</button>
       <button class="btn-ghost" id="btn-how">How to play</button>
-      <button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button>
       <button class="btn-ghost" id="btn-records">Records</button>
+      <button class="btn-ghost btn-settings">Settings</button>
     </div>
-    <div class="foot">Drag to orbit the view, scroll or pinch to zoom, two fingers to pan. Best with sound on; music and effects can be muted separately.</div>
-    <div class="ver" id="ver-menu"></div>
+    <div class="foot">Drag to orbit, scroll or pinch to zoom, two fingers to pan. <span class="ver" id="ver-menu"></span></div>
+  </div>
+  <div id="pk-list" class="pk-list" role="listbox" tabindex="-1" hidden></div>
+</div>
+
+<div id="settings" class="screen" role="dialog" aria-label="Settings">
+  <div class="sheet" style="max-width:460px">
+    <h2>Settings</h2>
+    <div class="set-row"><label for="vol-music">Music</label><input type="range" id="vol-music" min="0" max="100" step="1"><output id="vol-music-v"></output></div>
+    <div class="set-row"><label for="vol-fx">Effects</label><input type="range" id="vol-fx" min="0" max="100" step="1"><output id="vol-fx-v"></output></div>
+    <div class="set-row"><span>Graphics</span><button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button></div>
+    <p class="rec-note">Music and Effects in the top bar mute them during a battle; these set how loud they are.</p>
+    <div class="cta"><button class="btn-primary" data-close>Done</button></div>
   </div>
 </div>
 
@@ -159,7 +170,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-primary" data-close>Resume</button>
       <button class="btn-ghost" id="btn-restart">Restart battle</button>
       <button class="btn-ghost" id="btn-tomenu">Main menu</button>
-      <button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button>
+      <button class="btn-ghost btn-settings">Settings</button>
       <button class="btn-ghost" id="btn-surrender">Surrender</button>
     </div>
   </div>

@@ -1,4 +1,4 @@
-// Hard Burn: ship models: armor textures, materials, per-class builders, drive plumes, mesh merging.
+// Orion's Spur: ship models: armor textures, materials, per-class builders, drive plumes, mesh merging.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -69,7 +69,7 @@ function shipMaterials(side){
     patches: [],
     dark: new THREE.MeshStandardMaterial({color: P?0x2f353b:0x2d2723, metalness:0.8, roughness:0.42}),
     metal: new THREE.MeshStandardMaterial({color: P?0x9aa1a8:0x8f8479, metalness:1.0, roughness:0.26}),
-    accent: new THREE.MeshStandardMaterial({color: P?COL.player:COL.enemy, metalness:0.3, roughness:0.5, emissive: P?COL.player:COL.enemy, emissiveIntensity:0.1}),
+    accent: new THREE.MeshStandardMaterial({color: P?0xE9A53B:COL.enemy, metalness:0.3, roughness:0.5, emissive: P?0xE9A53B:COL.enemy, emissiveIntensity:0.1}),
     glow: new THREE.MeshBasicMaterial({color: P?0x9fdcff:0xffb07a}),
     bellIn: new THREE.MeshBasicMaterial({color: P?0x1c3a5c:0x4a2410, side:THREE.DoubleSide}),
     bell: new THREE.MeshStandardMaterial({color: P?0x7d848a:0x7a6f67, metalness:1.0, roughness:0.22, side:THREE.DoubleSide}),

@@ -1,4 +1,4 @@
-// Hard Burn: hex board, highlight tiles, asteroids and terrain generation.
+// Orion's Spur: hex board, highlight tiles, asteroids and terrain generation.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -48,7 +48,7 @@ const selRing = hexRing(HEX*0.8, HEX*0.95, COL.player, 0.9); selRing.visible=fal
 const hoverRing = hexRing(HEX*0.86, HEX*0.93, 0xffffff, 0.45); hoverRing.visible=false; scene.add(hoverRing);
 const tgtRing = hexRing(HEX*0.72, HEX*0.95, COL.enemy, 0.9); tgtRing.visible=false; scene.add(tgtRing);
 const actRing = hexRing(HEX*0.8, HEX*0.95, COL.enemy, 0.7); actRing.visible=false; scene.add(actRing);
-const pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0xffc86a, transparent:true, opacity:0.95, depthWrite:false}));
+const pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0x9fe0ff, transparent:true, opacity:0.95, depthWrite:false}));
 pathLine.visible=false; scene.add(pathLine);
 
 // asteroids

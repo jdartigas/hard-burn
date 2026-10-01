@@ -1,4 +1,4 @@
-// Hard Burn: scores and records, selection and player actions, HUD, tooltips.
+// Orion's Spur: scores and records, selection and player actions, HUD, tooltips.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -99,7 +99,7 @@ function recomputeHighlights(){
     if(state.mode==='target'){ const col=new THREE.Color(s.ability.def.target==='enemy'?0x5a2a7a:0x3b8a30); for(const o of abilityTargets(s)) map.set(cellAt(o.q,o.r).idx,col); }
     else {
       if(state.weaponSel!=='all'){ const w=s.weapons[state.weaponSel].def; for(const c of board.list){ const d=hdist(c,s); if(d>0 && d<=w.range && c.t!=='rock') map.set(c.idx,new THREE.Color(0x3a1410)); } }
-      if(s.mp>0){ state.reach=reachable(s); for(const [,c] of state.reach){ if(c.cost===0||c.blocked) continue; const cell=cellAt(c.q,c.r); const k=c.cost/s.mp; map.set(cell.idx,new THREE.Color(0x6a4812).multiplyScalar(1.15-k*0.45)); } }
+      if(s.mp>0){ state.reach=reachable(s); for(const [,c] of state.reach){ if(c.cost===0||c.blocked) continue; const cell=cellAt(c.q,c.r); const k=c.cost/s.mp; map.set(cell.idx,new THREE.Color(0x13506e).multiplyScalar(1.15-k*0.45)); } }
     }
   }
   setTiles(map); updatePathPreview();
