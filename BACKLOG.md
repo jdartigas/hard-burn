@@ -264,6 +264,8 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   galaxy low in the sky at 172°. Each is a camera-facing panel with its own shader. The camera never looks more than
   about 16° above the horizon, so sky features must sit low or nobody sees them. About 0.5 ms at High when the
   nebula fills a third of the screen.
+- **v41, fix (Jon):** nobody could see the galaxy. At the usual tilt the top of the screen is only about 5° above the
+  horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
 ## Scoring and records

@@ -49,7 +49,8 @@ const ENV = {
   // as azimuth (degrees, atan2 of z over x) and elevation, clear of the sun, the gas giant and the landmark.
   nebula: { az:30, el:3, dist:1650, width:1250, roll:0.2, gain:0.4, stars:90, seed:40001,
             steel:[0.32,0.46,0.60], rose:[0.62,0.44,0.46] },
-  galaxy: { az:172, el:7, dist:1650, width:130, tilt:0.5, gain:0.38, incline:2.4 },
+  // el 2: at the usual tilt the top of the screen is only about 5° up, and at 7° nobody saw it (Jon, v40)
+  galaxy: { az:172, el:2, dist:1650, width:330, tilt:0.5, gain:0.5, incline:2.4 },
   motes: { seed:37002, boxK:0.55, boxMin:6, boxMax:55, size:0.0014, drift:0.004, glint:0.03 },
 };
 
@@ -297,7 +298,7 @@ const Env = (() => {
           float arms=0.5+0.5*sin(2.0*th-log(r+0.02)*5.0);
           float disk=exp(-r*4.5)*(0.35+0.65*arms*smoothstep(0.05,0.25,r));
           float core=exp(-r*r*140.0);
-          vec3 col=(vec3(0.72,0.78,0.95)*disk*0.6+vec3(1.0,0.9,0.72)*core)*smoothstep(1.0,0.7,length(vP));
+          vec3 col=(vec3(0.72,0.78,0.95)*disk*0.95+vec3(1.0,0.9,0.72)*core)*smoothstep(1.0,0.7,length(vP));
           gl_FragColor=vec4(pow(col,vec3(2.2))*uGain,1.0); }` });
     skyPanel({...C, roll:C.tilt}, mat);
     return mat;
