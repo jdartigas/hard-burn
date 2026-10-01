@@ -268,7 +268,18 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
-## Scoring and records
+## Weapons fire from their mounts (v42 onwards, Jon)
+
+- **v42, done:** every weapon fires from a fitting on the model. New fittings where a hull had none: beam emitters
+  (cruiser shoulders, EW ship's keel), twin-barrel pulse turrets, vertical launch cells, tube mouths (patrol craft wing
+  pods, destroyer bow), a keel railgun on the destroyer. Missiles leave along the launcher's axis (up out of cells, out
+  of tubes, sideways out of the carrier's flank bays) before bending onto the attack path. Point defense streams from
+  the turret nearest the warhead. Fittings merge with the hull: one extra draw per ship at most (the lens material).
+- **v43, next:** turret tracking. Pulse turrets and PDCs swing to their target before firing. Turrets have to leave
+  the merged hull to rotate, so measure the draw-call cost (about 15 PDCs on a Dreadnought) and consider moving only the
+  turrets that are firing, or instancing turrets fleet-wide.
+
+
 
 The goal: a score for every battle, kept on the device across every future
 edit to `index.html`.

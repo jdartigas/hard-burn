@@ -105,6 +105,21 @@ function pathTo(reach, k){ const path=[]; let cur=reach.get(k); while(cur){ path
 const V=new THREE.Vector3();
 function fwd(s){ return new THREE.Vector3(Math.sin(s.group.rotation.y),0,Math.cos(s.group.rotation.y)); }
 function muzzle(s, spread=0){ const f=fwd(s), p=s.group.position.clone().addScaledVector(f,s.len*0.42); p.y+=0.05; if(spread){ p.x+=(Math.random()-.5)*spread; p.z+=(Math.random()-.5)*spread; } return p; }
+// v42: shots leave from the weapon's own fitting. Ships carry body-space mounts per loadout slot (buildShip); a volley
+// steps through them, and the starting mount advances every volley so twin single-shot guns alternate.
+function mountPoint(s, slot, i=0){
+  const list=s.mounts && slot!=null && s.mounts.w[slot];
+  if(!list || !list.length) return {p:muzzle(s), d:fwd(s)};
+  const m=list[i%list.length]; s.group.updateMatrixWorld(true);
+  return {p:s.body.localToWorld(m.p.clone()), d:m.d.clone().transformDirection(s.body.matrixWorld)};
+}
+// the point-defense turret on `s` nearest to `near`, in world space (the hull centre if it has none)
+function pdcPoint(s, near){
+  const list=s.mounts && s.mounts.pdc; if(!list || !list.length) return s.group.position.clone().add(new THREE.Vector3(0,0.2,0));
+  s.group.updateMatrixWorld(true); let best=null, bd=Infinity;
+  for(const t of list){ const w=s.body.localToWorld(V.copy(t.p)); const d=w.distanceToSquared(near); if(d<bd){ bd=d; best=w.clone(); } }
+  return best;
+}
 function hitPoint(s){ return s.group.position.clone().add(new THREE.Vector3(rand(-.3,.3)*s.len*0.5, rand(-.1,.2), rand(-.3,.3)*s.len*0.5)); }
 function angleTo(a, b){ return Math.atan2(b.x-a.x, b.z-a.z); }
 function shortestAngle(from,to){ let d=(to-from)%(Math.PI*2); if(d>Math.PI) d-=Math.PI*2; if(d<-Math.PI) d+=Math.PI*2; return d; }
@@ -139,13 +154,13 @@ function floatText(s, text, cls, dy=0){
     dispose(){ el.remove(); }});
 }
 
-function fxRail(att, tgt, outcomes, onEvent){
+function fxRail(att, tgt, outcomes, onEvent, mp){
   return new Promise(async res=>{
-    const a=muzzle(att), hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
+    const a=mp(0).p, hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
     if(!hit){ const dir=b.clone().sub(a).normalize(); const perp=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(1.2,2.2)*(Math.random()<.5?-1:1)); b=b.add(perp).addScaledVector(dir,60); }
     Sound.rail();
     // charge
-    for(let i=0;i<30;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.9); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
+    for(let i=0;i<30;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.55); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
     await wait(0.25);
     const core=beamMesh(a,b,0.05,0xffffff,1), glow=beamMesh(a,b,0.22,0x7fd0ff,0.55);
     flash(a,0x9fd8ff,5,0.25); Particles.burst(a,20,{speed:5,color:C_WHITE,size:0.3,life:0.3});
@@ -157,9 +172,9 @@ function fxRail(att, tgt, outcomes, onEvent){
     await wait(0.5); res();
   });
 }
-function fxBeam(att, tgt, outcomes, onEvent){
+function fxBeam(att, tgt, outcomes, onEvent, mp){
   return new Promise(async res=>{
-    const a=muzzle(att), hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
+    const a=mp(0).p, hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
     if(!hit){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,0.2,dir.x).multiplyScalar(rand(1.3,2)*(Math.random()<.5?-1:1))).addScaledVector(dir,25); }
     const col= att.side==='player'?0xffb44a:0xff5a3a; const colC=new THREE.Color(col);
     const core=beamMesh(a,b,0.04,0xffffff,0.95), glow=beamMesh(a,b,0.16,col,0.7);
@@ -173,12 +188,12 @@ function fxBeam(att, tgt, outcomes, onEvent){
     await wait(0.95); res();
   });
 }
-function fxPulse(att, tgt, outcomes, onEvent){
+function fxPulse(att, tgt, outcomes, onEvent, mp){
   return new Promise(res=>{
     let left=outcomes.length; const col=new THREE.Color(att.side==='player'?0xffd27a:0xff8a5a);
     outcomes.forEach((o,i)=>{
       after(i*0.13, ()=>{
-        const a=muzzle(att,0.25); let b=hitPoint(tgt); if(o!=='hit'){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,rand(-.3,.3),dir.x).multiplyScalar(rand(1,1.8)*(Math.random()<.5?-1:1))); }
+        const a=mp(i).p; let b=hitPoint(tgt); if(o!=='hit'){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,rand(-.3,.3),dir.x).multiplyScalar(rand(1,1.8)*(Math.random()<.5?-1:1))); }
         const dir=b.clone().sub(a); const dist=dir.length(); dir.normalize(); const end= o==='hit'? b : b.clone().addScaledVector(dir,14);
         const bolt=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshBasicMaterial({color:col.clone().multiplyScalar(2)})); bolt.scale.set(1,1,5);
         bolt.position.copy(a); bolt.lookAt(b); scene.add(bolt); Sound.pulse(); Particles.burst(a,5,{speed:3,color:col,size:0.25,life:0.2});
@@ -192,7 +207,7 @@ function fxPulse(att, tgt, outcomes, onEvent){
     });
   });
 }
-function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null){
+function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
   return new Promise(res=>{
     let left=outcomes.length;
     const fighter= kind==='fighter';
@@ -200,7 +215,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null){
     if(fighter) Sound.fighter();
     outcomes.forEach((o,i)=>{
       after(i*(fighter?0.1:0.18), ()=>{
-        const a=att.group.position.clone().add(new THREE.Vector3(rand(-.3,.3),0.25,rand(-.3,.3)));
+        const launch=mp(i), a=launch.p;
         let b=hitPoint(tgt); const dist=a.distanceTo(b); const dir=b.clone().sub(a).normalize();
         const side=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(-1,1)*(fighter?5:3));
         const ctrl=a.clone().lerp(b,0.45).add(side).add(new THREE.Vector3(0,rand(3,6)*(fighter?0.6:1),0));
@@ -209,14 +224,15 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null){
         const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x9aa0a6, metalness:0.6, roughness:0.4, emissive:0x222222}));
         scene.add(m); if(!fighter) Sound.missile();
         const dur=(dist/(fighter?13:16))+0.45; const cutK = o==='int'? rand(0.7,0.85) : 1.0;
-        const curve=new THREE.QuadraticBezierCurve3(a,ctrl,end);
+        // leave along the launcher's own axis (up out of a cell, out of a tube or bay), then bend onto the attack path
+        const curve=new THREE.CubicBezierCurve3(a, a.clone().addScaledVector(launch.d, clamp(dist*0.18,0.8,3)), ctrl, end);
         let pdcStarted=false;
         addFx({t:0,update(dt){ this.t+=dt; const k=Math.min(this.t/dur,1); const e=k*k*(1.6-0.6*k);
             const p=curve.getPoint(Math.min(e,1)); const p2=curve.getPoint(Math.min(e+0.02,1)); m.position.copy(p); m.lookAt(p2);
             Particles.emit(p, new THREE.Vector3(rand(-.2,.2),rand(-.2,.2),rand(-.2,.2)), trailCol, big?0.45:0.3, fighter?0.25:0.5, 1, big?0.6:0.3);
             if(!fighter && Math.random()<0.4) Particles.emit(p, new THREE.Vector3(), C_SMOKE, 0.5, 1.2, 0.5, 0.8);
             if(o==='int' && !pdcStarted && e>cutK-0.22){ pdcStarted=true; Sound.pdc(); }
-            if(o==='int' && pdcStarted && e<cutK){ const src=(screen||tgt).group.position.clone().add(new THREE.Vector3(rand(-.4,.4),0.2,rand(-.4,.4)));   // a screening escort fires its own point defense
+            if(o==='int' && pdcStarted && e<cutK){ const src=pdcPoint(screen||tgt, p);   // the turret nearest the warhead: a screening escort's own, or the target's
               const v=p.clone().sub(src); const dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src,v,new THREE.Color(1,.85,.4),0.12,dd/40,0); }
             if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); onEvent(i,o); return false; }
             if(e>=1){ if(o==='hit') onEvent(i,o); else onEvent(i,o); return false; }
@@ -225,7 +241,8 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null){
     });
   });
 }
-function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null){
-  switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent); case 'beam': return fxBeam(att,tgt,outcomes,onEvent);
-    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen); }
+function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=null){
+  const v=att.volleys=(att.volleys||0)+1, mp=i=>mountPoint(att, slot, v+i);
+  switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp);
+    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
 }

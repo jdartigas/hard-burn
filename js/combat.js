@@ -35,7 +35,7 @@ async function fireWeapon(att, wi, tgt){
       if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
     else { misses++; if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
   };
-  await playWeaponFx(d, att, tgt, outcomes, onEvent, screen);
+  await playWeaponFx(d, att, tgt, outcomes, onEvent, screen, wi);
   const cls= att.side==='player'?'p':'e';
   let msg=`${att.name} ${d.name.toLowerCase()} → ${tgt.name}: `;
   const byScr= screen? ` by ${screen.name}'s screen` : '';
