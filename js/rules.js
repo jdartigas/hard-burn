@@ -110,14 +110,34 @@ function muzzle(s, spread=0){ const f=fwd(s), p=s.group.position.clone().addScal
 function mountPoint(s, slot, i=0){
   const list=s.mounts && slot!=null && s.mounts.w[slot];
   if(!list || !list.length) return {p:muzzle(s), d:fwd(s)};
-  const m=list[i%list.length]; s.group.updateMatrixWorld(true);
-  return {p:s.body.localToWorld(m.p.clone()), d:m.d.clone().transformDirection(s.body.matrixWorld)};
+  const m=list[i%list.length]; s.group.updateMatrixWorld(true); let p=m.p.clone(), d=m.d.clone();
+  if(m.t){ const T=s.turrets[m.t-1], y=s.turretRig.yaw.value[m.t-1]; p.sub(T.pivot).applyAxisAngle(T.axis,y).add(T.pivot); d.applyAxisAngle(T.axis,y); }   // follows the turret round
+  return {p:s.body.localToWorld(p), d:d.transformDirection(s.body.matrixWorld)};
+}
+// v43: turret tracking. The bearing turret t needs to face a world point, as an angle about its own axis from rest.
+function turretBearing(s, t, point){
+  const T=s.turrets[t-1]; s.group.updateMatrixWorld(true);
+  const v=s.body.worldToLocal(point.clone()).sub(T.pivot), a=T.axis; v.addScaledVector(a,-v.dot(a)); if(v.lengthSq()<1e-8) return null; v.normalize();
+  const f=T.fwd.clone().addScaledVector(a,-T.fwd.dot(a)).normalize();
+  return Math.atan2(V.crossVectors(f,v).dot(a), f.dot(v));
+}
+function aimTurret(s, t, point, hold=2.5){ if(!t || !s.turrets) return 0; const y=turretBearing(s,t,point); if(y===null) return 0;
+  s.turretGoal[t-1]=y; s.turretHold[t-1]=hold; return Math.abs(shortestAngle(s.turretRig.yaw.value[t-1], y)); }
+// slew toward the goal; turrets with nothing to shoot drift between nearby bearings so a fleet at rest still looks crewed
+const TURRET_SLEW=5, TURRET_IDLE=0.7;
+function updateTurrets(s, dt){
+  const yaw=s.turretRig.yaw.value, goal=s.turretGoal, hold=s.turretHold;
+  for(let i=0;i<s.turrets.length;i++){
+    if(hold[i]>0) hold[i]-=dt; else if(Math.random()<dt*0.12) goal[i]=rand(-TURRET_IDLE,TURRET_IDLE);
+    const d=shortestAngle(yaw[i],goal[i]), step=(hold[i]>0?TURRET_SLEW:0.7)*dt;
+    yaw[i]=shortestAngle(0, yaw[i]+(Math.abs(d)<=step? d : Math.sign(d)*step)); }
 }
 // the point-defense turret on `s` nearest to `near`, in world space (the hull centre if it has none)
 function pdcPoint(s, near){
   const list=s.mounts && s.mounts.pdc; if(!list || !list.length) return s.group.position.clone().add(new THREE.Vector3(0,0.2,0));
-  s.group.updateMatrixWorld(true); let best=null, bd=Infinity;
-  for(const t of list){ const w=s.body.localToWorld(V.copy(t.p)); const d=w.distanceToSquared(near); if(d<bd){ bd=d; best=w.clone(); } }
+  s.group.updateMatrixWorld(true); let best=null, bt=null, bd=Infinity;
+  for(const t of list){ const w=s.body.localToWorld(V.copy(t.p)); const d=w.distanceToSquared(near); if(d<bd){ bd=d; best=w.clone(); bt=t; } }
+  if(bt) aimTurret(s, bt.t, near, 1.5);   // and that turret swings onto the warhead
   return best;
 }
 function hitPoint(s){ return s.group.position.clone().add(new THREE.Vector3(rand(-.3,.3)*s.len*0.5, rand(-.1,.2), rand(-.3,.3)*s.len*0.5)); }
@@ -241,8 +261,12 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
     });
   });
 }
-function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=null){
+async function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=null){
   const v=att.volleys=(att.volleys||0)+1, mp=i=>mountPoint(att, slot, v+i);
+  // turreted weapons traverse onto the target first, as long as the slowest one needs (capped, so play keeps moving)
+  const list=att.mounts && slot!=null ? att.mounts.w[slot] : null;
+  if(list && list.some(m=>m.t)){ let need=0; for(const m of list) if(m.t) need=Math.max(need, aimTurret(att, m.t, tgt.group.position, 3));
+    if(need>0.05) await wait(Math.min(0.45, need/TURRET_SLEW)); }
   switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp);
     case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
 }

@@ -275,9 +275,10 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   pods, destroyer bow), a keel railgun on the destroyer. Missiles leave along the launcher's axis (up out of cells, out
   of tubes, sideways out of the carrier's flank bays) before bending onto the attack path. Point defense streams from
   the turret nearest the warhead. Fittings merge with the hull: one extra draw per ship at most (the lens material).
-- **v43, next:** turret tracking. Pulse turrets and PDCs swing to their target before firing. Turrets have to leave
-  the merged hull to rotate, so measure the draw-call cost (about 15 PDCs on a Dreadnought) and consider moving only the
-  turrets that are firing, or instancing turrets fleet-wide.
+- **v43, done:** turret tracking. Pulse turrets traverse onto the target before a volley (up to 0.45 s), the PDC
+  nearest an incoming warhead swings onto it, and idle turrets drift between nearby bearings. Turrets stay merged and
+  turn in the vertex shader (an `aTurret` number per vertex, a per-ship angle array), so it costs no draw calls; pulling
+  them out of the merge would have cost one or more each, and a Dreadnought carries 17. Their shadows don't turn.
 
 
 

@@ -145,6 +145,7 @@ function mergeStatic(body, skip, keepOriginals){
     if(b.parts.length<2) continue;
     const geos=b.parts.map(o=>{ const g=o.geometry.index? o.geometry.toNonIndexed() : o.geometry.clone();
       rel.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(rel);
+      if(b.mat.userData.turretRig) g.setAttribute('aTurret', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(o.userData.turret||0),1));
       if(rel.determinant()<0){ for(const a of Object.values(g.attributes)){ const n=a.itemSize, arr=a.array;   // mirrored part: restore winding
         for(let t=0;t+2<a.count;t+=3) for(let c=0;c<n;c++){ const i=(t+1)*n+c, j=(t+2)*n+c, v=arr[i]; arr[i]=arr[j]; arr[j]=v; } } }
       return g; });
@@ -159,6 +160,20 @@ function mergeStatic(body, skip, keepOriginals){
     b.parts.forEach(o=>{ if(keepOriginals){ o.visible=false; o.userData.mergedAway=true; } else o.parent.remove(o); });
   }
 }
+// Turret tracking (v43). Turrets stay merged into the hull (pulling them out would cost a draw call or more each,
+// and a Dreadnought carries 17), so they turn in the vertex shader instead: every vertex of a turret carries its
+// turret number (aTurret, added by mergeStatic), and the ship's materials rotate those vertices about the turret's
+// own axis by that ship's per-turret angle. The shadow pass doesn't see the rotation, which at this size nobody can.
+const MAX_TURRETS=24;
+const TURRET_VS=`attribute float aTurret; uniform float uTYaw[${MAX_TURRETS}]; uniform vec3 uTPivot[${MAX_TURRETS}]; uniform vec3 uTAxis[${MAX_TURRETS}];
+vec3 tRot(vec3 v, vec3 k, float a){ float c=cos(a), s=sin(a); return v*c+cross(k,v)*s+k*dot(k,v)*(1.0-c); }`;
+function rigMaterial(m, rig){
+  m.userData.turretRig=true;
+  m.onBeforeCompile=sh=>{ sh.uniforms.uTYaw=rig.yaw; sh.uniforms.uTPivot=rig.pivot; sh.uniforms.uTAxis=rig.axis;
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\n'+TURRET_VS)
+      .replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\nint tId=int(aTurret+0.5)-1; if(tId>=0) objectNormal=tRot(objectNormal,uTAxis[tId],uTYaw[tId]);')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nif(tId>=0) transformed=uTPivot[tId]+tRot(transformed-uTPivot[tId],uTAxis[tId],uTYaw[tId]);'); };
+}
 function buildShip(cls, side, copy=0){
   const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const P=side==='player', R=mulberry32((P?1000:2000)+MODEL_SEED[cls]*77);
@@ -166,7 +181,14 @@ function buildShip(cls, side, copy=0){
   // weapon mounts, in body space: w[slot] lists the muzzles for that loadout slot (CLASSES[cls].weapons order), each
   // with the direction a shot leaves in; pdc lists every point-defense turret with its outward axis.
   const mounts={ w:CLASSES[cls].weapons.map(()=>[]), pdc:[] };
-  const mount=(slot,x,y,z,dx=0,dy=0,dz=1)=>{ mounts.w[slot].push({p:new THREE.Vector3(x,y,z), d:new THREE.Vector3(dx,dy,dz).normalize()}); };
+  const mount=(slot,x,y,z,dx=0,dy=0,dz=1)=>{ const m={p:new THREE.Vector3(x,y,z), d:new THREE.Vector3(dx,dy,dz).normalize()}; mounts.w[slot].push(m); return m; };
+  // turrets that can traverse: rest pivot, traverse axis and barrel direction in body space, numbered from 1
+  const turrets=[], rig={ yaw:{value:new Float32Array(MAX_TURRETS)}, pivot:{value:[...Array(MAX_TURRETS)].map(()=>new THREE.Vector3())}, axis:{value:[...Array(MAX_TURRETS)].map(()=>new THREE.Vector3(0,1,0))} };
+  [M.dark, M.metal, M.hull2].forEach(m=>rigMaterial(m, rig));
+  function rigTurret(grp){ if(turrets.length>=MAX_TURRETS) return 0; grp.updateMatrix(); const id=turrets.length+1;
+    const T={pivot:grp.position.clone(), axis:new THREE.Vector3(0,1,0).applyQuaternion(grp.quaternion).normalize(), fwd:new THREE.Vector3(0,0,1).applyQuaternion(grp.quaternion).normalize()};
+    turrets.push(T); rig.pivot.value[id-1].copy(T.pivot); rig.axis.value[id-1].copy(T.axis);
+    grp.traverse(o=>{ if(o.isMesh) o.userData.turret=id; }); return id; }
   const nav=P?0xffcf80:0xff6a50;
   const CH = 0.2;
   const add=(m,x=0,y=0,z=0,chunk=false)=>{ m.position.set(x,y,z); m.userData.chunk=chunk; body.add(m); return m; };
@@ -238,7 +260,7 @@ function buildShip(cls, side, copy=0){
     if(axis==='y'){ if(dir<0) grp.rotation.z=Math.PI; } else grp.rotation.z = -dir*Math.PI/2;
     grp.rotation.y = R()*0.8-0.4; add(grp,x,y,z);
     const out= axis==='y'? new THREE.Vector3(0,dir,0) : new THREE.Vector3(dir,0,0);
-    mounts.pdc.push({p:new THREE.Vector3(x,y,z).addScaledVector(out,0.07), out, grp});
+    mounts.pdc.push({p:new THREE.Vector3(x,y,z).addScaledVector(out,0.07), out, grp, t:rigTurret(grp)});
   }
   function radiator(x,y,z,w,d,tilt=0){ // flat fin radiating off the hull, ribbed and heat-glowing at the root
     const p=new THREE.Mesh(new THREE.PlaneGeometry(w,d,1,1),M.rad); p.rotation.set(-Math.PI/2,0,0); p.rotation.y=tilt;
@@ -325,8 +347,8 @@ function buildShip(cls, side, copy=0){
     const mant=new THREE.Mesh(new THREE.BoxGeometry(0.08*s,0.03*s,0.02*s),M.dark); mant.position.set(0,0.032*s,0.055*s); grp.add(mant);
     [-1,1].forEach(k=>{ const b=new THREE.Mesh(new THREE.CylinderGeometry(0.009*s,0.009*s,0.11*s,8),M.metal); b.rotation.x=Math.PI/2; b.position.set(k*0.022*s,0.032*s,0.115*s); grp.add(b);
       const sl=new THREE.Mesh(new THREE.CylinderGeometry(0.013*s,0.013*s,0.025*s,8),M.dark); sl.rotation.x=Math.PI/2; sl.position.set(k*0.022*s,0.032*s,0.165*s); grp.add(sl); });
-    if(flip<0) grp.rotation.z=Math.PI; add(grp,x,y,z);
-    [-1,1].forEach(k=>mount(slot, x+k*0.022*s*flip, y+0.032*s*flip, z+0.18*s)); }
+    if(flip<0) grp.rotation.z=Math.PI; add(grp,x,y,z); const t=rigTurret(grp);
+    [-1,1].forEach(k=>{ mount(slot, x+k*0.022*s*flip, y+0.032*s*flip, z+0.18*s).t=t; }); }
   function cells(slot,x,y,z,nx,nz,step=0.045){ // vertical launch cells flush with the deck: framed hatches, missiles leave upward
     for(let i=0;i<nx;i++) for(let j=0;j<nz;j++){ const cx=x+(i-(nx-1)/2)*step, cz=z+(j-(nz-1)/2)*step;
       const fr=new THREE.Mesh(new THREE.BoxGeometry(step*0.9,0.008,step*0.9),M.metal); add(fr,cx,y+0.004,cz);
@@ -550,6 +572,7 @@ function buildShip(cls, side, copy=0){
   const pickMesh=new THREE.Mesh(new THREE.SphereGeometry(L*0.5,8,6), new THREE.MeshBasicMaterial()); pickMesh.visible=false; g.add(pickMesh);
   enableShadows(g);
   mergeShipParts({group:g, body, engines, lights, shieldMesh:shield, pickMesh, fineMesh});
-  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts};
+  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts, turrets, turretRig:rig,
+    turretGoal:new Float32Array(turrets.length), turretHold:new Float32Array(turrets.length)};
 }
 
