@@ -64,7 +64,7 @@ const ABIL = {
 const CLASSES = {
   patrol:   {label:'Patrol craft',  role:'Stealth hunter',         cost:20, hull:45,  armor:1, shield:15, regen:8,  mp:7, ev:32, pdc:0.20, weapons:['pulse','missL'],        ability:'ecm',        len:1.8, y:0.7},
   corvette: {label:'Corvette',      role:'Fast skirmisher',        cost:40, hull:70,  armor:3, shield:25, regen:10, mp:6, ev:24, pdc:0.30, weapons:['railL','missL'],        ability:'burn',       len:2.3, y:0.75},
-  frigate:  {label:'Frigate',       role:'Escort, point defense',  cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.45, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
+  frigate:  {label:'Frigate',       role:'Escort, point defense',  cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.56, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
   destroyer:{label:'Destroyer',     role:'Line combatant',         cost:140, hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
   cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
   fastattack:{label:'Fast attack ship', role:'Ambush striker',      cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:34, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
@@ -72,7 +72,7 @@ const CLASSES = {
   // v34: support classes. `passive` is shown in the ship panel and builder; the effects live in the rules.
   ewar:     {label:'Electronic warfare ship', role:'Jamming and targeting', cost:90, hull:60, armor:2, shield:30, regen:10, mp:5, ev:22, pdc:0.30, weapons:['beamL'], ability:'blackout', len:2.4, y:0.8, jam:true,
              passive:'Jams enemies within 4 hexes (-10 accuracy, -15 with missiles) and gives allies within 3 hexes +8 accuracy'},
-  tender:   {label:'Repair tender', role:'Repair and resupply',    cost:110, hull:150, armor:3, shield:50, regen:12, mp:3, ev:8,  pdc:0.35, weapons:['pulse'], ability:'resupply', len:3.0, y:0.9, fieldRepair:10, fieldRange:2,
+  tender:   {label:'Repair tender', role:'Repair and resupply',    cost:70, hull:150, armor:3, shield:50, regen:12, mp:3, ev:8,  pdc:0.35, weapons:['pulse'], ability:'resupply', len:3.0, y:0.9, fieldRepair:10, fieldRange:2,
              passive:'Field repairs: allies within 2 hexes regain 10 hull each turn'},
   carrier:  {label:'Fleet carrier', role:'Strike and support',     cost:150, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };

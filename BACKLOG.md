@@ -183,12 +183,34 @@ fleet), but thin one-on-one, and its escort job was invisible.
 "by X's screen" in the log, an end-screen row). Preset round robin after it, average win rate:
 Carrier 53, Gunline 52, Swarm 52, Classic 49, Wolfpack 45, a tighter spread than v27 (45–57).
 
-**Open: the Frigate can't escort capitals.** Its point defense (0.45) is below the Heavy cruiser's
+**Fixed in v46 (was open): the Frigate couldn't escort capitals.** Its point defense (0.45) is below the Heavy cruiser's
 (0.50) and the Carrier's (0.55), and a screen only counts when it beats a ship's own. Tested
 `PD_NET.stack` (both fire: 1-(1-own)(1-screen)): round robin Carrier 57, Swarm 56, Gunline 55,
 Classic 46, **Wolfpack 36**, and Carrier grp v Wolfpack 80%. Too hard on missile fleets. Options to
 try: stack at a lower share (say 50%), or raise the Frigate's own `pdc` to about 0.55 so its screen
 reaches the capitals under the current rule. Re-measure the presets either way.
+
+**v46 balance pass** (Standard budget, 40 battles a pairing, sides swapped; one matchup is ±8, an average over
+seven opponents about ±3). Round robin of the five presets and the AI plans Dreadnought, Raiders and Support:
+
+| Fleet | Baseline avg | Notes |
+|---|---|---|
+| Swarm | 61 | strongest; left alone |
+| Raiders | 58 | hard counter to the Dreadnought (85–90) |
+| Gunline / Wolfpack | 54 / 57 | |
+| Dreadnought | 51 | polarised: 90–97 over Carrier group, 10–15 against Raiders and Wolfpack. Real counters, left alone |
+| Classic / Carrier group | 48 / 48 | |
+| **Support** | **23** | the outlier |
+
+Changes shipped:
+- **Frigate point defense 0.45 → 0.56**, so its screen beats the Heavy cruiser's 0.50 and Carrier's 0.55 under the
+  existing rule. Same seeds: Classic +3, Wolfpack −4, Raiders −3, the rest within 1. Small; it makes the escort real.
+- **Repair tender 110 → 70.** Support fleet variants against the other seven: as was 27; Tender stronger repairs
+  (15 hull, range 3) 30; **Tender at 70: 39**; no Tender at all 42; more hulls with two EW ships and no cruiser 12.
+  The Tender added too little fighting power for its price; cheaper helped, stronger didn't. Support is still the
+  weakest plan, a force multiplier rather than a brawler.
+
+**Still to run:** the same check at the Skirmish and Large budgets (Jon: hold for now), and the EW ship's price alone.
 
 ### 0c. New ship classes (Jon, v33 onwards)
 

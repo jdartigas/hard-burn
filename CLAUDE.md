@@ -90,14 +90,14 @@ Find a section by grepping `js/` for one of its names below (for example `functi
 |---|---|---|---|---|---|---|---|---|---|
 | Patrol craft | 20 | 45 | 1 | 15 (+8) | 7 | 32 | .20 | Pulse, missiles | ECM screen |
 | Corvette | 40 | 70 | 3 | 25 (+10) | 6 | 24 | .30 | Light railgun, missiles | Hard burn |
-| Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .45 (screens allies within 3 hexes with all of it) | Beam, missiles | PD surge |
+| Frigate | 60 | 95 | 4 | 35 (+12) | 5 | 18 | .56 (screens allies within 3 hexes with all of it; above the capitals' own since v46, so it covers them) | Beam, missiles | PD surge |
 | Destroyer | 140 | 140 | 6 | 45 (+15) | 4 | 12 | .40 | Railgun, pulse battery, torpedo | Shield overcharge |
 | Heavy cruiser | 250 | 230 | 9 | 70 (+18) | 3 | 6 | .50 | Spinal railgun, heavy beam, torpedo bay | Brace for impact |
 | Fleet carrier | 150 | 250 | 7 | 80 (+20) | 3 | 4 | .55 | Strike wing, pulse | Repair drones |
 | Fast attack ship | 50 | 55 | 1 | 16 (+6) | 8 | 34 | .15 | Strike missiles (2×32, range 9, 2 salvos, harder to intercept), pulse | Ambush |
 | Dreadnought | 480 | 400 | 12 | 120 (+22) | 2 | 2 | .60 | Spinal railgun, 2 light railguns, 2 heavy beams, pulse | Brace for impact |
 | Electronic warfare ship | 90 | 60 | 2 | 30 (+10) | 5 | 22 | .30 | Light beam | Sensor blackout |
-| Repair tender | 110 | 150 | 3 | 50 (+12) | 3 | 8 | .35 | Pulse | Resupply |
+| Repair tender | 70 | 150 | 3 | 50 (+12) | 3 | 8 | .35 | Pulse | Resupply |
 
 **Turn.** Each ship can move up to its movement allowance, fire each ready weapon once, and use its ability if charged, in any order. Then the AI takes its turn.
 
