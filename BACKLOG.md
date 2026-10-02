@@ -327,6 +327,45 @@ changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
     which raises download size; measure it.
   - Does location change anything in play (light, sensor range, debris density)? Default: cosmetic only.
 
+### Locations beyond the solar system (Jon)
+
+**Chosen by Jon:** Alpha Centauri, Wolf 359, Sirius A and B. **Candidates** within about 50 light years, picked for how
+different each would look (distance from the Sun):
+
+| System | ly | The setting |
+|---|---|---|
+| **Alpha Centauri A, B and Proxima** | 4.2–4.4 | Two Sun-like stars in a close pair, a red dwarf far out, Proxima b in the habitable zone |
+| Barnard's Star | 6.0 | Old, dim red dwarf with small rocky planets |
+| **Wolf 359** | 7.9 | Small, violent flare star: dim, red-lit, flaring |
+| **Sirius A and B** | 8.6 | The brightest star in Earth's sky, blue-white, with a white-dwarf companion |
+| Epsilon Eridani | 10.5 | Young orange star, debris disk, a planet, asteroid belts. The best frontier setting |
+| Procyon A and B | 11.5 | Yellow-white star with a white dwarf; a smaller Sirius |
+| 61 Cygni | 11.4 | Two orange dwarfs; the first star whose distance was measured |
+| Epsilon Indi | 11.9 | Orange star, a brown-dwarf pair, a cold giant planet imaged directly |
+| Tau Ceti | 11.9 | Nearest single Sun-like star, heavy debris disk: a dense, dusty field |
+| Teegarden's Star | 12.5 | Tiny red dwarf, two Earth-sized planets |
+| 40 Eridani | 16.3 | Triple: orange dwarf, white dwarf, red dwarf |
+| Altair | 16.7 | Spins so fast it is visibly flattened |
+| Gliese 667 | 23.6 | Triple star with planets: three suns in one sky |
+| Vega | 25 | Brilliant blue-white star, wide dust disk |
+| Fomalhaut | 25 | Sharp, bright debris ring: a ready-made arena |
+| Pollux | 34 | Orange giant with a gas giant planet |
+| Arcturus | 37 | Red giant filling the sky |
+| TRAPPIST-1 | 41 | Seven rocky planets close round a red dwarf, several visible at once |
+| 55 Cancri | 41 | Binary star, five planets including a lava world |
+| Capella | 43 | Pair of yellow giants |
+| Castor | 51 | Just outside: six stars in three pairs |
+
+Claude's picks to add for variety: **TRAPPIST-1, Epsilon Eridani, Fomalhaut, Arcturus.**
+
+Notes for building them:
+- **The sky has to be recomputed from each star's position.** The catalogue's 3D positions give every star's
+  direction and brightness as seen from there: constellations shift, and **the Sun shows as a star** (fairly bright
+  from Alpha Centauri, faint from TRAPPIST-1). Mark it: it ties in with the galactic map's "you are here".
+- Each primary star at its true angular size and colour, from its radius, temperature and the orbit chosen.
+- Planets and disks in these systems are partly known and partly guessed; say which in each location's description.
+- These are real stars. Use the astronomy, not any fiction's lore about them.
+
 ### Galactic map
 
 A 3D map of the galaxy with points of interest, added later. Two uses:
