@@ -303,7 +303,8 @@ changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
 |---|---|
 | **Mars orbit** | Mars below or beside the board, **Phobos** (and Deimos, small) |
 | **Earth orbit** | Earth, **the Moon** |
-| **Asteroid belt** | Belt material all around, no large body close; closest to today's scenery |
+| **Asteroid belt** | Belt material all around, no large body close |
+| **The Shattered Reach** | Today's scenery: fictional gas giant and moons, shattered dwarf planet, nebula, galaxy |
 | **Jupiter orbit** | Jupiter, **the Galilean moons** (Io, Europa, Ganymede, Callisto) |
 
 - **The star field as close to reality as possible.** Replace the random stars with a real catalogue: the brightest
@@ -315,8 +316,9 @@ changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
   in the belt (2.7 AU) and 0.10° at Jupiter. Brightness and the sun light's intensity can follow it, but keep the
   board readable; light intensity is a gameplay-readability decision, not just physics.
 - **Decisions to make when it's built:**
-  - The scenery since v36 is fictional: the brown gas giant, the shattered dwarf planet, the nebula and the galaxy.
-    Either they become a "Deep space" location, or they go. A real sky has no nearby nebula like v40's.
+  - **Decided (Jon):** the fictional scenery since v36 (the brown gas giant and its moons, the shattered dwarf planet,
+    the nebula and the galaxy) stays, as its own location: **The Shattered Reach**, after the broken dwarf planet.
+    It keeps its own made-up sky; the real star catalogue is for the solar system locations.
   - **Orbit height.** From low orbit Earth fills half the sky; from the Moon's distance it is about 2°. Pick heights
     that look good and are honest (high orbit for Earth and Mars, say), and say so in the location's description.
   - The camera never looks more than about 16° above the horizon (see the environment pass), so planets and moons
@@ -336,8 +338,8 @@ system, to the local view of the battle. Notes for building it:
 - One three.js scene per scale, cross-faded, rather than one scene spanning light years (depth precision breaks
   across that range). Galaxy: a particle spiral with the Sun's position marked; solar system: planets on their
   orbits; local: today's board.
-- The name fits it: Laniakea is the supercluster that contains the Milky Way, so the zoom could even start one level
-  further out.
+- **Decided (Jon): the zoom starts one level further out,** at the Laniakea supercluster that contains the Milky
+  Way (the game's name), then the galaxy, the solar system and the battle.
 - Needs a points-of-interest data format before any content; keep it a separate data file like `PRESETS`.
 
 ## Weapons fire from their mounts (v42 onwards, Jon)
