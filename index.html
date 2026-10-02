@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Orion's Spur — fleet engagement</title>
+<title>Laniakea's Edge — fleet engagement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '44';
+const GAME_VERSION = '45';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -22,7 +22,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="hud">
   <header id="topbar">
-    <div id="brand">Orion's Spur</div>
+    <div id="brand">Laniakea's Edge</div>
     <div id="turninfo"><b id="ti-turn">Turn 1</b><span id="ti-phase">Your orders</span></div>
     <div id="strength">
       <span class="lbl">Your fleet</span>
@@ -62,7 +62,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="menu" class="screen on">
   <div class="inner">
-    <h1 id="title">Orion's<span>Spur</span></h1>
+    <h1 id="title">Laniakea's<span>Edge</span></h1>
     <p class="lede">Choose your fleet and theirs. Close the distance, strip their shields and break their line before they break yours.</p>
     <div class="setup">
       <div class="srow"><span class="slabel" id="lb-diff">Difficulty</span>

@@ -1,10 +1,10 @@
-// Orion's Spur: utilities, all game data (weapons, abilities, classes, fleets, budgets, presets, AI plans), hex maths.
+// Laniakea's Edge: utilities, all game data (weapons, abilities, classes, fleets, budgets, presets, AI plans), hex maths.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
 
 /* =====================================================================
-   ORION'S SPUR — turn-based 2.5D fleet engagement
+   LANIAKEA'S EDGE — turn-based 2.5D fleet engagement
    ===================================================================== */
 
 

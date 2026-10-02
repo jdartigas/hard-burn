@@ -1,4 +1,4 @@
-// Orion's Spur: screens and buttons: menu pickers, fleet builder, records, settings, pause, surrender, HUD drawers.
+// Laniakea's Edge: screens and buttons: menu pickers, fleet builder, records, settings, pause, surrender, HUD drawers.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
@@ -26,14 +26,14 @@ function renderRecords(){
 }
 $('#btn-records').onclick=()=>{ Sound.init(); Sound.ui(); $('#rec-msg').textContent=''; renderRecords(); showScreen('records'); };
 $('#btn-export').onclick=()=>{ const d=loadScores(); const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,1)],{type:'application/json'})); a.download=`orions-spur-records-${new Date().toISOString().slice(0,10)}.json`;
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,1)],{type:'application/json'})); a.download=`laniakeas-edge-records-${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); $('#rec-msg').textContent=`Exported ${d.games.length} game${d.games.length!==1?'s':''}.`; };
 $('#btn-import').onclick=()=>$('#rec-file').click();
 $('#rec-file').onchange=async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return; $('#rec-msg').textContent=importScores(await f.text()); renderRecords(); };
 // merge a records file into what's stored: games already present are skipped, bests keep the higher score
 function importScores(text){
-  let inc; try{ inc=JSON.parse(text); }catch(e){ return "That file isn't an Orion's Spur records file."; }
-  if(!inc || typeof inc!=='object' || !Array.isArray(inc.games)) return "That file isn't an Orion's Spur records file.";
+  let inc; try{ inc=JSON.parse(text); }catch(e){ return "That file isn't a Laniakea's Edge records file."; }
+  if(!inc || typeof inc!=='object' || !Array.isArray(inc.games)) return "That file isn't a Laniakea's Edge records file.";
   const d=loadScores(), key=g=>g.date+'|'+g.seed+'|'+g.score, have=new Set(d.games.map(key)); let added=0;
   for(const g of inc.games){ if(!validGame(g)) continue; const f=fillGame(g); if(have.has(key(f))) continue; d.games.push(f); have.add(key(f)); considerBest(d,f); added++; }
   if(inc.bests && typeof inc.bests==='object') for(const b of Object.values(inc.bests)) if(validGame(b)) considerBest(d, fillGame(b));

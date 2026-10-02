@@ -220,10 +220,11 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);ou
 .bl-link:hover{border-color:var(--accent)}
 @media (max-width:760px){ .bl-row{grid-template-columns:1fr auto} .bl-row .c{display:none} .bl-budget .fchip span{display:none} }
 @media (max-height:760px) and (min-width:761px){   /* short screens (iPad landscape with Safari's bars): tighter, never scrolling */
-  #title{font-size:clamp(34px,min(6vw,7.5vh),74px)} #menu p.lede{margin:8px 0 12px;font-size:16px} #menu{padding-top:16px;padding-bottom:3vh}
+  #title{font-size:clamp(34px,min(6vw,7.5vh),70px)} #menu p.lede{margin:8px 0 12px;font-size:16px} #menu{padding-top:16px;padding-bottom:3vh}
   .srow{margin-top:6px} .picker{height:42px} .diff{height:34px} #menu .foot{margin-top:10px}
 }
-#title{font-family:var(--display);font-weight:400;font-size:clamp(40px,min(7.4vw,9vh),92px);line-height:1.02;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0;
+#title{font-family:var(--display);font-weight:400;font-size:clamp(34px,min(6.6vw,9vh),76px);line-height:1.02;   /* LANIAKEA'S runs about 8.2em wide: 76px fills the 660px column */
+  letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0;
   text-shadow:0 0 28px rgba(111,208,255,.45),0 0 2px rgba(189,235,255,.8)}
 #title span{display:block;color:var(--accent-hi)}
 #menu p.lede{font-size:18px;line-height:1.4;color:#b4cddc;margin:14px 0 18px;max-width:31em}
@@ -331,5 +332,5 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   #menu .cta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   #menu .cta .btn-primary{grid-column:1/-1}
   #menu .cta .btn-ghost{padding:0 6px;font-size:10px;letter-spacing:.06em;height:44px}
-  #title{font-size:clamp(32px,11vw,56px)} #menu p.lede{font-size:16px}
+  #title{font-size:clamp(26px,10.2vw,52px)} #menu p.lede{font-size:16px}
 }

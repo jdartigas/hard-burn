@@ -1,6 +1,6 @@
 # Backlog
 
-Work Orion's Spur (Hard Burn until v44) still owes, in rough priority order. Each item carries enough
+Work Laniakea's Edge (Hard Burn until v44, then briefly Orion's Spur) still owes, in rough priority order. Each item carries enough
 context to pick up cold. `CLAUDE.md` describes what the game *is*; this file
 describes what it doesn't do yet.
 

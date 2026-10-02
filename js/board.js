@@ -1,4 +1,4 @@
-// Orion's Spur: hex board, highlight tiles, asteroids and terrain generation.
+// Laniakea's Edge: hex board, highlight tiles, asteroids and terrain generation.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';

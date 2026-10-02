@@ -1,6 +1,6 @@
-# Orion's Spur — project guide for Claude Code
+# Laniakea's Edge — project guide for Claude Code
 
-The game was called Hard Burn until v44. The repo, the Pages URL, the `css/hard-burn.css` file name and the `hardburn.` storage prefix keep the old name on purpose: renaming the repo moves the live URL, and renaming the prefix would lose every saved score.
+The game was called Hard Burn until v44 and Orion's Spur for v44 only; it is Laniakea's Edge from v45. The repo, the Pages URL, the `css/hard-burn.css` file name and the `hardburn.` storage prefix keep the old name on purpose: renaming the repo moves the live URL, and renaming the prefix would lose every saved score.
 
 Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. The player commands six ships against an AI fleet of six on a hex grid strewn with destructible asteroids. The ship designs follow The Expanse, modeled on the owner's painted 3D-printed miniatures.
 
