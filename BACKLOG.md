@@ -329,8 +329,9 @@ changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
 
 ### Locations beyond the solar system (Jon)
 
-**Chosen by Jon:** Alpha Centauri, Wolf 359, Sirius A and B. **Candidates** within about 50 light years, picked for how
-different each would look (distance from the Sun):
+**Decided (Jon): every system in this table is a location.** He asked first for Alpha Centauri, Wolf 359 and Sirius
+A and B, then for all of them. **Keep each as real as possible:** its known planets, companions, disks and belts,
+at their real sizes, colours and arrangement. Within about 50 light years (distance from the Sun):
 
 | System | ly | The setting |
 |---|---|---|
@@ -356,14 +357,14 @@ different each would look (distance from the Sun):
 | Capella | 43 | Pair of yellow giants |
 | Castor | 51 | Just outside: six stars in three pairs |
 
-Claude's picks to add for variety: **TRAPPIST-1, Epsilon Eridani, Fomalhaut, Arcturus.**
-
 Notes for building them:
 - **The sky has to be recomputed from each star's position.** The catalogue's 3D positions give every star's
   direction and brightness as seen from there: constellations shift, and **the Sun shows as a star** (fairly bright
   from Alpha Centauri, faint from TRAPPIST-1). Mark it: it ties in with the galactic map's "you are here".
 - Each primary star at its true angular size and colour, from its radius, temperature and the orbit chosen.
-- Planets and disks in these systems are partly known and partly guessed; say which in each location's description.
+- **Realism first (Jon).** Use the known planets and objects for each system, from the current exoplanet record (NASA
+  Exoplanet Archive) at the time it's built. Where something isn't known (a planet's surface, a disk's exact look), keep
+  it plausible and say in the location's description which parts are measured and which are drawn.
 - These are real stars. Use the astronomy, not any fiction's lore about them.
 
 ### Galactic map
