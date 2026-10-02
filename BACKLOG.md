@@ -268,6 +268,56 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
+## Battle locations and the galactic map (Jon, after v45)
+
+More to come from Jon; capture additions here.
+
+### Battle locations
+
+The player picks where a battle is fought, or Random. The board and rules stay the same; the scenery around it
+changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
+
+| Location | Show |
+|---|---|
+| **Mars orbit** | Mars below or beside the board, **Phobos** (and Deimos, small) |
+| **Earth orbit** | Earth, **the Moon** |
+| **Asteroid belt** | Belt material all around, no large body close; closest to today's scenery |
+| **Jupiter orbit** | Jupiter, **the Galilean moons** (Io, Europa, Ganymede, Callisto) |
+
+- **The star field as close to reality as possible.** Replace the random stars with a real catalogue: the brightest
+  few thousand stars (for example the HYG or Yale Bright Star catalogue, to about magnitude 6.5) with real positions,
+  brightness and colour from spectral type, plus the Milky Way band in the right place on the sky. Ship it as a small
+  data file in the repo; no network calls. The same sky works at every location in the solar system, since the stars
+  don't shift visibly between planets.
+- **The Sun at its true size from each location.** Angular diameter about 0.53° at Earth, 0.35° at Mars, about 0.2°
+  in the belt (2.7 AU) and 0.10° at Jupiter. Brightness and the sun light's intensity can follow it, but keep the
+  board readable; light intensity is a gameplay-readability decision, not just physics.
+- **Decisions to make when it's built:**
+  - The scenery since v36 is fictional: the brown gas giant, the shattered dwarf planet, the nebula and the galaxy.
+    Either they become a "Deep space" location, or they go. A real sky has no nearby nebula like v40's.
+  - **Orbit height.** From low orbit Earth fills half the sky; from the Moon's distance it is about 2°. Pick heights
+    that look good and are honest (high orbit for Earth and Mars, say), and say so in the location's description.
+  - The camera never looks more than about 16° above the horizon (see the environment pass), so planets and moons
+    have to sit low or below the board, as the gas giant does today.
+  - Real planet surfaces need textures. Either procedural (like today's gas giant) or real maps as files in the repo,
+    which raises download size; measure it.
+  - Does location change anything in play (light, sensor range, debris density)? Default: cosmetic only.
+
+### Galactic map
+
+A 3D map of the galaxy with points of interest, added later. Two uses:
+- **The multiplayer and campaign phase:** the shared universe in the campaign section is navigated on it.
+- **A small "you are here" inset** during battles and in menus.
+
+**Zoom from galaxy to battle:** a continuous, as-cool-and-3D-as-possible zoom from the whole galaxy, to the solar
+system, to the local view of the battle. Notes for building it:
+- One three.js scene per scale, cross-faded, rather than one scene spanning light years (depth precision breaks
+  across that range). Galaxy: a particle spiral with the Sun's position marked; solar system: planets on their
+  orbits; local: today's board.
+- The name fits it: Laniakea is the supercluster that contains the Milky Way, so the zoom could even start one level
+  further out.
+- Needs a points-of-interest data format before any content; keep it a separate data file like `PRESETS`.
+
 ## Weapons fire from their mounts (v42 onwards, Jon)
 
 - **v42, done:** every weapon fires from a fitting on the model. New fittings where a hull had none: beam emitters
