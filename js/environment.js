@@ -55,12 +55,14 @@ const ENV = {
 };
 
 const Env = (() => {
+  const reachRoot = new THREE.Group(); scene.add(reachRoot);   // everything here belongs to The Shattered Reach
+  
   const R = mulberry32(ENV.seed);
   const planeGroup = new THREE.Group();
   planeGroup.position.y = ENV.plane.y; planeGroup.rotation.set(ENV.plane.tiltX, 0, ENV.plane.tiltZ);
-  scene.add(planeGroup);
+  reachRoot.add(planeGroup);
   const farSpin = new THREE.Group(), midSpin = new THREE.Group();
-  planeGroup.add(farSpin); scene.add(midSpin);
+  planeGroup.add(farSpin); reachRoot.add(midSpin);
 
   const gapFade = a => { let k=1; for(const g of ENV.gaps){ let d=Math.abs(((a-g.a)%(Math.PI*2)+Math.PI*3)%(Math.PI*2)-Math.PI); k*=clamp(d/g.w,0,1)**2; } return k; };
   const density = a => (0.3 + 0.7*(0.5+0.5*Math.sin(3*a+1.3))**2) * gapFade(a);
@@ -130,7 +132,7 @@ const Env = (() => {
       m.position.set(Math.cos(a)*r, Math.max(L.yMin+Rn()*L.ySpan, size*0.8-16), Math.sin(a)*r); m.scale.setScalar(size); m.rotation.set(Rn()*6.3,Rn()*6.3,Rn()*6.3);
       m.userData.spin=new THREE.Vector3(Rn()-0.5,Rn()-0.5,Rn()-0.5).multiplyScalar(L.spin); m.userData.noAO=true; m.userData.noShadow=true;
       group.add(m); rocks.push(m); }
-    scene.add(group);
+    reachRoot.add(group);
     return { setCount(n){ rocks.forEach((m,i)=>m.visible=i<n); },
       update(dt){ for(const m of rocks) if(m.visible){ const s=m.userData.spin; m.rotation.x+=s.x*dt; m.rotation.y+=s.y*dt; m.rotation.z+=s.z*dt; } } };
   }
@@ -248,7 +250,7 @@ const Env = (() => {
     for(const m of ENV.moons){
       const mesh=new THREE.Mesh(bodyGeometry(m.seed, 12, false), new THREE.MeshStandardMaterial({vertexColors:true, roughness:1, metalness:0, envMapIntensity:0.15, color:new THREE.Color(...m.color)}));
       mesh.position.copy(P.position).addScaledVector(right,m.right).addScaledVector(up,m.up).addScaledVector(view,-m.toward);
-      mesh.scale.setScalar(m.radius); mesh.rotation.set(m.seed%7, m.seed%5, 0); mesh.userData.noAO=true; mesh.userData.noShadow=true; scene.add(mesh); }
+      mesh.scale.setScalar(m.radius); mesh.rotation.set(m.seed%7, m.seed%5, 0); mesh.userData.noAO=true; mesh.userData.noShadow=true; reachRoot.add(mesh); }
   }
 
   const skyDir=(az,el)=>{ const a=az*Math.PI/180, e=el*Math.PI/180; return new THREE.Vector3(Math.cos(e)*Math.cos(a), Math.sin(e), Math.cos(e)*Math.sin(a)); };
@@ -259,7 +261,7 @@ const Env = (() => {
   function skyPanel(C, mat){
     const m=new THREE.Mesh(new THREE.PlaneGeometry(C.width, C.width), mat);
     m.position.copy(skyDir(C.az, C.el).multiplyScalar(C.dist)); m.lookAt(0,0,0); m.rotateZ(C.roll||0);
-    m.frustumCulled=true; m.userData.noAO=true; m.userData.noShadow=true; m.renderOrder=-1; scene.add(m); m.updateMatrixWorld(true); return m;
+    m.frustumCulled=true; m.userData.noAO=true; m.userData.noShadow=true; m.renderOrder=-1; reachRoot.add(m); m.updateMatrixWorld(true); return m;
   }
 
   // the nebula: domain-warped gas, steel-blue at the core fading to dusty rose at the edges, with dark dust lanes
@@ -285,7 +287,7 @@ const Env = (() => {
       v.set(g()*C.width*0.32, g()*C.width*0.19, 20); panel.localToWorld(v); pos.set([v.x,v.y,v.z],i*3);
       const b=0.35+Math.pow(Rs(),2)*0.6; col.set([b*0.86,b*0.93,b].map(toLinear),i*3); }
     const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
-    const pts=new THREE.Points(g, new THREE.PointsMaterial({size:1.8, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; scene.add(pts);
+    const pts=new THREE.Points(g, new THREE.PointsMaterial({size:1.8, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; reachRoot.add(pts);
     return mat;
   }
 
@@ -315,7 +317,7 @@ const Env = (() => {
   const nebula = nebulaLayer(), galaxy = galaxyLayer();
 
   return {
-    group: planeGroup, motes, nebula, galaxy,
+    group: planeGroup, reachRoot, motes, nebula, galaxy,
     setQuality(q){ const c=QUALITY[q].env; far.setCount(c.far); mid.setCount(c.mid); dust.setCount(c.dust); near.setCount(c.near); motes.setCount(c.motes); landmark.setCount(c.lmRocks, c.lmDust); },
     update(dt){ farSpin.rotation.y+=dt*ENV.far.spin; midSpin.rotation.y+=dt*ENV.mid.spin; near.update(dt); motes.update(dt); landmark.update(dt); },
   };

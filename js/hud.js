@@ -41,7 +41,7 @@ function recordBattle(result){
   if(simRunning || state.simulated || state.recorded) return null; state.recorded=true;
   const mine=state.ships.filter(s=>s.side==='player'), theirs=state.ships.filter(s=>s.side==='enemy');
   const cost=l=>l.reduce((a,s)=>a+s.C.cost,0);
-  const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, limit:BATTLE_TURNS,
+  const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, location:state.location, limit:BATTLE_TURNS,
     you:lastFleets.youId||'custom', enemy:lastFleets.enemyId||'custom', result, turns:Math.max(1,state.turn),
     left:alive('player').length, of:mine.length,
     hullPct:Math.round(100*mine.reduce((a,s)=>a+Math.max(0,s.hull),0)/Math.max(1,mine.reduce((a,s)=>a+s.hullMax,0))),

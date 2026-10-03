@@ -296,6 +296,23 @@ More to come from Jon; capture additions here.
 
 ### Battle locations
 
+**Phase 1 done in v48:** location picker (with Random), the real sky from the HYG catalogue with the Milky Way in
+galactic coordinates, the sun at true size, **The Shattered Reach** and **Earth orbit** (geostationary: Earth 17.4
+degrees across, the Moon at its true 0.52 degrees, lit by the real sun so its phase is right, near side toward Earth,
+Earth's axis on the real celestial pole). Decided with Jon: real data files are allowed (assets/CREDITS.md); the sun
+sits low (8 degrees) so it is on screen in tilted views; the Moon at true size.
+
+Learned building it:
+- A low sun barely lights the tops of ships, and a black sky gives metal nothing to reflect: the board went dark.
+  Earthshine fixes it, as in reality: each location sets a second light (Earth's direction, bluish) and its
+  environment map includes a bright Earth. Every new location needs its own fill, or it will be too dark to play.
+- Planets need sunlight-only shading (`bodyMaterial`); the game's ambient and fill would light their night sides.
+- A sun disc much brighter than about 4x blooms into a soft square. Brightness comes from the glare sprite.
+- Seen elsewhere, not fixed: a ship's engine glow can bloom into a soft square very close to the camera.
+
+**Phase 2, next:** Mars orbit (Phobos, Deimos), the asteroid belt, Jupiter (Galilean moons). The Shattered Reach keeps
+its old high sun for now; move it low too if Jon wants the sun visible there as well.
+
 The player picks where a battle is fought, or Random. The board and rules stay the same; the scenery around it
 changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
 

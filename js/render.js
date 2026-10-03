@@ -94,6 +94,17 @@ function panelTexture(seed){
 const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,64,0,64,64,64); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(.25,'rgba(255,255,255,.55)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,w,h); }, false);
 
 /* ---------------- environment ---------------- */
+// v48: battle locations (js/locations.js). This builds The Shattered Reach's sky into reachSky, and its baked
+// environment map into reachEnv; a location shows its own roots and sets the sun direction with setSunDir.
+const reachSky = new THREE.Group(); scene.add(reachSky);
+let reachEnv = null;
+function setSunDir(v){
+  sunDir.copy(v).normalize(); sun.position.copy(sunDir).multiplyScalar(100);
+  SH_X.crossVectors(new THREE.Vector3(0,1,0), sunDir).normalize(); SH_Y.crossVectors(sunDir, SH_X);
+  sun.shadow.camera.right=-1;   // forces updateShadowFrustum to rebuild the shadow camera
+}
+// prefiltered environment map of a scene of sky objects, so metal reflects the place the battle is in
+function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); const t=pmrem.fromScene(es, 0.02, 1, 3000).texture; pmrem.dispose(); return t; }
 (function buildEnvironment(){
   // nebula backdrop
   const neb = new THREE.Mesh(new THREE.SphereGeometry(1800, 48, 24), new THREE.ShaderMaterial({
@@ -117,7 +128,7 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
         lin+=uFill*mix(vec3(0.030,0.042,0.060), vec3(0.085,0.068,0.050), k*k) * (0.75+0.25*smoothstep(-0.6,0.6,d.y));
         gl_FragColor=vec4(lin,1.0); }`
   }));
-  neb.userData.noAO=true; scene.add(neb);
+  neb.userData.noAO=true; reachSky.add(neb);
   // stars, in two tiers from a fixed seed: a faint field that crowds along the nebula's band, and a sparse bright
   // layer. Tints are subtle: mostly neutral, some warm, some cool.
   const SR=mulberry32(5150), TINTS=[[1,0.97,0.93],[1,0.86,0.70],[0.78,0.87,1]];
@@ -130,14 +141,14 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
       const b=bright[0]+(bright[1]-bright[0])*Math.pow(SR(),2.2), r=SR(), t=TINTS[r<0.62?0:r<0.8?1:2];
       col.set([b*t[0],b*t[1],b*t[2]].map(toLinear), i*3); }
     const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
-    const pts=new THREE.Points(g, new THREE.PointsMaterial({size, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; scene.add(pts);
+    const pts=new THREE.Points(g, new THREE.PointsMaterial({size, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; reachSky.add(pts);
   }
   starTier(7000, 1.3, [0.08,0.5], 0.6);
   starTier(420, 2.2, [0.45,1.0], 0.25);
   starTier(28, 3.2, [0.85,1.0], 0);
   // sun glow
   const sunSpr = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xffd9a8, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true}));
-  sunSpr.position.copy(sunDir).multiplyScalar(1400); sunSpr.scale.setScalar(260); scene.add(sunSpr);
+  sunSpr.position.copy(sunDir).multiplyScalar(1400); sunSpr.scale.setScalar(260); reachSky.add(sunSpr);
   // gas giant
   const ptex = canvasTex(1024,512,(g,w,h)=>{ const R=mulberry32(7);
     for(let y=0;y<h;y++){ const t=y/h; const b=Math.sin(t*38+Math.sin(t*9)*2)*0.5+0.5, c=Math.sin(t*13)*0.5+0.5;
@@ -145,21 +156,19 @@ const glowTex = canvasTex(128,128,(g,w,h)=>{ const gr=g.createRadialGradient(64,
     for(let i=0;i<500;i++){ g.fillStyle=`rgba(${R()<.5?255:60},${R()<.5?220:40},${150},${R()*0.07})`; const y=R()*h; g.fillRect(0,y,w,R()*6); }
     g.fillStyle='rgba(170,80,50,.5)'; g.beginPath(); g.ellipse(640,300,46,22,0,0,Math.PI*2); g.fill(); });
   const planet = new THREE.Mesh(new THREE.SphereGeometry(140,64,32), new THREE.MeshStandardMaterial({map:ptex, color:0x6a6560, roughness:1, metalness:0}));
-  planet.position.set(620,-230,-1100); planet.rotation.z=0.35; scene.add(planet);
+  planet.position.set(620,-230,-1100); planet.rotation.z=0.35; reachSky.add(planet);
   const atm = new THREE.Mesh(new THREE.SphereGeometry(146,64,32), new THREE.ShaderMaterial({ transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide,
     uniforms:{uSun:{value:sunDir}},
     vertexShader:`varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
     fragmentShader:`varying vec3 vN; varying vec3 vW; uniform vec3 uSun; void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(max(1.0-abs(dot(vN,v)),0.0),3.0);   /* max(): interpolated normals can push |dot| past 1, and pow of a negative is NaN */ float l=clamp(dot(-vN,uSun)*0.5+0.6,0.0,1.0); gl_FragColor=vec4(pow(vec3(1.0,0.65,0.4)*f*l*0.9,vec3(2.2))*1.6,1.0); }`}));
-  atm.position.copy(planet.position); scene.add(atm);
+  atm.position.copy(planet.position); reachSky.add(atm);
   planet.userData.spin = true; window.__planet = planet; planet.userData.noAO = true;
   // image-based lighting: bake the sky, sun and planet into a prefiltered environment map so metal reflects the scene
   const es=new THREE.Scene();
   const nebEnv=new THREE.Mesh(neb.geometry, neb.material.clone()); nebEnv.material.uniforms.uGain.value=5; nebEnv.material.uniforms.uFill.value=1; es.add(nebEnv);
   const sunBall=new THREE.Mesh(new THREE.SphereGeometry(55,24,12), new THREE.MeshBasicMaterial({color:new THREE.Color(1,0.86,0.68).multiplyScalar(40)})); sunBall.position.copy(sunDir).multiplyScalar(1400); es.add(sunBall);
   const pEnv=new THREE.Mesh(planet.geometry, new THREE.MeshBasicMaterial({map:ptex, color:0x6a5a4c})); pEnv.position.copy(planet.position); es.add(pEnv);
-  const pmrem=new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(es, 0.02, 1, 3000).texture; scene.environmentIntensity = 2.2;
-  pmrem.dispose();
+  reachEnv = bakeEnvironment(es); scene.environment = reachEnv; scene.environmentIntensity = 2.2;
 })();
 
 /* ---------------- particles ---------------- */

@@ -43,7 +43,11 @@ function importScores(text){
 // quick play fleet pickers; the enemy's "Random" is rolled again for every new battle, not for a restart
 // Your fleet is a preset or 'custom' (built in the fleet builder, stored as hardburn.custom = {budget, fleet}).
 // The enemy is Random (any preset), a preset, or 'aibuild': the AI spends your budget itself.
-let pickYou=store.get('fleetYou','classic'), pickEnemy=store.get('fleetEnemy','random');
+let pickYou=store.get('fleetYou','classic'), pickEnemy=store.get('fleetEnemy','random'), pickLoc=store.get('location','reach');
+if(pickLoc!=='random' && !LOCATIONS.some(l=>l.id===pickLoc)) pickLoc='reach';
+// the battle's location: Random rolls one per battle; the menu's backdrop shows the chosen one (the Reach for Random)
+const rollLocation=()=> pickLoc==='random'? LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)].id : pickLoc;
+const menuLocation=()=> pickLoc==='random'? 'reach' : pickLoc;
 const validCustom=c=> !!c && BUDGETS[c.budget]!==undefined && Array.isArray(c.fleet) && c.fleet.length>0 && c.fleet.length<=MAX_FLEET && c.fleet.every(k=>CLASSES[k]) && fleetCost(c.fleet)<=BUDGETS[c.budget];
 let custom=store.get('custom',null); if(!validCustom(custom)) custom=null;   // e.g. a price change put it over budget
 if(pickYou==='custom' ? !custom : !PRESETS.some(p=>p.id===pickYou)) pickYou='classic';
@@ -52,9 +56,9 @@ const yourBudget=()=> pickYou==='custom'? custom.budget : 'standard';
 function chosenFleets(){
   const you= pickYou==='custom'? {fleet:custom.fleet, id:'custom'} : PRESETS.find(p=>p.id===pickYou);
   if(pickEnemy==='aibuild'){ const plans=Object.keys(AI_PLANS), plan=plans[Math.floor(Math.random()*plans.length)];
-    return {player:you.fleet, enemy:aiBuild(BUDGETS[yourBudget()], plan), enemyName:`AI build: ${AI_PLANS[plan].label}`, youId:you.id, enemyId:'ai-'+plan, budget:yourBudget()}; }
+    return {player:you.fleet, enemy:aiBuild(BUDGETS[yourBudget()], plan), enemyName:`AI build: ${AI_PLANS[plan].label}`, youId:you.id, enemyId:'ai-'+plan, budget:yourBudget(), location:rollLocation()}; }
   const en= pickEnemy==='random'? PRESETS[Math.floor(Math.random()*PRESETS.length)] : PRESETS.find(p=>p.id===pickEnemy);
-  return {player:you.fleet, enemy:en.fleet, enemyName:en.name, youId:you.id, enemyId:en.id, budget:yourBudget()};
+  return {player:you.fleet, enemy:en.fleet, enemyName:en.name, youId:you.id, enemyId:en.id, budget:yourBudget(), location:rollLocation()};
 }
 // Fleet pickers (v44): each is one button that opens a list, a popover beside it on wide screens and a sheet from
 // the bottom on phones. Chip grids for 7 and 8 options pushed Begin below the fold on iPad; a native <select> can't
@@ -65,7 +69,9 @@ function enemyOptions(){ return [{id:'random', name:'Random', sub:'Any preset', 
   .concat(PRESETS.map(p=>({id:p.id, name:p.name, sub:`${p.fleet.length} ships`, info:fleetSummary(p.fleet)})))
   .concat([{id:'aibuild', name:'AI build', sub:`Spends ${BUDGETS[yourBudget()]}`, info:'The AI builds its own fleet to your budget.'}]); }
 const PICKERS={ you:{btn:'#pk-you', options:youOptions, get:()=>pickYou, set:id=>{ if(id==='custom'){ openBuilder(); return; } pickYou=id; store.set('fleetYou',pickYou); } },
-  enemy:{btn:'#pk-enemy', options:enemyOptions, get:()=>pickEnemy, set:id=>{ pickEnemy=id; store.set('fleetEnemy',pickEnemy); } } };
+  enemy:{btn:'#pk-enemy', options:enemyOptions, get:()=>pickEnemy, set:id=>{ pickEnemy=id; store.set('fleetEnemy',pickEnemy); } },
+  loc:{btn:'#pk-loc', options:()=>[{id:'random', name:'Random', sub:'Any location', info:'A different place every battle.'}].concat(LOCATIONS.map(l=>({id:l.id, name:l.name, sub:l.sub, info:l.info}))),
+    get:()=>pickLoc, set:id=>{ pickLoc=id; store.set('location',pickLoc); if(state.phase==='menu') Loc.set(menuLocation()); } } };
 let openPk=null, pkFocus=0;
 function renderPicks(){
   for(const k of Object.keys(PICKERS)){ const P=PICKERS[k], o=P.options().find(x=>x.id===P.get()) || P.options()[0];
@@ -79,7 +85,7 @@ function openPicker(k){
   const P=PICKERS[k], opts=P.options(), list=$('#pk-list'), btn=$(P.btn);
   pkFocus=Math.max(0, opts.findIndex(o=>o.id===P.get()));
   list.innerHTML=opts.map((o,i)=>`<div class="pk-opt${o.id===P.get()?' on':''}" role="option" id="pko-${i}" data-id="${o.id}" aria-selected="${o.id===P.get()}"><b>${o.name}</b><span class="n">${o.sub}</span><span class="i">${o.info}</span></div>`).join('');
-  list.setAttribute('aria-label', k==='you'?'Your fleet':'Enemy fleet');
+  list.setAttribute('aria-label', k==='you'?'Your fleet':k==='enemy'?'Enemy fleet':'Location');
   // beside the button on wide screens, so the rest of the setup stays readable; a bottom sheet on phones (CSS)
   // beside the button when there's room (landscape), otherwise below it, or above it if below would run off the screen
   list.hidden=false; const r=btn.getBoundingClientRect(), w=list.offsetWidth, h=list.offsetHeight;
@@ -91,7 +97,7 @@ function focusOpt(i){ const els=$('#pk-list').querySelectorAll('.pk-opt'); if(!e
   els.forEach((el,j)=>el.classList.toggle('focus', j===pkFocus)); $('#pk-list').setAttribute('aria-activedescendant','pko-'+pkFocus); els[pkFocus].scrollIntoView({block:'nearest'}); }
 function pickOption(i){ const k=openPk, P=PICKERS[k], o=P.options()[i]; closePicker(); Sound.ui(); P.set(o.id); renderPicks(); }
 function closePicker(){ if(!openPk) return; $(PICKERS[openPk].btn).setAttribute('aria-expanded','false'); $('#pk-list').hidden=true; const b=$(PICKERS[openPk].btn); openPk=null; b.focus(); }
-$('#pk-you').onclick=()=>openPicker('you'); $('#pk-enemy').onclick=()=>openPicker('enemy');
+$('#pk-you').onclick=()=>openPicker('you'); $('#pk-enemy').onclick=()=>openPicker('enemy'); $('#pk-loc').onclick=()=>openPicker('loc');
 $('#pk-list').addEventListener('keydown', e=>{ if(!openPk) return; const k=e.key;
   if(k==='ArrowDown'){ focusOpt(pkFocus+1); e.preventDefault(); } else if(k==='ArrowUp'){ focusOpt(pkFocus-1); e.preventDefault(); }
   else if(k==='Home'){ focusOpt(0); e.preventDefault(); } else if(k==='End'){ focusOpt(-1); e.preventDefault(); }

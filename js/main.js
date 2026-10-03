@@ -42,6 +42,7 @@ function deployFleet(list){
 }
 function setupBattle(seed, fleets={}){
   clearBattle(); board.seed=seed; seedGameRand(seed);
+  state.location=fleets.location||menuLocation(); Loc.set(state.location);
   const lists={player:cleanFleet(fleets.player), enemy:cleanFleet(fleets.enemy)};
   const cells={player:deployFleet(lists.player), enemy:deployFleet(lists.enemy).map(([q,r])=>[-q,-r])};
   board.deploy=[...cells.player, ...cells.enemy];
@@ -62,7 +63,7 @@ function startGame(fleets){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
   cam.thGoal=cam.phGoal=null; cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
-  log(`Engagement begins on ${state.diff} difficulty. Enemy fleet${lastFleets.enemyName?` (${lastFleets.enemyName})`:''} closing from the east: ${fleetSummary(lastFleets.enemy||CLASSIC_FLEET)}.`, 'sys');
+  log(`Engagement begins ${(LOCATIONS.find(l=>l.id===state.location)||LOCATIONS[0]).where} on ${state.diff} difficulty. Enemy fleet${lastFleets.enemyName?` (${lastFleets.enemyName})`:''} closing from the east: ${fleetSummary(lastFleets.enemy||CLASSIC_FLEET)}.`, 'sys');
   state.phase='starting'; updateHUD();
   after(1.2, ()=>startPlayerTurn());
   canvas.focus();
@@ -204,7 +205,7 @@ function frame(){
   updateWrecks(dt);
   board.rocks.forEach(m=>{ const sp=m.userData.spin; if(sp){ m.rotation.x+=sp.x*dt; m.rotation.y+=sp.y*dt; m.rotation.z+=sp.z*dt; } });
   if(window.__planet) window.__planet.rotation.y+=dt*0.004;
-  Env.update(dt);
+  Env.update(dt); Loc.update();
   // rings
   const sel=state.selected; selRing.visible=!!sel && state.phase==='player';
   if(sel){ selRing.position.copy(hexToWorld(sel.q,sel.r,0.04)).lerp(new THREE.Vector3(sel.group.position.x,0.04,sel.group.position.z),1); selRing.material.opacity=0.6+Math.sin(elapsed*4)*0.3; }
