@@ -290,6 +290,43 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
+## Combat: damage model and railgun range (Jon, after v49)
+
+### Damage model: weapons and systems knocked out
+
+**Jon:** when ships take damage, some weapons may stop working properly, with a notification that they are offline or
+damaged.
+
+Proposed design:
+- **Trigger:** a hit that reaches the hull has a chance of a critical, higher for big hits and as hull falls. Rolled
+  with `gameRand` so battles stay seeded and replayable.
+- **Effects:** one system is *damaged* or *offline*:
+  - a weapon: damaged means less accuracy or damage; offline means it can't fire for 1–3 turns
+  - engines: less movement
+  - shield generator: slower recharge
+  - point defense: weaker interception
+- **Shown:** floating text ("Railgun offline"), a log line, the status on that weapon's button in the command bar, a
+  small icon on the ship's tag, and on enemy cards so the player sees what they knocked out.
+- **On the model:** sparks or smoke at the hit fitting. The weapon mounts (v42) already know where every weapon is.
+- **Repair:** the Repair tender's Resupply fixes damaged systems; ships also recover slowly on their own.
+- **Watch:** crippling damage amplifies snowballing (the winning side wins faster). Measure with `HB.sim`.
+
+### Railguns without a range limit
+
+**Jon:** raise railgun range; in space there shouldn't be a range limit (a slug never slows down).
+
+Proposed design, agreed in principle: what limits a railgun is **time of flight**, not distance. At long range the
+target has seconds to move, so only big or slow targets get hit.
+- **No range cap on railguns.** Line of sight still applies (asteroids block).
+- **Accuracy falls with distance, scaled by the target's evasion.** A Dreadnought or Carrier (evasion 2–4) is hit at
+  almost any range; a Patrol craft or Fast attack ship (32–34) is nearly untouchable far out and must be engaged close.
+  Today's falloff past `opt` per hex already does half of this; remove `range` for `kind:'rail'` and let falloff and
+  evasion do the rest.
+- **Gives light hulls a real job:** closing the distance on capital gunlines.
+- **Balance risk:** today Spinal reaches 12 and Light railgun 7. Unlimited range lets Gunline and the Dreadnought group
+  hit big targets from turn 1, and missiles lose their unique long reach. Run the preset round robin before shipping
+  and tune the falloff.
+
 ## Battle locations and the galactic map (Jon, after v45)
 
 More to come from Jon; capture additions here.
