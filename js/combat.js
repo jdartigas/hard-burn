@@ -124,7 +124,8 @@ function threatAt(s, cell){
 }
 function evalCell(s, cell, D){
   const from={q:cell.q, r:cell.r}; let off=0; const foes=alive(other(s.side));
-  for(const w of s.weapons){ if(!weaponReady(w)) continue; let best=0; for(const t of foes) best=Math.max(best, scoreAttack(s,w.def,t,from,D)); off+=best; }
+  let ready=0, idle=0;
+  for(const w of s.weapons){ if(!weaponReady(w)) continue; let best=0; for(const t of foes) best=Math.max(best, scoreAttack(s,w.def,t,from,D)); off+=best; ready++; if(best===0) idle++; }
   const late=Math.max(0.3, 1-state.turn/10);
   // the turn limit decides on fleet value: in the last three turns a side that is ahead protects its lead and a
   // side that is behind presses, instead of both playing as if the battle had no end
@@ -139,7 +140,10 @@ function evalCell(s, cell, D){
   // field and allies inside its uplink
   if(s.C.fieldRepair){ for(const o of alive(s.side)) if(o!==s && hdist(o,cell)<=2) score += (1-o.hull/o.hullMax)*14; }
   if(s.C.jam){ score += foes.filter(f=>hdist(f,cell)<=JAM.range).length*5 + alive(s.side).filter(o=>o!==s && hdist(o,cell)<=JAM.uplink).length*3; }
-  if(off===0) score -= near*1.8;
+  // closing pressure for every ready weapon that can't reach anything from here. It used to apply only when no weapon
+  // could fire, and railguns without a range limit always can: railgun ships then sat back and never brought their
+  // beams and torpedoes into range (v50). With nothing in reach this is the same as before.
+  if(ready) score -= near*1.8*idle/ready;
   score += (gameRand()-0.5)*D.noise;
   return score;
 }

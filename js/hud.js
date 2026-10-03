@@ -98,7 +98,7 @@ function recomputeHighlights(){
   if(s && state.phase==='player' && !state.busy){
     if(state.mode==='target'){ const col=new THREE.Color(s.ability.def.target==='enemy'?0x5a2a7a:0x3b8a30); for(const o of abilityTargets(s)) map.set(cellAt(o.q,o.r).idx,col); }
     else {
-      if(state.weaponSel!=='all'){ const w=s.weapons[state.weaponSel].def; for(const c of board.list){ const d=hdist(c,s); if(d>0 && d<=w.range && c.t!=='rock') map.set(c.idx,new THREE.Color(0x3a1410)); } }
+      if(state.weaponSel!=='all'){ const w=s.weapons[state.weaponSel].def; for(const c of board.list){ const d=hdist(c,s); if(d>0 && d<=(isFinite(w.range)? w.range : w.reach) && c.t!=='rock') map.set(c.idx,new THREE.Color(0x3a1410)); } }
       if(s.mp>0){ state.reach=reachable(s); for(const [,c] of state.reach){ if(c.cost===0||c.blocked) continue; const cell=cellAt(c.q,c.r); const k=c.cost/s.mp; map.set(cell.idx,new THREE.Color(0x13506e).multiplyScalar(1.15-k*0.45)); } }
     }
   }
@@ -189,7 +189,7 @@ function updateHUD(){
       <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>`;
     const wc=$('#sp-weapons'); wc.innerHTML='';
     s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
-      b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">Range ${d.range}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}</span>`;
+      b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">${isFinite(d.range)? 'Range '+d.range : 'Range '+d.reach+'+'}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}</span>`;
       b.onclick=()=>setWeapon(i); b.title=weaponBlurb(d); wc.appendChild(b); });
     const ab=document.createElement('button'); ab.className='wbtn'+(state.weaponSel==='all'?' on':''); ab.disabled=state.busy||state.phase!=='player'||!s.weapons.some(weaponReady);
     ab.innerHTML=`<span class="k">F</span><span class="wn">All weapons</span><span class="wd">Fire everything in reach</span><span class="ws">${s.weapons.filter(weaponReady).length} ready</span>`; ab.onclick=()=>setWeapon('all'); wc.appendChild(ab);

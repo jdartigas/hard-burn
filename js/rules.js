@@ -44,6 +44,7 @@ function hitCore(w, attSide, dist, tgt, tgtCell, los, adj=0){
   if(dist>w.range || dist<1) return 0;
   if(!w.guided && !los) return 0;
   let p = w.guided ? w.acc - tgt.ev*0.5 : w.acc - Math.max(0,dist-w.opt)*w.fall - tgt.ev;
+  if(w.reach && dist>w.reach) p -= (dist-w.reach)*tgt.ev*w.dodge;   // beyond a railgun's old range, the target has time to dodge
   const c=cellAt(tgtCell.q,tgtCell.r); if(c && c.t==='debris') p -= w.guided?5:15;
   if(tgt.fx.ecm) p -= w.guided?25:20;
   p += accMod(attSide) + adj;

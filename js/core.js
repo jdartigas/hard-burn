@@ -38,9 +38,12 @@ const WEAPONS = {
   pulseH: {name:'Pulse battery', kind:'pulse', range:4, opt:2, acc:82, fall:6, dmg:8,  shots:4, sh:1.6, hu:0.7, pierce:0,   reload:1},
   beam:   {name:'Beam laser',    kind:'beam',  range:5, opt:2, acc:95, fall:8, dmg:24, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
   beamH:  {name:'Heavy beam',    kind:'beam',  range:6, opt:3, acc:95, fall:7, dmg:34, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
-  railL:  {name:'Light railgun', kind:'rail',  range:7, opt:3, acc:86, fall:5, dmg:18, shots:1, sh:0.6, hu:1.1, pierce:0.6, reload:1},
-  rail:   {name:'Railgun',       kind:'rail',  range:9, opt:4, acc:88, fall:4, dmg:30, shots:1, sh:0.6, hu:1.1, pierce:0.7, reload:1},
-  spinal: {name:'Spinal railgun',kind:'rail',  range:12,opt:6, acc:85, fall:3, dmg:62, shots:1, sh:0.6, hu:1.1, pierce:0.8, reload:2},
+  // v50 (Jon): railguns have no range limit. A slug never slows; what limits it is time of flight, which lets a target
+  // dodge. Inside `reach` (the old range) accuracy is as it always was; past it, each extra hex also costs `fall` plus
+  // the target's evasion times `dodge`, so capitals are hit from anywhere and nimble hulls are nearly safe far out.
+  railL:  {name:'Light railgun', kind:'rail',  range:Infinity, reach:7, opt:3, acc:86, fall:5, dodge:0.12, dmg:18, shots:1, sh:0.6, hu:1.1, pierce:0.6, reload:1},
+  rail:   {name:'Railgun',       kind:'rail',  range:Infinity, reach:9, opt:4, acc:88, fall:4, dodge:0.12, dmg:30, shots:1, sh:0.6, hu:1.1, pierce:0.7, reload:1},
+  spinal: {name:'Spinal railgun',kind:'rail',  range:Infinity,reach:12,opt:6, acc:85, fall:3, dodge:0.12, dmg:62, shots:1, sh:0.6, hu:1.1, pierce:0.8, reload:2},
   missL:  {name:'Missile rack',  kind:'missile',range:8, acc:92, dmg:13, shots:2, sh:1, hu:1.0, pierce:0.3, reload:1, ammo:4, guided:true, pdcF:1.0},
   torp:   {name:'Torpedo',       kind:'missile',range:10,acc:90, dmg:44, shots:1, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},
   torpH:  {name:'Torpedo bay',   kind:'missile',range:10,acc:90, dmg:36, shots:2, sh:1, hu:1.15,pierce:0.5, reload:1, ammo:3, guided:true, pdcF:0.85, big:true},

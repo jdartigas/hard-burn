@@ -313,6 +313,20 @@ Proposed design:
 
 ### Railguns without a range limit
 
+**Done in v50.** What was measured (8-fleet round robin, 40 battles a pairing, same seeds; averages good to about ±3):
+
+| | Classic | Gunline | Swarm | Carrier | Wolfpack | Dreadnought | Raiders | Support | turns |
+|---|---|---|---|---|---|---|---|---|---|
+| v49 | 48 | 57 | 58 | 51 | 50 | 51 | 52 | 33 | 20.3 |
+| no cap, evasion falloff from `opt` | 50 | 42 | 52 | 56 | 59 | 45 | 66 | 29 | 21.3 |
+| + AI closing fix | 46 | 47 | 65 | 44 | 56 | 43 | 67 | 33 | 19.1 |
+| **shipped: old accuracy inside `reach`, dodge only past it** | 52 | 48 | 47 | 49 | 53 | 57 | 57 | 38 | 20.3 |
+
+Lessons: changing accuracy inside the old ranges reshuffled everything (the gunline collapsed against the small-hull
+fleets); keeping it and adding reach beyond is a clean extension. And the AI only closed when no weapon could reach
+anything: with unlimited railguns that never happened, so railgun ships sat back. Closing pressure is now per idle
+weapon (`evalCell`).
+
 **Jon:** raise railgun range; in space there shouldn't be a range limit (a slug never slows down).
 
 Proposed design, agreed in principle: what limits a railgun is **time of flight**, not distance. At long range the
