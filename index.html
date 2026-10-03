@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '50';
+const GAME_VERSION = '51';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -172,6 +172,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-ghost" id="btn-restart">Restart battle</button>
       <button class="btn-ghost" id="btn-tomenu">Main menu</button>
       <button class="btn-ghost btn-settings">Settings</button>
+      <button class="btn-ghost" id="btn-howp">How to play</button>
       <button class="btn-ghost" id="btn-surrender">Surrender</button>
     </div>
   </div>

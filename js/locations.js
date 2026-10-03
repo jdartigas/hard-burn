@@ -10,30 +10,31 @@
 // never looks more than about 16 degrees above the horizon, so a visible sun sits low (Jon: low and visible).
 const LOCATIONS = [
   { id:'reach', name:'The Shattered Reach', where:'in the Shattered Reach', sub:'Uncharted', info:'A broken dwarf planet bleeding debris into an asteroid belt, under a banded gas giant. Not on any chart.' },
-  { id:'earth', name:'Earth orbit', where:'in high Earth orbit', sub:'High orbit', info:'Geostationary height, 36,000 km up. Earth below, the Moon at its true size, the real stars.',
+  { id:'earth', name:'Earth orbit', where:'in high Earth orbit', sub:'High orbit', heroAz:305, info:'Geostationary height, 36,000 km up. Earth below, the Moon at its true size, the real stars.',
     // the Sun's ecliptic longitude sets the date: 190 degrees is early October. Earth and Moon are placed for that day.
     sunLon:190, sunAz:205, sunEl:8, sunDist:1400, sunDiam:0.53,
     earth:{ az:305, el:-17, dist:1200, diam:17.4, faceLon:-15 },   // geostationary: Earth spans 17.4 degrees
     moon:{ elong:95, lat:4, dist:1300, diam:0.52 } },   // a little past first quarter; the Moon's true size
   // Mars: on Phobos' own orbit (9,376 km from Mars' centre), 600 km behind Phobos. The only way to see Phobos as more
   // than a dot is to be near it, and from there Mars is genuinely huge, 42 degrees across.
-  { id:'mars', name:'Mars orbit', where:'off Phobos, in Mars orbit', sub:'Beside Phobos', info:'On Phobos\u2019 orbit, 600 km from it and 6,000 km above Mars. Mars fills the sky below; Deimos is a faint point. Real stars.',
+  { id:'mars', heroAz:20, name:'Mars orbit', where:'off Phobos, in Mars orbit', sub:'Beside Phobos', info:'On Phobos\u2019 orbit, 600 km from it and 6,000 km above Mars. Mars fills the sky below; Deimos is a faint point. Real stars.',
     sunDist:1400, sunDiam:0.35, sunEl:8, zodi:0.7,
     mars:{ az:20, el:-8,   /* high enough that from overhead only its lower limb shows: lower, it sat behind the far half of the board */ radiusKm:3389.5, distKm:9376, dist:1300, faceLon:-70, pole:[317.68,52.89] },   // Valles Marineris toward the board
     phobos:{ distKm:600, dist:1000, axesKm:[13.4,11.1,9.1], el:3 },
     deimos:{ el:-1, azOff:-150 } },
-  { id:'belt', name:'Asteroid belt', where:'in the asteroid belt', sub:'2.7 AU', info:'Between Mars and Jupiter, 2.7 times Earth\u2019s distance from the Sun. A small, distant Sun; Jupiter the brightest star; dark carbon-rich rocks drifting past.',
+  { id:'belt', heroAz:150, name:'Asteroid belt', where:'in the asteroid belt', sub:'2.7 AU', info:'Between Mars and Jupiter, 2.7 times Earth\u2019s distance from the Sun. A small, distant Sun; Jupiter the brightest star; dark carbon-rich rocks drifting past.',
     sunLon:240, sunAz:150, sunEl:8, sunDist:1400, sunDiam:0.20, zodi:0.45,
     planets:[ {name:'Jupiter', elong:140, lat:0.8, size:4.2, color:[1.0,0.92,0.80], gain:2.4}, {name:'Mars', elong:-70, lat:-1.2, size:2.2, color:[1.0,0.62,0.45], gain:0.7} ] },
-  // Jupiter: 800,000 km out, between Europa's and Ganymede's orbits, in Jupiter's equatorial plane, so the four large
-  // moons line up along its equator. Their orbital phases are chosen so all four are in view.
-  { id:'jupiter', name:'Jupiter orbit', where:'in Jupiter orbit', sub:'Among the moons', info:'800,000 km from Jupiter, between the orbits of Europa and Ganymede. Jupiter 10 degrees across; Io, Europa, Ganymede and Callisto strung along its equator.',
+  // Jupiter (v51, Jon: much closer): 230,000 km out, just beyond Thebe's orbit and inside Io's, in Jupiter's equatorial
+  // plane. Jupiter is 36 degrees across; the four large moons, all farther out than us, line up along its equator just
+  // beyond its limb. Their orbital phases are chosen so all four are in view.
+  { id:'jupiter', heroAz:250, name:'Jupiter orbit', where:'in Jupiter orbit', sub:'Inside Io\u2019s orbit', info:'230,000 km from Jupiter, inside the orbit of Io. Jupiter fills 36 degrees of sky; Io, Europa, Ganymede and Callisto strung along its equator.',
     sunDist:1400, sunDiam:0.10, sunEl:8, zodi:0.15,
-    jupiter:{ az:250, el:-14, radiusKm:71492, distKm:800000, dist:1200, faceLon:-50, pole:[268.057,64.495], sunAngle:110 },
-    moons:[ {name:'Io', map:'io', rKm:1821.6, orbitKm:421700, phase:60, tint:[1,1,1]},
-            {name:'Europa', map:'europa', rKm:1560.8, orbitKm:671100, phase:-35, tint:[1.0,0.93,0.82]},
+    jupiter:{ az:250, el:-8, radiusKm:71492, distKm:230000, dist:900, depthExp:0.2, faceLon:-50, pole:[268.057,64.495], sunAngle:110 },
+    moons:[ {name:'Io', map:'io', rKm:1821.6, orbitKm:421700, phase:130, tint:[1,1,1]},
+            {name:'Europa', map:'europa', rKm:1560.8, orbitKm:671100, phase:-125, tint:[1.0,0.93,0.82]},
             {name:'Ganymede', map:null, rKm:2634.1, orbitKm:1070400, phase:150, tint:[1,1,1]},
-            {name:'Callisto', map:'callisto', rKm:2410.3, orbitKm:1882700, phase:-160, tint:[0.78,0.70,0.60]} ] },
+            {name:'Callisto', map:'callisto', rKm:2410.3, orbitKm:1882700, phase:-150, tint:[0.78,0.70,0.60]} ] },
 ];
 const OBLIQUITY = 23.44*Math.PI/180;
 const dirAzEl=(az,el)=>{ const a=az*Math.PI/180, e=el*Math.PI/180; return new THREE.Vector3(Math.cos(e)*Math.cos(a), Math.sin(e), Math.cos(e)*Math.sin(a)); };
@@ -270,7 +271,7 @@ const Loc = (() => {
     // the moons, placed by their real orbits and the chosen phases; nearer than Jupiter means nearer in the scene too
     const e1=jupDir.clone().negate(), e2=new THREE.Vector3().crossVectors(poleSc, e1).normalize(), moons=[];
     for(const m of L.moons){ const ph=m.phase*Math.PI/180, rel=e1.clone().multiplyScalar(m.orbitKm*Math.cos(ph)-J.distKm).addScaledVector(e2, m.orbitKm*Math.sin(ph));
-      const dKm=rel.length(), dir=rel.normalize(), sd=J.dist*Math.pow(dKm/J.distKm,0.35), pos=dir.clone().multiplyScalar(sd);
+      const dKm=rel.length(), dir=rel.normalize(), sd=J.dist*Math.pow(dKm/J.distKm,J.depthExp||0.35), pos=dir.clone().multiplyScalar(sd);
       const tex= m.map? loadTex(`assets/sol/${m.map}.jpg`) : ganymedeTex();
       const body=sphereBody(root, bodyMaterial(tex, null, 0.004, m.tint), sd*m.rKm/dKm, pos, 48); orient(body, poleSc, jPos.clone().sub(pos), 0); moons.push(body); }
     return {root, sun:sunSc, env:envOf(sunSc, {pos:jPos, r:jR*1.4, color:[0.62,0.52,0.40]}), jupiter:jup, moons,
@@ -292,7 +293,15 @@ const Loc = (() => {
     fill.position.copy(Lt.fill.dir).multiplyScalar(100); fill.color.setHex(Lt.fill.color); fill.intensity=Lt.fill.intensity; amb.intensity=Lt.ambient;
     current.id=id;
   }
-  return { set, get id(){ return current.id; }, built,
+  // the menu camera's heading for the current location: the hero body on the right of the screen, clear of the menu
+  // panel, with a slow sway. null means circle freely (the Reach).
+  function menuTheta(){
+    const L=LOCATIONS.find(l=>l.id===current.id); if(!L || L.heroAz==null) return null;
+    const a=L.heroAz*Math.PI/180, base=Math.atan2(-Math.cos(a), -Math.sin(a)), hx=Math.cos(a), hz=Math.sin(a);
+    const side=[0.26,-0.26].find(d=>{ const t=base+d; return hx*Math.cos(t)-hz*Math.sin(t)>0; }) ?? 0.26;   // the side that puts it screen-right
+    return base+side+Math.sin(performance.now()/1000*0.06)*0.1;
+  }
+  return { set, menuTheta, get id(){ return current.id; }, built,
     update(){ for(const k of Object.keys(built)) if(built[k].root.visible){ const st=built[k].root.children[0]; if(st && st.material.uniforms) st.material.uniforms.uPR.value=renderer.getPixelRatio(); } } };
 })();
 Loc.set('reach');

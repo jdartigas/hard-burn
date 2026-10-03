@@ -372,6 +372,10 @@ Learned building it:
   its equator at true sizes (Io 0.30, Europa 0.39, Ganymede 0.17, Callisto 0.10 degrees).
 - Zodiacal light on every real location, fading with distance from the sun.
 
+**v51 (Jon):** Jupiter moved in to 230,000 km (inside Io's orbit): 36 degrees across, the moons just beyond its limb.
+The intro screen frames each location's planet beside the menu (`heroAz`, `Loc.menuTheta`), swaying gently; the
+Shattered Reach keeps its slow circle.
+
 **Next:** the 21 nearby star systems, which need the sky recomputed from each star's position. The Shattered Reach keeps
 its old high sun for now; move it low too if Jon wants the sun visible there as well.
 

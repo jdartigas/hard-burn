@@ -12,7 +12,9 @@ function camFocus(p, amount=1){ cam.goal.lerp(new THREE.Vector3(p.x,0,p.z), amou
 // is zoomed in following a ship, it follows the new one instead of staying on the old.
 function focusShip(s){ if(cam.menu) return; if(cam.follow) cam.follow=s; else camFocus(s.group.position, 1); }
 function updateCamera(dt){
-  if(cam.menu){ cam.theta+=dt*0.05; cam.goal.set(0,0,0); cam.rGoal=46; cam.phi=lerp(cam.phi,1.12,dt); }
+  if(cam.menu){ const hero=Loc.menuTheta(); cam.goal.set(0,0,0); cam.rGoal=46; cam.phi=lerp(cam.phi,1.12,dt);
+    // a location with a planet frames it beside the menu, swaying gently; the Shattered Reach keeps its slow circle
+    if(hero===null) cam.theta+=dt*0.05; else cam.theta+=shortestAngle(cam.theta, hero)*Math.min(1,dt*1.2); }
   // drag-rotation eases toward where the pointer put it, like pan and zoom, instead of stepping per pointer event
   if(cam.thGoal!=null && !cam.menu){ const k=1-Math.pow(0.0002,dt); cam.theta+=(cam.thGoal-cam.theta)*k; cam.phi+=(cam.phGoal-cam.phi)*k;
     if(!drag && Math.abs(cam.thGoal-cam.theta)<1e-4 && Math.abs(cam.phGoal-cam.phi)<1e-4) cam.thGoal=cam.phGoal=null; }

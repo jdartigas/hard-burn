@@ -140,6 +140,7 @@ $('#bl-done').onclick=()=>{ if(!validCustom(draft)) return; Sound.ui();
 renderPicks();
 $('#btn-how').onclick=()=>{ Sound.init(); Sound.ui(); showScreen('help'); };
 $('#btn-help').onclick=()=>{ Sound.ui(); showScreen('help'); };
+$('#btn-howp').onclick=()=>{ Sound.ui(); showScreen('help'); };
 $('#btn-pause').onclick=()=>{ Sound.ui(); openPause(); };
 // HUD drawers: fleet lists and the log fold away; the choice is remembered (hardburn.hud)
 const hudPrefs=Object.assign({roster:true, enemies:true, log:false}, store.get('hud',{}));
