@@ -310,7 +310,18 @@ Learned building it:
 - A sun disc much brighter than about 4x blooms into a soft square. Brightness comes from the glare sprite.
 - Seen elsewhere, not fixed: a ship's engine glow can bloom into a soft square very close to the camera.
 
-**Phase 2, next:** Mars orbit (Phobos, Deimos), the asteroid belt, Jupiter (Galilean moons). The Shattered Reach keeps
+**Phase 2 done in v49:**
+- **Mars orbit:** on Phobos' orbit, 600 km behind it. Mars 42 degrees across (true from there), Phobos 2.6 degrees with
+  its real 27 x 22 x 18 km proportions and Viking map, long axis toward Mars, Deimos a point. Mars first sat 26 degrees
+  below the horizon, behind the far half of the board, where red ships vanished against it; at 8 below only its lower
+  limb shows from overhead and it fills the horizon when tilted.
+- **Asteroid belt:** 2.7 AU, sun 0.2 degrees, Jupiter and Mars as points, a sparse field of dark rocks, zodiacal light.
+  Nothing out there reflects much light: the fill is a faint cool skylight, a readability concession.
+- **Jupiter orbit:** 800,000 km out, in Jupiter's equatorial plane, Jupiter 10 degrees, the four Galilean moons along
+  its equator at true sizes (Io 0.30, Europa 0.39, Ganymede 0.17, Callisto 0.10 degrees).
+- Zodiacal light on every real location, fading with distance from the sun.
+
+**Next:** the 21 nearby star systems, which need the sky recomputed from each star's position. The Shattered Reach keeps
 its old high sun for now; move it low too if Jon wants the sun visible there as well.
 
 The player picks where a battle is fought, or Random. The board and rules stay the same; the scenery around it
