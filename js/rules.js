@@ -14,11 +14,12 @@ function createShip(cls, side, q, r, copy=0){
   const hullMax=Math.round(C.hull*(side==='enemy'?d.hull:1));
   const m=buildShip(cls, side, copy);
   const s={ id:shipId++, side, cls, C, name:NAMES[side][cls]+(copy?' '+ROMAN[copy]:''), copy, hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
-    mp:C.mp, mpMax:C.mp, ev:C.ev, pdc:C.pdc, q, r, alive:true, len:C.len*SHIP_SCALE, baseY:C.y, phase:Math.random()*6,
+    mp:C.mp, mpMax:C.mp, ev:C.ev, pdc:C.pdc, q, r, alive:true, len:C.m/M_PER_UNIT*SHIP_SCALE, baseY:C.y, phase:Math.random()*6,
     weapons:C.weapons.map(k=>({key:k, def:WEAPONS[k], wait:0, ammo:WEAPONS[k].ammo, firedTurn:-1})),
     ability:{key:C.ability, def:ABIL[C.ability], wait:0}, fx:{}, moved:false,
     ...m };
-  s.group.scale.setScalar(SHIP_SCALE);
+  s.group.scale.setScalar(SHIP_SCALE*(C.m/M_PER_UNIT)/s.modelLen);   // the built model, scaled to the class's length in metres
+  s.pickMesh.scale.setScalar(Math.max(1, 0.9/(C.len*0.5*s.group.scale.x)));   // small hulls keep a finger-sized target
   s.group.position.copy(hexToWorld(q,r,s.baseY));
   s.group.rotation.y = side==='player'? Math.PI/2 : -Math.PI/2;
   s.pickMesh.userData.ship=s;

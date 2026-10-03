@@ -572,7 +572,12 @@ function buildShip(cls, side, copy=0){
   const pickMesh=new THREE.Mesh(new THREE.SphereGeometry(L*0.5,8,6), new THREE.MeshBasicMaterial()); pickMesh.visible=false; g.add(pickMesh);
   enableShadows(g);
   mergeShipParts({group:g, body, engines, lights, shieldMesh:shield, pickMesh, fineMesh});
-  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts, turrets, turretRig:rig,
+  // the model's own length, bow tip to nozzle: opaque hull only, no plumes, glows or shield (v47 sizes ships from it)
+  const box=new THREE.Box3(), part=new THREE.Box3(); g.updateMatrixWorld(true); const inv=new THREE.Matrix4().copy(g.matrixWorld).invert();
+  body.traverse(o=>{ const m=o.material; if(!o.isMesh || !o.visible || !m || Array.isArray(m) || m.transparent || m.isShaderMaterial) return;
+    if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); part.copy(o.isInstancedMesh? (o.computeBoundingBox(), o.boundingBox) : o.geometry.boundingBox).applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); box.union(part); });
+  const modelLen=box.max.z-box.min.z;
+  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts, turrets, turretRig:rig, modelLen,
     turretGoal:new Float32Array(turrets.length), turretHold:new Float32Array(turrets.length)};
 }
 
