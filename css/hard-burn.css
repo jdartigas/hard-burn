@@ -448,3 +448,11 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 #title{font-size:clamp(40px,min(8.4vw,10vh),100px);line-height:1}
 @media (max-height:900px) and (min-width:761px){ #title{font-size:clamp(32px,min(7vw,7.6vh),76px)} }
 @media (max-width:760px){ #title{font-size:clamp(34px,13vw,64px)} }
+
+/* ---- v71 (Jon): the logo (assets/logo.webp, cut from reference/logo.png with its dark sky keyed out) replaces the text
+   title on the intro. Sized by height on shorter screens so the intro still never scrolls on iPad landscape. ---- */
+#title{font-size:0;line-height:0;filter:none;background:none;margin:0 0 6px}
+#title img{display:block;width:min(100%,600px);height:auto;margin-left:-3%}
+@media (max-height:900px) and (min-width:761px){ #title img{width:auto;height:clamp(130px,25vh,230px);max-width:100%} }
+@media (max-height:820px) and (min-width:761px){ #menu p.lede{display:none} }   /* the logo says it; the screen must not scroll */
+@media (max-width:760px){ #title img{width:100%;margin-left:0} }

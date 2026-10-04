@@ -6,11 +6,11 @@
 <title>Laniakea's Edge — fleet engagement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '70';
+const GAME_VERSION = '71';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -62,8 +62,8 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="menu" class="screen on">
   <div class="inner">
+    <h1 id="title"><img src="assets/logo.webp" alt="Laniakea's Edge" width="1000" height="568"></h1>
     <div class="eyebrow">Turn-based fleet combat</div>
-    <h1 id="title">Laniakea's<span>Edge</span></h1>
     <p class="lede">Close the distance, strip their shields and break their line before they break yours.</p>
     <button class="btn-quick" id="btn-quick"><span><b>Quick battle</b><small id="quick-sub"></small></span><i aria-hidden="true">›</i></button>
     <div class="setup">
