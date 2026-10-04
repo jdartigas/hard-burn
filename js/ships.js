@@ -397,38 +397,48 @@ function buildShip(cls, side, copy=0){
     for(let i=0;i<n;i++){ const p=A.clone().lerp(B,i/n), q=C.clone().lerp(D,(i+1)/n), p2=A.clone().lerp(B,(i+1)/n); rod(p,q,r,mat); rod(q,p2,r,mat); } }
 
   if(cls==='patrol'){
-    const SM=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x8c9095:0xa9adb2, metalness:0.55, roughness:0.42});
-    const SM2=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x5a5e63:0x7c8186, metalness:0.7, roughness:0.38});
-    // angular stealth hunter: stacked knife-edged plates, twin ventral drive pods
-    const spine=plate(-0.82,0.92,.32,.18,.03,.04,{ch:.46,mat:SM,greeble:false}); 
-    plate(-0.7,0.6,.14,.12,.03,.03,{y:.12,ch:.46,mat:SM2,greeble:false});
-    [-1,1].forEach(s=>{
-      const w=plate(-0.78,0.38,.26,.13,.1,.08,{x:s*.25,y:.02,ch:.4,mat:SM,greeble:false}); w.rotation.z=-s*0.32;
-      const c=plate(-0.2,0.62,.14,.1,.04,.05,{x:s*.14,y:.07,ch:.45,mat:SM2,greeble:false}); c.rotation.z=-s*0.5;
-      plate(-0.82,0.05,.17,.17,.14,.14,{x:s*.19,y:-.14,ch:.3,mat:M.dark});
-      for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.CylinderGeometry(.035,.04,.05,16),M.metal); add(b,s*.19,-.24,-0.6+i*.17); }
-      drum(.08,.1,-0.82,s*.19,-.14);
-      const fin=plate(-0.78,-0.4,.012,.18,.012,.06,{x:s*.36,y:.1,ch:.2,mat:SM2,greeble:false}); fin.rotation.z=s*0.4;
-    });
-    stripes(-0.5,0.4,.095,.05,.012); pdc(0,.17,-.2,1); pdc(0,-.1,.35,-1);
-    pulseTurret(0,0,.14,.4,1,.8);
-    [-1,1].forEach(s=>{ plate(-0.12,0.3,.07,.05,.07,.05,{x:s*.33,y:-.04,mat:M.dark,ch:.3,greeble:false}); tubeMouth(1,s*.33,-.04,.302,.016); });   // missile pods under the wings
-    windows(0,.11,.55,.14,3); number(idn,.0,.187,-.35,.06,'top');
-    light(.44,.12,-.75,nav); light(-.44,.12,-.75,nav);
+    // v55, from reference/patrol-craft.png: a low faceted stealth wedge on three drives (boxed outboard, round in the
+    // middle), swept flanks aft carrying a PDC each above and a missile pod each below, tail fins, a twin pulse turret
+    // on the dorsal spine
+    drive(.1,.2,-0.68,0,-.01,{bands:[[0.3,0.6,PL]]});
+    [-1,1].forEach(sd=>{ const x=sd*.22;
+      plate(-0.9,-0.66,.2,.18,.2,.18,{x,y:-.01,mat:H2,ch:.25}); band({z0:-0.9,z1:-0.66,w0:.2,h0:.18,w1:.2,h1:.18,x,y:-.01,ch:.25},-0.8,-0.72);
+      const sq=new THREE.Mesh(new THREE.PlaneGeometry(.12,.1),M.glow); sq.rotation.y=Math.PI; add(sq,x,-.01,-0.902); engines.push(makePlume(.06,x,-.01,-0.91)); });
+    plate(-0.7,-0.45,.64,.2,.68,.22,{mat:H2,ch:.3});                                        // engine block
+    const aft=sec(-0.48,0.0,.74,.24,.8,.24,{ch:.42}), bow=sec(0.0,0.92,.8,.24,.04,.04,{ch:.45});
+    [-1,1].forEach(sd=>{ const x=sd*.36;
+      plate(-0.66,-0.08,.14,.1,.08,.08,{x,y:-.04,mat:HULL,ch:.35});                         // swept flank
+      band({z0:-0.66,z1:-0.08,w0:.14,h0:.1,w1:.08,h1:.08,x,y:-.04,ch:.35},-0.5,-0.4);
+      const fin=plate(-0.8,-0.55,.02,.2,.02,.08,{x:sd*.3,y:.13,mat:H2,ch:.15,greeble:false}); fin.rotation.z=-sd*0.25;   // tail fins
+      deck(-0.76,-0.68,.024,.12,.024,.1,{x:sd*.3,y:.13,mat:PL,ch:.1,greeble:false}).rotation.z=-sd*0.25;
+      plate(-0.42,-0.12,.06,.06,.06,.06,{x:sd*.3,y:-.16,mat:M.dark,ch:.3,greeble:false}); tubeMouth(1,sd*.3,-.16,-0.118,.02);   // missile pods under the flanks
+      pdc(x,.06,-0.52,1); });                                                              // PDCs port and starboard
+    band(aft,-0.3,-0.2); band(bow,0.22,0.3); band(bow,0.34,0.37,ST); band(bow,0.56,0.62);
+    plate(-0.4,0.5,.24,.07,.08,.04,{y:.14,mat:H2,ch:.42});                                 // dorsal spine
+    const slope=Math.atan2(.1,.92);   // white stripes flush on the bow's top face
+    [-.03,.03].forEach(x=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(.03,.006,.4),ST); m.rotation.x=slope; add(m,x,.051,.68); });
+    pulseTurret(0,0,.175,.15,1,.85);
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(.035,16,10),M.dark); add(dome,0,.19,-0.25); light(0,.225,-0.25,0x7fffcf);
+    [-.02,.02].forEach(x=>rod(new THREE.Vector3(x,.17,-0.15),new THREE.Vector3(x,.3,-0.15),.004,M.metal));
+    [-.035,.035].forEach(x=>{ const h=new THREE.Mesh(new THREE.BoxGeometry(.025,.012,.01),M.window); add(h,x,-.01,0.905); });   // bow lamps
+    number(idn,.33,.0,0.2,.05,'r'); number(idn,-.33,.0,0.2,.05,'l');
+    light(.43,-.04,-0.6,nav); light(-.43,-.04,-0.6,nav); light(.3,.25,-0.76,0xff3020); light(-.3,.25,-0.76,0xff3020);
   } else if(cls==='corvette'){
-    drum(.2,.3,-0.86);
-    struts(-0.86,-0.68,.17,.2);
-    plate(-0.68,-0.2,.44,.42,.44,.42,{mat:H2}); sidePlates(-0.62,-0.28,.44,.3); turretBlock(-0.44,.21,.16);
-    collar(-0.2,-0.14,.34,.32);
-    plate(-0.14,0.52,.48,.38,.54,.38); sidePlates(-0.05,0.45,.5,.2,-.04);
-    plate(0.52,1.12,.54,.38,.1,.08,{ch:.34,y:-.02}); 
-    [-1,1].forEach(s=>{ const p=plate(0.5,1.0,.03,.26,.02,.1,{x:s*.22,y:-.05,mat:PL,ch:.1,greeble:false}); p.rotation.y=s*0.36; });
-    topPlate(0.0,0.5,.3,.3,.19,H2); stripes(0.55,0.95,.12,.09); chevron(0.9,.08,.14);
-    barrels([-.05,.05],-.14,0.7,1.34,.012); mount(0,-.05,-.14,1.35); mount(0,.05,-.14,1.35);   // twin light railguns under the bow
-    cells(1,0,.206,.4,2,2);
-    pdc(.27,.1,.2,1,'x'); pdc(-.27,.1,.2,-1,'x'); pdc(0,-.2,.3,-1); pdc(.25,-.1,-.45,1,'x'); pdc(-.25,-.1,-.45,-1,'x');
-    windows(0,.14,.8,.2,4); number(idn,0,.2,.2,.08,'top'); number(idn,.276,-.02,-.02,.07,'r'); number(idn,-.276,-.02,-.02,.07,'l');
-    light(.24,0,-.5,nav); light(-.24,0,-.5,nav); rcs(.25,.2,.5); rcs(-.25,.2,.5);
+    // v55, from reference/corvette.png: three drives (two above, one below), a banded engineering block, a pinched
+    // waist of pipework, a missile block on the dorsal deck, a canopy bridge and a rounded bow with twin light
+    // railguns under it
+    drive(.13,.4,-0.75,.15,.08,{bands:[[0.3,0.6,PL],[0.63,0.69,ST]]}); drive(.13,.4,-0.75,-.15,.08,{bands:[[0.3,0.6,PL],[0.63,0.69,ST]]}); drive(.13,.4,-0.75,0,-.14,{bands:[[0.3,0.6,PL],[0.63,0.69,ST]]});
+    const eng=sec(-0.77,-0.42,.56,.44,.56,.44,{mat:H2,ch:.22}); band(eng,-0.7,-0.6); band(eng,-0.6,-0.56,ST);
+    collar(-0.43,-0.39,.42,.36); truss(-0.4,-0.14,.36,.3); tank(0,.02,-0.27,.05,.14,H2);
+    const mid=sec(-0.16,0.45,.6,.42,.58,.4,{ch:.24}), fore=sec(0.45,1.15,.58,.4,.12,.1,{ch:.36});
+    band(mid,-0.1,0.02); band(mid,0.02,0.06,ST); band(mid,0.3,0.4); band(fore,0.6,0.64,ST); band(fore,0.64,0.74); band(fore,0.9,0.96,ST);
+    plate(-0.1,0.3,.3,.06,.28,.06,{y:.22,mat:H2,ch:.3}); cells(1,0,.25,.1,2,2,.055);         // missile block
+    plate(0.4,0.72,.24,.08,.16,.06,{y:.21,ch:.35}); windows(0,.25,.62,.12,3);               // canopy bridge
+    [-.03,.03].forEach(x=>rod(new THREE.Vector3(x,.25,.48),new THREE.Vector3(x,.4,.48),.005,M.metal));
+    [-.07,.07].forEach(x=>{ tube(.015,0.72,1.02,x,-.13,M.metal,10); tube(.026,0.68,0.8,x,-.13,M.dark,10); tube(.02,1.0,1.03,x,-.13,M.dark,10); mount(0,x,-.13,1.04); });   // light railguns under the bow
+    pdc(.17,.22,-0.6,1); pdc(-.17,.22,-0.6,1); pdc(.3,.05,0.2,1,'x'); pdc(-.3,.05,0.2,-1,'x'); pdc(.15,-.21,-0.3,-1); pdc(-.15,-.21,-0.3,-1);   // 2 dorsal, 2 flank, 2 ventral
+    number(idn,.302,.0,0.0,.06,'r'); number(idn,-.302,.0,0.0,.06,'l'); number(idn,0,.21,-0.6,.06,'top');
+    light(.29,.1,-0.5,nav); light(-.29,.1,-0.5,nav); light(0,0,1.16,0xffffff); rcs(.24,.12,.6); rcs(-.24,.12,.6);
   } else if(cls==='frigate'){
     // v54, from reference/frigate.png: one big banded drive, an open truss, then a hull tapering to a needle bow with
     // twin beam projectors under it and a 2x2 block of missile cells on the dorsal deck
