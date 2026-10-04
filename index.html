@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '58';
+const GAME_VERSION = '59';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -91,8 +91,9 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <h2>Settings</h2>
     <div class="set-row"><label for="vol-music">Music</label><input type="range" id="vol-music" min="0" max="100" step="1"><output id="vol-music-v"></output></div>
     <div class="set-row"><label for="vol-fx">Effects</label><input type="range" id="vol-fx" min="0" max="100" step="1"><output id="vol-fx-v"></output></div>
+    <div class="set-row"><label for="bright">Brightness</label><input type="range" id="bright" min="50" max="200" step="5"><output id="bright-v"></output></div>
     <div class="set-row"><span>Graphics</span><button class="btn-ghost btn-gfx" title="Graphics quality (G)">Graphics: High</button></div>
-    <p class="rec-note">Music and Effects in the top bar mute them during a battle; these set how loud they are.</p>
+    <p class="rec-note">Music and Effects in the top bar mute them during a battle; these set how loud they are. Brightness lightens or darkens the whole scene, for screens that run dark or for playing outdoors.</p>
     <div class="cta"><button class="btn-primary" data-close>Done</button></div>
   </div>
 </div>

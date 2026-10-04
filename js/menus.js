@@ -184,11 +184,13 @@ function toggleMusic(){ Sound.init(); const on=Sound.toggleMusic(); $('#btn-musi
 // settings sheet (v44): music and effects volume, graphics. Opened from the menu or from pause, and returns there.
 let settingsFrom='menu';
 function syncVol(){ for(const [id,v] of [['music',Sound.musicLevel],['fx',Sound.fxLevel]]){ $('#vol-'+id).value=Math.round(v*100); $('#vol-'+id+'-v').textContent=Math.round(v*100)+'%';
-  $('#vol-'+id).style.setProperty('--fill', Math.round(v*100)+'%'); } }
+  $('#vol-'+id).style.setProperty('--fill', Math.round(v*100)+'%'); }
+  const b=Math.round(brightness*100); $('#bright').value=b; $('#bright-v').textContent=b+'%'; $('#bright').style.setProperty('--fill', ((b-50)/150*100)+'%'); }
 document.querySelectorAll('.btn-settings').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); settingsFrom= $('#pause').classList.contains('on')? 'pause' : 'menu'; syncVol(); showScreen('settings'); });
 $('#vol-music').oninput=e=>{ Sound.init(); Sound.setMusicLevel(e.target.value/100); syncVol(); };
 $('#vol-fx').oninput=e=>{ Sound.init(); Sound.setFxLevel(e.target.value/100); syncVol(); };
 $('#vol-fx').onchange=()=>Sound.ui();   // a sample at the new level
+$('#bright').oninput=e=>{ setBrightness(e.target.value/100); syncVol(); };
 $('#settings [data-close]').onclick=()=>{ Sound.ui(); if(settingsFrom==='pause') showScreen('pause'); else closeScreen(); };
 $('#btn-sound').onclick=toggleSound; $('#btn-sound').textContent= Sound.on?'Effects on':'Effects off';
 $('#btn-music').onclick=toggleMusic; $('#btn-music').textContent= Sound.musicOn?'Music on':'Music off';

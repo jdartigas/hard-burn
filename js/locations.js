@@ -74,13 +74,21 @@ function starColor(bv){
 function buildRealSky(R, root, sunSc, zodi=1){
   const D=STAR_DATA.d, n=STAR_DATA.n, pos=new Float32Array(n*3), col=new Float32Array(n*3), size=new Float32Array(n), v=new THREE.Vector3();
   for(let i=0;i<n;i++){ const k=i*5; v.set(D[k],D[k+1],D[k+2]).normalize().applyMatrix3(R).multiplyScalar(1500); pos.set([v.x,v.y,v.z],i*3);
-    const m=D[k+3], b=Math.min(Math.pow(10,-0.4*m*0.55)*1.6, 2.6), c=starColor(D[k+4]);   // a softened magnitude scale: what the eye reads, not raw flux
-    col.set([c.r*b, c.g*b, c.b*b], i*3); size[i]=clamp(5.2-0.6*m,1.6,7.0); }
+    const m=D[k+3], b=Math.min(Math.pow(10,-0.4*m*0.55)*1.6, 2.6)*LOOK.starGain, c=starColor(D[k+4]);   // a softened magnitude scale: what the eye reads, not raw flux
+    col.set([c.r*b, c.g*b, c.b*b], i*3); size[i]=clamp(5.2-0.6*m,1.6,7.0)*LOOK.starSize; }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3)); g.setAttribute('size',new THREE.BufferAttribute(size,1));
   const mat=new THREE.ShaderMaterial({ depthWrite:false, transparent:true, blending:THREE.AdditiveBlending, uniforms:{uPR:{value:1}},
     vertexShader:`attribute float size; attribute vec3 color; varying vec3 vC; uniform float uPR; void main(){ vC=color; gl_PointSize=size*uPR; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader:`varying vec3 vC; void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c)*2.0; float a=exp(-d*d*3.0); if(a<0.01) discard; gl_FragColor=vec4(vC*a,1.0); }` });
   const stars=new THREE.Points(g, mat); stars.frustumCulled=false; stars.userData.noAO=true; root.add(stars);
+  // v59: faint filler stars below the catalogue's naked-eye limit, crowding toward the Milky Way so the sky isn't bare
+  { const toGalF=new THREE.Matrix3().multiplyMatrices(EQ_TO_GAL, new THREE.Matrix3().copy(R).transpose()), FR=mulberry32(4242), nf=LOOK.faintStars;
+    const fp=new Float32Array(nf*3), fc=new Float32Array(nf*3), fs=new Float32Array(nf).fill(1.5*LOOK.starSize), gv=new THREE.Vector3();
+    for(let i=0;i<nf;i++){ do { v.set(FR()*2-1,FR()*2-1,FR()*2-1); } while(v.lengthSq()>1 || v.lengthSq()<1e-4);
+      v.normalize(); gv.copy(v).applyMatrix3(toGalF); if(FR()>0.35+0.65*Math.exp(-gv.z*gv.z/0.04)){ i--; continue; }
+      fp.set([v.x*1500,v.y*1500,v.z*1500],i*3); const b=(0.05+0.17*Math.pow(FR(),2))*LOOK.starGain, t=FR(); fc.set(t<0.2?[b,b*0.9,b*0.78]:t<0.35?[b*0.8,b*0.88,b]:[b,b,b], i*3); }
+    const fg=new THREE.BufferGeometry(); fg.setAttribute('position',new THREE.BufferAttribute(fp,3)); fg.setAttribute('color',new THREE.BufferAttribute(fc,3)); fg.setAttribute('size',new THREE.BufferAttribute(fs,1));
+    const faint=new THREE.Points(fg, mat); faint.frustumCulled=false; faint.userData.noAO=true; root.add(faint); }
   // the Milky Way: a glow along the galactic plane with the bulge toward Sagittarius and the dark rift through it
   const rt=new THREE.Matrix3().copy(R).transpose(), toGal=new THREE.Matrix3().multiplyMatrices(EQ_TO_GAL, rt);
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1800,48,24), new THREE.ShaderMaterial({ side:THREE.BackSide, depthWrite:false, uniforms:{uGal:{value:toGal}, uGain:{value:1}, uSun:{value:sunSc.clone()}, uEcl:{value:eclToEq(0,90).applyMatrix3(R).normalize()}, uZodi:{value:zodi}},
@@ -99,7 +107,7 @@ function buildRealSky(R, root, sunSc, zodi=1){
         float clump=fbm(g*7.0)*0.9+fbm(g*19.0)*0.35;
         float rift=1.0-0.75*exp(-pow((b-0.012)/0.03,2.0))*smoothstep(-0.2,0.6,cl)*smoothstep(0.35,0.7,fbm(g*11.0+3.0));
         float glow=(band*clump+bulge*clump)*rift;
-        vec3 col=vec3(0.0016,0.0022,0.0040) + vec3(0.050,0.046,0.040)*glow;
+        vec3 col=vec3(0.0016,0.0022,0.0040) + vec3(0.050,0.046,0.040)*glow*${LOOK.mwGain.toFixed(2)};
         // zodiacal light: sunlight on interplanetary dust, a glow along the ecliptic that brightens toward the sun
         vec3 d=normalize(vDir); float eb=dot(d,uEcl), es=max(dot(d,uSun),-1.0);
         col+=vec3(0.040,0.036,0.028)*uZodi*exp(-eb*eb/0.018)*(exp((es-1.0)*2.2)+0.12);
@@ -290,7 +298,7 @@ const Loc = (() => {
     setSunDir(id==='reach'? reachSun : built[id].sun);
     scene.environment = id==='reach'? reachEnv : built[id].env;
     const Lt= id==='reach'? reachLight : built[id].light;   // the second light: the Reach's blue fill, or earthshine
-    fill.position.copy(Lt.fill.dir).multiplyScalar(100); fill.color.setHex(Lt.fill.color); fill.intensity=Lt.fill.intensity; amb.intensity=Lt.ambient;
+    fill.position.copy(Lt.fill.dir).multiplyScalar(100); fill.color.setHex(Lt.fill.color); fill.intensity=Lt.fill.intensity*LOOK.fillGain; amb.intensity=Lt.ambient*LOOK.ambientGain;
     current.id=id;
   }
   // the menu camera's heading for the current location: the hero body on the right of the screen, clear of the menu

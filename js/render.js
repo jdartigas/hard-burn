@@ -8,7 +8,14 @@ const canvas = $('#view');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:false, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
 renderer.setSize(innerWidth, innerHeight, false);
-renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.3;
+// v59 (Jon): the scene read too dark. Every brightness lever lives here: star brightness and size, the faint filler
+// stars and the Milky Way on the real-sky locations, the second (fill) light and ambient on every location, and a rim
+// light opposite the sun that outlines hulls against space. EXPOSURE is the base the Brightness setting scales.
+const LOOK = { starGain:2.6, starSize:1.25, faintStars:9000, mwGain:2.2, fillGain:1.6, ambientGain:1.35, rimColor:0xb6c9e2, rim:2.0 };
+const EXPOSURE = 1.4;   // was 1.3 before v59
+let brightness = clamp(+store.get('bright', 1) || 1, 0.5, 2);   // Settings, 50% to 200%
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = EXPOSURE*brightness;
+function setBrightness(v){ brightness=clamp(v,0.5,2); store.set('bright',brightness); renderer.toneMappingExposure=EXPOSURE*brightness; }
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
 const scene = new THREE.Scene();
@@ -49,6 +56,10 @@ const sunDir = new THREE.Vector3(-0.62, 0.55, -0.56).normalize();
 const sun = new THREE.DirectionalLight(0xfff0dc, 6.5); sun.position.copy(sunDir).multiplyScalar(100); scene.add(sun); scene.add(sun.target);
 sun.castShadow = true; sun.shadow.mapSize.set(4096,4096); sun.shadow.bias = -0.0004;
 const fill = new THREE.DirectionalLight(0x4a6aa8, 0.8); fill.position.set(60,-20,80); scene.add(fill);
+// rim light: from the side away from the sun and a little above, so a hull's shadowed side keeps a lit edge
+const rimLight = new THREE.DirectionalLight(LOOK.rimColor, LOOK.rim); scene.add(rimLight);
+const placeRim = () => rimLight.position.set(-sunDir.x, Math.abs(sunDir.y)*0.5+0.35, -sunDir.z).normalize().multiplyScalar(100);
+placeRim();
 // shadow frustum follows the camera and tightens as you zoom in, snapped to texels so edges don't crawl
 const SH_X = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), sunDir).normalize(), SH_Y = new THREE.Vector3().crossVectors(sunDir, SH_X), SH_C = new THREE.Vector3();
 function updateShadowFrustum(){
@@ -102,6 +113,7 @@ function setSunDir(v){
   sunDir.copy(v).normalize(); sun.position.copy(sunDir).multiplyScalar(100);
   SH_X.crossVectors(new THREE.Vector3(0,1,0), sunDir).normalize(); SH_Y.crossVectors(sunDir, SH_X);
   sun.shadow.camera.right=-1;   // forces updateShadowFrustum to rebuild the shadow camera
+  placeRim();
 }
 // prefiltered environment map of a scene of sky objects, so metal reflects the place the battle is in
 function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); const t=pmrem.fromScene(es, 0.02, 1, 3000).texture; pmrem.dispose(); return t; }
@@ -139,11 +151,11 @@ function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); co
       do { v.set(SR()*2-1,SR()*2-1,SR()*2-1); } while(v.lengthSq()>1 || v.lengthSq()<1e-4 || SR()>1-bandBias+bandBias*band(v.normalize()));
       v.normalize().multiplyScalar(1500); pos.set([v.x,v.y,v.z],i*3);
       const b=bright[0]+(bright[1]-bright[0])*Math.pow(SR(),2.2), r=SR(), t=TINTS[r<0.62?0:r<0.8?1:2];
-      col.set([b*t[0],b*t[1],b*t[2]].map(toLinear), i*3); }
+      col.set([b*t[0],b*t[1],b*t[2]].map(toLinear).map(x=>x*LOOK.starGain), i*3); }
     const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
-    const pts=new THREE.Points(g, new THREE.PointsMaterial({size, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; reachSky.add(pts);
+    const pts=new THREE.Points(g, new THREE.PointsMaterial({size:size*LOOK.starSize, sizeAttenuation:false, vertexColors:true, depthWrite:false})); pts.userData.noAO=true; reachSky.add(pts);
   }
-  starTier(7000, 1.3, [0.08,0.5], 0.6);
+  starTier(7000+LOOK.faintStars, 1.3, [0.08,0.5], 0.6);
   starTier(420, 2.2, [0.45,1.0], 0.25);
   starTier(28, 3.2, [0.85,1.0], 0);
   // sun glow
