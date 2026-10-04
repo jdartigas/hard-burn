@@ -27,15 +27,15 @@ async function fireWeapon(att, wi, tgt){
   const onEvent=(i,o)=>{
     if(o==='hit'){ hits++; st.hits++;
       const r=res[i]; S+=r.s; H+=r.h;
-      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; }
+      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; att.st.dealt+=r.s+r.h; tgt.st.taken+=r.s+r.h; }
       if(!tgt.alive) return;
       tgt.shield=Math.max(0,tgt.shield-r.s); tgt.hull-=r.h; if(tgt.isRock) rockDamaged(tgt);
       impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1);
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
       if(r.crit && i!==killShot) applyCrit(tgt, r.crit);
-      if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; destroyShip(tgt, att); } }
+      if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; att.st.kills++; destroyShip(tgt, att); } }
       refreshTags(); updateHUD();
-    } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++;
+    } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++; if(!tgt.isRock) (screen||tgt).st.ints++;
       if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
     else { misses++; if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
   };
@@ -76,7 +76,7 @@ async function useAbility(s, target=null){
   else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
   else if(k==='resupply'){ if(!target) return false;
     const hull=Math.min(a.def.amount, target.hullMax-target.hull), sh=Math.min(target.shieldMax/2, target.shieldMax-target.shield); let salvos=0;
-    target.hull+=hull; target.shield+=sh; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } }); const fixed=repairAll(target);
+    target.hull+=hull; target.shield+=sh; s.st.repaired+=hull; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } }); const fixed=repairAll(target);
     const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.55,.9,1),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
@@ -85,7 +85,7 @@ async function useAbility(s, target=null){
     const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
     for(let i=0;i<30;i++){ after(i*0.02,()=>{ const p=a0.clone().lerp(b0,i/30); Particles.emit(p.setY(p.y+0.3),new THREE.Vector3().randomDirection().multiplyScalar(0.6),new THREE.Color(.75,.5,1),0.22,0.5,0.4); }); }
     Particles.burst(b0,40,{speed:3,color:new THREE.Color(.75,.5,1),size:0.3,life:0.8}); floatText(target,'Blackout','int'); }
-  else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; Sound.power();
+  else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; s.st.repaired+=add; Sound.power();
     const a0=s.group.position.clone(), b0=target.group.position.clone();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.5,1,.5),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.5,1,.5),size:0.3,life:0.9}); floatText(target,`+${Math.round(add)} hull`,'heal'); }
@@ -204,7 +204,7 @@ function beginSideTurn(side){
   for(const e of state.ships) if(e.blackout===side) e.blackout=null;
   // field repairs: a Repair tender patches up every ally within its field range
   for(const t of alive(side)) if(t.C.fieldRepair) for(const o of alive(side)) if(o!==t && hdist(o,t)<=(t.C.fieldRange||1) && o.hull<o.hullMax){
-    const add=Math.min(t.C.fieldRepair, o.hullMax-o.hull); o.hull+=add; if(add>=1) floatText(o,`+${Math.round(add)}`,'heal'); }
+    const add=Math.min(t.C.fieldRepair, o.hullMax-o.hull); o.hull+=add; t.st.repaired+=add; if(add>=1) floatText(o,`+${Math.round(add)}`,'heal'); }
   refreshTags();
 }
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }

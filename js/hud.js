@@ -59,6 +59,21 @@ const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const fmtN=n=>Math.round(n).toLocaleString('en-US');
 const DIFF_LABEL={easy:'Easy', normal:'Normal', hard:'Hard'};
 
+// v61 (Jon): the battle summary. Each of your ships, what it did, and the most valuable one. MVP weighs damage dealt,
+// kills, missiles and fighters stopped, and hull repaired, so escorts and tenders can earn it too.
+const MVP_WEIGHT = { dealt:1, kills:60, ints:15, repaired:0.8 };
+const mvpScore = s => s.st.dealt*MVP_WEIGHT.dealt + s.st.kills*MVP_WEIGHT.kills + s.st.ints*MVP_WEIGHT.ints + s.st.repaired*MVP_WEIGHT.repaired;
+function mvpCitation(s){ const t=s.st, n=(v,one,many)=>`${fmtN(v)} ${v===1?one:many}`, parts=[];
+  if(t.dealt>=1) parts.push(`${fmtN(t.dealt)} damage`); if(t.kills) parts.push(n(t.kills,'kill','kills')); if(t.ints) parts.push(`${n(t.ints,'missile','missiles')} stopped`); if(t.repaired>=1) parts.push(`${fmtN(t.repaired)} hull repaired`);
+  return parts.join(', ') || 'held the line'; }
+function renderShipSummary(){
+  const mine=state.ships.filter(s=>s.side==='player'), mvp=mine.reduce((b,s)=>!b || mvpScore(s)>mvpScore(b) ? s : b, null);
+  const anyRep=mine.some(s=>s.st.repaired>=1), anyInt=mine.some(s=>s.st.ints>0);
+  $('#end-mvp').innerHTML= mvp && mvpScore(mvp)>0 ? `<div class="mvp"><span>MVP</span><b>${esc(mvp.name)}</b><em>${esc(mvp.C.label)} · ${mvpCitation(mvp)}</em></div>` : '';
+  $('#end-ships').innerHTML=`<span class="h">Ship</span><span class="h n">Damage</span><span class="h n">Kills</span>${anyInt?'<span class="h n">Stopped</span>':''}${anyRep?'<span class="h n">Repaired</span>':''}<span class="h n">Taken</span>`+
+    mine.slice().sort((a,b)=>mvpScore(b)-mvpScore(a)).map(s=>`<span class="nm${s.alive?'':' lost'}">${esc(s.name)}<small>${esc(s.C.label)}${s.alive?'':' · lost'}</small></span><b>${fmtN(s.st.dealt)}</b><b>${s.st.kills||'—'}</b>${anyInt?`<b>${s.st.ints||'—'}</b>`:''}${anyRep?`<b>${s.st.repaired>=1?fmtN(s.st.repaired):'—'}</b>`:''}<b>${fmtN(s.st.taken)}</b>`).join('');
+  $('#end-ships').style.gridTemplateColumns=`minmax(0,1fr) repeat(${3+anyInt+anyRep}, auto)`;
+}
 function showEnd(win, byValue=null, surrendered=false){
   select(null); state.phase='end'; Sound.setMood('end'); (win?Sound.win:Sound.lose)();
   const draw= byValue && byValue.p===byValue.e;
@@ -77,6 +92,7 @@ function showEnd(win, byValue=null, surrendered=false){
     <span>Shots fired</span><b>${P.shots}</b><b>${E.shots}</b>
     <span>Accuracy</span><b>${acc(P)}</b><b>${acc(E)}</b>
     <span>Missiles and fighters stopped</span><b>${P.ints}${P.screened?` (${P.screened} by escorts)`:''}</b><b>${E.ints}${E.screened?` (${E.screened} by escorts)`:''}</b>`;
+  renderShipSummary();
   const rec=recordBattle(surrendered?'surrender': win?'win': draw?'draw':'loss');
   if(rec){ const {g,best}=rec, pt=g.parts;
     $('#end-score').innerHTML=`<div class="sc-top"><span>Score</span><b>${fmtN(g.score)}</b>${best?`<em>New best on ${DIFF_LABEL[g.diff]}</em>`:''}</div>

@@ -14,7 +14,8 @@ function createShip(cls, side, q, r, copy=0){
   const C=CLASSES[cls], d=DIFF[state.diff];
   const hullMax=Math.round(C.hull*(side==='enemy'?d.hull:1));
   const m=buildShip(cls, side, copy);
-  const s={ id:shipId++, side, cls, C, name:NAMES[side][cls]+(copy?' '+ROMAN[copy]:''), copy, hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
+  const s={ id:shipId++, side, cls, C, name:NAMES[side][cls]+(copy?' '+ROMAN[copy]:''), copy, st:{dealt:0,taken:0,kills:0,ints:0,repaired:0},   // v61: this ship's battle summary
+    hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
     mp:C.mp, mpMax:C.mp, ev:C.ev, pdc:C.pdc, q, r, alive:true, len:C.m/M_PER_UNIT*SHIP_SCALE, baseY:C.y, phase:Math.random()*6,
     weapons:C.weapons.map(k=>({key:k, def:WEAPONS[k], wait:0, ammo:WEAPONS[k].ammo, firedTurn:-1})),
     ability:{key:C.ability, def:ABIL[C.ability], wait:0}, fx:{}, moved:false,
