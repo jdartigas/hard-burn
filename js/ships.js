@@ -7,40 +7,50 @@
 /* ---------------- ship models (Expanse-inspired: stacked decks, drive at the stern, keel guns, PDC turrets) ----------------
    Player fleet: sleek naval style, chamfered armored decks, grey with amber markings.
    Enemy fleet: cobbled frontier style, boxy modules, exposed trusses, strapped-on tanks, patchwork plating. */
-// Armor tile set: color, normal (from a height field), and packed occlusion/roughness/metalness, all generated.
-// Tiles run lengthwise along the hull like the reference models; panel seams every quarter; chipped paint shows bare metal.
+// Armor panel set (v54, from Jon's reference sheets): square riveted plates in a grid, some doubled up, with dark
+// seams between them, a row of rivets round every plate, the odd scuffed or replaced plate, chipped edges, grime
+// and small amber running lights. Color, normal (from a height field), packed occlusion/roughness/metalness and
+// emissive are all generated here.
 function armorTextures(seed){
   const S=1024, R=mulberry32(seed);
   const H=new Float32Array(S*S), Cc=new Float32Array(S*S), Ro=new Float32Array(S*S), Me=new Float32Array(S*S), Ao=new Float32Array(S*S);
-  H.fill(0.08); Cc.fill(0.46); Ro.fill(0.8); Ao.fill(0.62);
+  H.fill(0.06); Cc.fill(0.3); Ro.fill(0.85); Ao.fill(0.45);
   const rect=(x0,y0,w,h,fn)=>{ for(let y=Math.max(0,y0|0); y<Math.min(S,(y0+h)|0); y++) for(let x=Math.max(0,x0|0); x<Math.min(S,(x0+w)|0); x++) fn(y*S+x, x-x0, y-y0); };
-  const CW=32;
-  for(let cx=0; cx<S; cx+=CW){
-    let y=-Math.floor(R()*90);
-    while(y<S){
-      const bl=58+Math.floor(R()*58), shade=0.62+R()*0.1-(R()<0.06?0.1:0), rough=0.55+R()*0.2, tilt=(R()-0.5)*0.05;
-      rect(cx+2,y+2,CW-4,bl-4,(i,lx,ly)=>{ const ex=Math.min(lx,CW-5-lx), ey=Math.min(ly,bl-5-ly), e=Math.min(ex,ey);
-        const bevel=Math.min(1,e/3.5); H[i]=0.5+0.42*bevel+tilt*(ly/bl-0.5); Cc[i]=shade*(0.94+0.06*bevel); Ro[i]=rough; Ao[i]=0.8+0.2*bevel; });
-      y+=bl;
-    }
+  const P=64, N=S/P, used=new Uint8Array(N*N), plates=[];
+  for(let gy=0; gy<N; gy++) for(let gx=0; gx<N; gx++){ if(used[gy*N+gx]) continue;
+    const r=R(); let w=1, h=1; if(r<0.18) w=2; else if(r<0.32) h=2; else if(r<0.37){ w=2; h=2; }
+    if(gx+w>N) w=1; if(gy+h>N) h=1;
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) if(used[(gy+j)*N+gx+i]){ w=1; h=1; }
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) used[(gy+j)*N+gx+i]=1;
+    plates.push([gx*P, gy*P, w*P, h*P]); }
+  for(const [px,py,pw,ph] of plates){
+    const k=R(), shade= k<0.05? 0.82+R()*0.1 : k<0.12? 0.5+R()*0.08 : 0.6+R()*0.12, rough=0.55+R()*0.25, tilt=(R()-0.5)*0.06;
+    rect(px+2,py+2,pw-4,ph-4,(i,lx,ly)=>{ const e=Math.min(lx,ly,pw-5-lx,ph-5-ly), bevel=Math.min(1,e/3);
+      H[i]=0.5+0.4*bevel+tilt*(lx/pw-0.5); Cc[i]=shade*(0.9+0.1*bevel); Ro[i]=rough; Ao[i]=0.75+0.25*bevel; });
+    // rivets: a row inset round the plate edge
+    const inset=6, step=12, dot=(cx,cy)=>rect(cx-2,cy-2,5,5,(i,lx,ly)=>{ const d=(lx-2)*(lx-2)+(ly-2)*(ly-2); if(d<=5){ H[i]+=0.12*(1-d/6); Cc[i]=Math.min(1,Cc[i]*1.25+0.05); Ro[i]=0.4; Me[i]=0.5; } });
+    for(let x=px+inset; x<=px+pw-inset; x+=step){ dot(x,py+inset); dot(x,py+ph-inset); }
+    for(let y=py+inset+step; y<py+ph-inset; y+=step){ dot(px+inset,y); dot(px+pw-inset,y); }
   }
-  // panel seams and recessed service hatches
-  for(let k=0;k<4;k++){ const ys=k*256+Math.floor(R()*30); rect(0,ys,S,5,(i)=>{ H[i]=0.02; Ao[i]=0.3; Cc[i]*=0.6; }); }
-  for(let k=0;k<6;k++){ const hx=Math.floor(R()*28)*CW+2, hy=Math.floor(R()*S), hw=CW*(1+Math.floor(R()*2))-4, hh=40+Math.floor(R()*50);
-    rect(hx,hy,hw,hh,(i,lx,ly)=>{ const e=Math.min(lx,ly,hw-1-lx,hh-1-ly); if(e<2){ H[i]=0.15; Ao[i]=0.4; } else { H[i]=0.62; Cc[i]=0.5; Ro[i]=0.5; } }); }
-  // chipped paint -> bare metal along tile edges
-  for(let k=0;k<900;k++){ const cx=Math.floor(R()*S/CW)*CW+(R()<0.5?2:CW-6)+Math.floor(R()*4), cy=Math.floor(R()*S), r=1+R()*3.2;
-    rect(cx-r,cy-r*2,r*2+1,r*4+1,(i,lx,ly)=>{ const dx=lx-r, dy=(ly-r*2)/2; if(dx*dx+dy*dy<=r*r){ Cc[i]=0.78; Ro[i]=0.32; Me[i]=0.95; H[i]-=0.04; } }); }
+  // a few recessed hatches and vents
+  for(let k=0;k<10;k++){ const pl=plates[Math.floor(R()*plates.length)], hw=pl[2]-28, hh=Math.min(pl[3]-28, 18+Math.floor(R()*20)), hx=pl[0]+14, hy=pl[1]+14;
+    const vent=R()<0.5; rect(hx,hy,hw,hh,(i,lx,ly)=>{ const e=Math.min(lx,ly,hw-1-lx,hh-1-ly); if(e<2){ H[i]=0.2; Ao[i]=0.35; } else if(vent){ H[i]= ly%5<2? 0.25:0.45; Cc[i]*=0.6; } else { H[i]=0.42; Cc[i]*=0.85; } }); }
+  // chipped paint: bare metal along plate edges
+  for(let k=0;k<1100;k++){ const pl=plates[Math.floor(R()*plates.length)], side=Math.floor(R()*4), t=R();
+    const cx= side<2? pl[0]+t*pl[2] : pl[0]+(side===2?3:pl[2]-4), cy= side<2? pl[1]+(side===0?3:pl[3]-4) : pl[1]+t*pl[3], r=1+R()*2.6;
+    rect(cx-r,cy-r,r*2+1,r*2+1,(i,lx,ly)=>{ const dx=lx-r, dy=ly-r; if(dx*dx+dy*dy<=r*r){ Cc[i]=0.78; Ro[i]=0.32; Me[i]=0.95; H[i]-=0.03; } }); }
   // grime streaks running aft
-  for(let k=0;k<160;k++){ const x=Math.floor(R()*S), y=Math.floor(R()*S), len=40+R()*160, w=1+Math.floor(R()*3), a=0.05+R()*0.1;
+  for(let k=0;k<180;k++){ const x=Math.floor(R()*S), y=Math.floor(R()*S), len=30+R()*140, w=1+Math.floor(R()*3), a=0.05+R()*0.12;
     rect(x,y,w,len,(i,lx,ly)=>{ Cc[i]*=1-a*(1-ly/len); Ro[i]=Math.min(1,Ro[i]+a); }); }
   const toCanvas=(fn)=>canvasTex(S,S,(g)=>{ const img=g.createImageData(S,S), d=img.data; for(let i=0;i<S*S;i++){ const [r,gg,b]=fn(i); d[i*4]=r; d[i*4+1]=gg; d[i*4+2]=b; d[i*4+3]=255; } g.putImageData(img,0,0); }, false);
   const map=toCanvas(i=>{ const v=Math.round(clamp(Cc[i],0,1)*255); return [v,v,v]; }); map.colorSpace=THREE.SRGBColorSpace;
   const normal=toCanvas(i=>{ const x=i%S, y=(i/S)|0; const hL=H[y*S+((x-1+S)%S)], hR=H[y*S+((x+1)%S)], hU=H[((y-1+S)%S)*S+x], hD=H[((y+1)%S)*S+x];
     const nx=(hL-hR)*4, ny=(hD-hU)*4, nz=1, l=Math.hypot(nx,ny,nz); return [Math.round((nx/l*0.5+0.5)*255), Math.round((ny/l*0.5+0.5)*255), Math.round((nz/l*0.5+0.5)*255)]; });
   const orm=toCanvas(i=>[Math.round(clamp(Ao[i],0,1)*255), Math.round(clamp(Ro[i],0.05,1)*255), Math.round(clamp(0.12+Me[i]*0.85,0,1)*255)]);
-  const emis=canvasTex(S,S,(g,w,h)=>{ g.fillStyle='#000'; g.fillRect(0,0,w,h);
-    for(let i=0;i<16;i++){ const x=Math.floor(R()*32)*CW+10, y=Math.floor(R()*h), n=2+Math.floor(R()*5); g.fillStyle='rgba(255,210,150,1)'; for(let k=0;k<n;k++) g.fillRect(x,y+k*11,10,6); } });
+  // small amber running lights in plate corners, and the odd row of lit ports
+  const emis=canvasTex(S,S,(g,w,h)=>{ g.fillStyle='#000'; g.fillRect(0,0,w,h); g.fillStyle='rgba(255,168,70,1)';
+    for(const [px,py,pw,ph] of plates){ if(R()<0.16){ const cx=R()<0.5? px+12 : px+pw-16, cy=R()<0.5? py+12 : py+ph-16; g.fillRect(cx,cy,4,4); if(R()<0.3) g.fillRect(cx,cy+8,4,4); } }
+    for(let i=0;i<10;i++){ const pl=plates[Math.floor(R()*plates.length)], n=2+Math.floor(R()*4); for(let k=0;k<n;k++) g.fillRect(pl[0]+14+k*10,pl[1]+pl[3]/2,6,4); } });
   for(const t of [map,normal,orm,emis]){ t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=MAX_ANISO; }
   return {map, normal, orm, emis};
 }
@@ -59,13 +69,14 @@ function shipMaterials(side){
   const NS=new THREE.Vector2(1.1,1.1);
   const hull = (color, rough=1, metal=1, emis=true) => new THREE.MeshStandardMaterial({map:t.map, normalMap:t.normal, normalScale:NS, roughnessMap:t.orm, metalnessMap:t.orm, aoMap:t.orm, aoMapIntensity:1, color, metalness:metal, roughness:rough, ...(emis?{emissiveMap:t.emis, emissive:0xffffff, emissiveIntensity:2.2}:{})});
   return {
-    hull: hull(P?0x8a8a8e:0xcfd3d6),
-    hull2: hull(P?0x606066:0xa9aeb3, 0.95),
-    plate: hull(P?0xe8672a:0xb03a2c, 0.95, 1, false),
+    hull: hull(P?0x6c6c70:0xcfd3d6),
+    hull2: hull(P?0x505056:0xa9aeb3, 0.95),
+    plate: hull(P?0xf0702e:0xb03a2c, 0.95, 0.75, false),
     deckTop: hull(P?0x4a4a4e:0x8d9297, 1, 1, false),
-    stripe: new THREE.MeshStandardMaterial({color: P?0xefefea:0xc93a2c, metalness:0.1, roughness:0.45}),
+    stripe: hull(P?0xf4f4ee:0xc93a2c, 0.8, 0.3, false),
+    crane: new THREE.MeshStandardMaterial({color:0xc8961a, metalness:0.2, roughness:0.7}),
     drum: new THREE.MeshStandardMaterial({color: P?0x3c3c42:0x4c5156, metalness:0.85, roughness:0.38, side:THREE.DoubleSide}),
-    bay: new THREE.MeshBasicMaterial({color:0x9a7a4a}),
+    bay: new THREE.MeshBasicMaterial({color:new THREE.Color(0xff8a34).multiplyScalar(1.15)}),
     patches: [],
     dark: new THREE.MeshStandardMaterial({color: P?0x2f353b:0x2d2723, metalness:0.8, roughness:0.42}),
     metal: new THREE.MeshStandardMaterial({color: P?0x9aa1a8:0x8f8479, metalness:1.0, roughness:0.26}),
@@ -271,7 +282,7 @@ function buildShip(cls, side, copy=0){
     grp.rotation.z = x>0? -tilt : tilt; add(grp,x,y,z);
   }
   function dish(x,y,z,r){ const prof=[]; for(let i=0;i<=10;i++){ const t=i/10; prof.push(new THREE.Vector2(r*t, r*0.35*t*t)); }
-    const d=new THREE.Mesh(new THREE.LatheGeometry(prof,32),new THREE.MeshStandardMaterial({color:0xd8dcdf,metalness:0.4,roughness:0.5,side:THREE.DoubleSide}));
+    const d=new THREE.Mesh(new THREE.LatheGeometry(prof,32),new THREE.MeshStandardMaterial({color:0x9da2a6,metalness:0.4,roughness:0.6,side:THREE.DoubleSide}));
     const grp=new THREE.Group(); grp.add(d); const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.014,r*1.1,8),M.dark); mast.position.y=-r*0.5; grp.add(mast);
     const feed=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,r*0.6,6),M.dark); feed.position.y=r*0.3; grp.add(feed);
     grp.rotation.set(-0.6,R()*6,0.3); add(grp,x,y+r*0.5,z); }
@@ -357,6 +368,34 @@ function buildShip(cls, side, copy=0){
     const ring=new THREE.Mesh(new THREE.TorusGeometry(r,r*0.22,8,16),M.metal), hole=new THREE.Mesh(new THREE.CircleGeometry(r*0.9,16),M.dark);
     const yaw=Math.atan2(dx,dz); ring.rotation.y=yaw; hole.rotation.y=yaw; add(ring,x,y,z); add(hole,x-dx*0.002,y,z-dz*0.002); mount(slot,x+dx*0.01,y,z+dz*0.01,dx,0,dz); }
 
+  // --- v54 kit, for the hulls rebuilt from Jon's reference sheets ---
+  // cylinder along z with UVs in world units, so armour plates stay square on round surfaces; o.r1 is the front radius
+  function cyl(r,z0,z1,mat,o={}){ if(o===true) o={open:true}; const len=z1-z0, gq=new THREE.CylinderGeometry(o.r1||r,r,len,o.seg||48,1,!!o.open);
+    const uv=gq.attributes.uv; for(let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)*Math.PI*2*r*1.05, uv.getY(i)*len*1.05);
+    const m=new THREE.Mesh(gq,mat); m.rotation.x=Math.PI/2; return add(m,o.x||0,o.y||0,(z0+z1)/2,true); }
+  // drive: a solid armoured cylinder with livery bands (fractions of its length from the stern), armour ribs, a
+  // glowing aft ring round the bell, and the plume
+  function drive(r,len,zf,x=0,y=0,o={}){
+    const zb=zf-len, at=t=>zb+len*t;
+    cyl(r,zb+0.02,zf,HULL,{x,y});
+    (o.bands||[[0.3,0.55,PL],[0.58,0.64,ST]]).forEach(([a,b,m])=>cyl(r*1.012,at(a),at(b),m,{x,y,open:true}));
+    [0.04,0.66,0.97].forEach(t=>{ const tr=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,Math.max(.008,r*0.04),8,48),M.dark); add(tr,x,y,at(t)); });
+    const nr=Math.max(8,Math.round(r*44)); for(let i=0;i<nr;i++){ const a=i/nr*Math.PI*2; greebles.dark.push([x+Math.cos(a)*r*1.02,y+Math.sin(a)*r*1.02,at(0.17), r*0.1,r*0.1,len*0.2]); }
+    const face=new THREE.Mesh(new THREE.CircleGeometry(r,48),M.dark); face.rotation.y=Math.PI; add(face,x,y,zb+0.021);
+    const rim=new THREE.Mesh(new THREE.RingGeometry(r*0.6,r*0.82,48),M.glow); rim.rotation.y=Math.PI; add(rim,x,y,zb+0.018);
+    const bell=new THREE.Mesh(new THREE.CylinderGeometry(r*0.48,r*0.58,.06,32),M.bell); bell.rotation.x=Math.PI/2; add(bell,x,y,zb-0.01);
+    const front=new THREE.Mesh(new THREE.CircleGeometry(r*0.98,48),M.dark); add(front,x,y,zf+0.001);
+    engines.push(makePlume(r*0.55,x,y,zb-0.03));
+  }
+  // a hull section that remembers its shape, so livery bands can wrap it anywhere along a taper
+  function sec(z0,z1,w0,h0,w1,h1,o={}){ plate(z0,z1,w0,h0,w1,h1,o); return {z0,z1,w0,h0,w1,h1,x:o.x||0,y:o.y||0,ch:o.ch!==undefined?o.ch:CH}; }
+  const secF=(s,z)=>clamp((z-s.z0)/(s.z1-s.z0),0,1), secW=(s,z)=>lerp(s.w0,s.w1,secF(s,z)), secH=(s,z)=>lerp(s.h0,s.h1,secF(s,z));
+  function band(s,za,zb,mat=PL,grow=0.014){ deck(za,zb,secW(s,za)+grow,secH(s,za)+grow,secW(s,zb)+grow,secH(s,zb)+grow,{x:s.x,y:s.y,mat,ch:s.ch,greeble:false}); }
+  // open lattice mast from a to b: two rails w apart (across `side`), zig-zag bracing between them
+  function lattice(a,b,w,side,mat=M.metal,r=.006){ const o=side.clone().multiplyScalar(w/2), n=Math.max(2,Math.round(a.distanceTo(b)/(w*1.2)));
+    const A=a.clone().add(o), B=b.clone().add(o), C=a.clone().sub(o), D=b.clone().sub(o); rod(A,B,r*1.4,mat); rod(C,D,r*1.4,mat);
+    for(let i=0;i<n;i++){ const p=A.clone().lerp(B,i/n), q=C.clone().lerp(D,(i+1)/n), p2=A.clone().lerp(B,(i+1)/n); rod(p,q,r,mat); rod(q,p2,r,mat); } }
+
   if(cls==='patrol'){
     const SM=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x8c9095:0xa9adb2, metalness:0.55, roughness:0.42});
     const SM2=new THREE.MeshStandardMaterial({map:smoothTex.map, color:P?0x5a5e63:0x7c8186, metalness:0.7, roughness:0.38});
@@ -391,81 +430,97 @@ function buildShip(cls, side, copy=0){
     windows(0,.14,.8,.2,4); number(idn,0,.2,.2,.08,'top'); number(idn,.276,-.02,-.02,.07,'r'); number(idn,-.276,-.02,-.02,.07,'l');
     light(.24,0,-.5,nav); light(-.24,0,-.5,nav); rcs(.25,.2,.5); rcs(-.25,.2,.5);
   } else if(cls==='frigate'){
-    drum(.17,.24,-1.0);
-    struts(-1.0,-0.9,.15,.18);
-    plate(-0.9,0.5,.5,.3,.5,.3,{ch:.16});
-    [-1,1].forEach(s=>{ plate(-0.85,0.45,.1,.07,.1,.07,{x:s*.2,y:.18,ch:.25,mat:H2}); });  // raised trench rails
-    plate(-0.35,-0.05,.18,.12,.16,.1,{y:.2,ch:.3,mat:PL}); pdc(0,.26,-.2,1); pdc(0,.16,.25,1);
-    sidePlates(-0.8,0.45,.5,.22,-.01);
-    plate(0.5,1.24,.5,.3,.64,.1,{ch:.2,y:-.03,mat:PL}); topPlate(0.55,1.2,.36,.5,.07,HULL); chevron(1.0,.095,.3); chevron(1.1,.08,.36);
-    barrels([-.06,.06],-.1,0.9,1.52,.013);   // twin beam projectors: lenses at the muzzles
-    [-.06,.06].forEach(x=>{ const l=new THREE.Mesh(new THREE.CircleGeometry(.012,12),lensMat); add(l,x,-.1,1.523); mount(0,x,-.1,1.53); });
-    cells(1,0,.152,.06,2,2);
-    stripes(-0.8,0.4,.155,.21,.015);
-    pdc(.27,0,-.5,1,'x'); pdc(-.27,0,-.5,-1,'x'); pdc(0,-.17,.0,-1); pdc(.3,-.02,.8,1,'x'); pdc(-.3,-.02,.8,-1,'x');
-    windows(0,.19,.3,.3,4); number(idn,.3,-.05,1.05,.06,'r'); number(idn,-.3,-.05,1.05,.06,'l'); number(idn,0,.19,-.6,.07,'top');
-    light(.27,0,-.85,nav); light(-.27,0,-.85,nav); rcs(.26,.15,.4); rcs(-.26,.15,.4);
+    // v54, from reference/frigate.png: one big banded drive, an open truss, then a hull tapering to a needle bow with
+    // twin beam projectors under it and a 2x2 block of missile cells on the dorsal deck
+    drive(.27,.55,-0.75,0,0,{bands:[[0.12,0.3,PL],[0.32,0.37,ST],[0.45,0.7,PL],[0.72,0.77,ST]]});
+    collar(-0.77,-0.72,.36,.3);
+    truss(-0.72,-0.36,.3,.22); tank(0,0,-0.54,.06,.22,H2); tank(.09,-.05,-0.54,.03,.24,M.metal); tank(-.09,-.05,-0.54,.03,.24,M.metal);
+    const mid=sec(-0.38,0.32,.46,.3,.46,.3,{ch:.22}), bow=sec(0.32,1.3,.46,.3,.05,.05,{ch:.3});
+    plate(-0.3,0.55,.16,.06,.12,.04,{y:-.17,mat:H2,ch:.3});                                  // keel
+    [-1,1].forEach(sd=>{ plate(-0.3,0.25,.07,.16,.07,.16,{x:sd*.26,mat:H2,ch:.25}); plate(-0.3,-0.22,.075,.17,.075,.17,{x:sd*.26,mat:PL,ch:.2,greeble:false}); });   // flank sponsons
+    plate(-0.34,0.3,.28,.07,.22,.06,{y:.18,mat:H2,ch:.3});                                 // dorsal block with the launch cells
+    band(mid,-0.3,-0.2); band(mid,-0.2,-0.17,ST); band(mid,0.12,0.2); band(bow,0.5,0.62); band(bow,0.65,0.69,ST); band(bow,0.86,0.96); band(bow,1.02,1.05,ST);
+    cells(1,0,.215,-0.08,2,2,.05);
+    plate(0.08,0.24,.14,.06,.1,.05,{y:.24,ch:.3}); windows(0,.27,.16,.12,3);                 // conning block and antennas
+    [-.03,.03].forEach(x=>rod(new THREE.Vector3(x,.27,.18),new THREE.Vector3(x,.42,.18),.005,M.metal));
+    [-.04,.04].forEach(x=>{ tube(.016,0.98,1.24,x,-.08,M.metal,10); tube(.028,0.95,1.06,x,-.08,M.dark,10);   // twin beam projectors under the bow
+      const l=new THREE.Mesh(new THREE.CircleGeometry(.013,12),lensMat); add(l,x,-.08,1.242); mount(0,x,-.08,1.25); });
+    pdc(.16,.15,-0.3,1); pdc(-.13,.145,0.42,1);                                           // 2 dorsal, 4 flank, 1 ventral
+    pdc(.3,0,-0.2,1,'x'); pdc(-.3,0,-0.2,-1,'x'); pdc(.18,0,0.62,1,'x'); pdc(-.18,0,0.62,-1,'x'); pdc(0,-.2,0.1,-1);
+    number(idn,.3,.0,0.08,.055,'r'); number(idn,-.3,.0,0.08,.055,'l'); number(idn,0,.153,0.62,.06,'top');
+    light(.2,.1,-0.42,nav); light(-.2,.1,-0.42,nav); light(0,0,1.31,0xffffff); rcs(.22,.1,.3); rcs(-.22,.1,.3);
   } else if(cls==='destroyer'){
-    drum(.25,.34,-1.16);
-    struts(-1.16,-1.0,.21,.24);
-    plate(-1.0,-0.55,.52,.5,.52,.5,{mat:H2}); sidePlates(-0.95,-0.62,.52,.34); turretBlock(-0.78,.25,.18);
-    plate(-0.55,-0.25,.4,.38,.42,.38); turretBlock(-0.4,.19,.2);
-    collar(-0.25,-0.19,.36,.34);
-    plate(-0.19,0.9,.62,.44,.72,.46);
-    plate(-0.1,0.8,.24,.08,.3,.08,{y:.27,ch:.3,mat:H2}); // raised spine ridge
-    [-1,1].forEach(s=>{ plate(0.0,0.82,.1,.3,.1,.32,{x:s*.39,y:-.02,mat:PL,ch:.2}); });
-    plate(0.9,1.46,.82,.54,.76,.48,{ch:.24}); sidePlates(0.95,1.4,.82,.3,-.02); topPlate(1.0,1.42,.5,.46,.27,PL);
-    plate(0.95,1.4,.5,.12,.46,.1,{y:-.3,ch:.3,mat:H2});
-    grille(1.46,-.02,.56,.26);
-    rail(-.37,0.5,1.42,.06); mount(0,0,-.37,1.47);   // keel railgun
-    [-1,1].forEach(s=>{ pulseTurret(1,s*.14,.286,1.2); tubeMouth(2,s*.32,-.02,1.462,.03); });   // pulse battery on the bow, torpedo tubes in its face
-    stripes(0.95,1.42,.29,.33,.02); stripes(-0.1,0.8,.235,.33,.018);
-    pdc(.36,.24,.9,1); pdc(-.36,.24,.9,1); pdc(.42,0,1.2,1,'x'); pdc(-.42,0,1.2,-1,'x'); pdc(.45,-.1,.4,1,'x'); pdc(-.45,-.1,.4,-1,'x'); pdc(0,-.25,.3,-1); pdc(.22,-.36,1.2,-1);
-    windows(0,.31,.3,.4,6); number(idn,0,.285,.55,.1,'top'); number(idn,.414,.05,-.3,.08,'r'); number(idn,-.414,.05,-.3,.08,'l');
-    light(.3,.2,-.95,nav); light(-.3,.2,-.95,nav); rcs(.34,.28,1.3); rcs(-.34,.28,1.3); rcs(.28,-.24,-.7); rcs(-.28,-.24,-.7);
+    // v54, from reference/destroyer.png: four drives in a 2x2 block, a long armoured hull under a raised citadel, a
+    // sloping prow carrying the pulse battery, torpedo blisters low on either side, and a railgun along the keel
+    [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(([sx,sy])=>drive(.19,.5,-0.95,sx*.2,sy*.19,{bands:[[0.3,0.62,PL],[0.66,0.72,ST]]}));
+    plate(-0.97,-0.78,.66,.6,.7,.56,{mat:H2,ch:.15});                                      // drive mount
+    const main=sec(-0.78,0.55,.7,.5,.68,.48,{ch:.2}), prow=sec(0.55,1.5,.68,.48,.04,.06,{ch:.3});
+    plate(-0.6,0.15,.4,.12,.34,.1,{y:.3,mat:H2,ch:.3});                                    // dorsal citadel
+    plate(-0.45,-0.05,.2,.1,.18,.08,{y:.4,ch:.3}); windows(0,.45,-0.25,.3,5);
+    [-.05,0,.06].forEach((x,i)=>rod(new THREE.Vector3(x,.44,-0.35+i*.05),new THREE.Vector3(x,.6+i*.03,-0.35+i*.05),.005,M.metal));
+    plate(-0.5,0.5,.2,.07,.2,.07,{y:-.28,mat:H2,ch:.3}); plate(0.5,1.0,.16,.2,.1,.26,{y:-.22,mat:H2,ch:.3});   // keel
+    band(main,-0.62,-0.5); band(main,-0.5,-0.46,ST); band(main,-0.05,0.08); band(main,0.3,0.34,ST); band(main,0.34,0.46); band(prow,0.75,0.8,ST); band(prow,0.8,0.92); band(prow,1.18,1.26);
+    rail(-.36,-0.3,0.98,.07); mount(0,0,-.36,1.04);                                          // keel railgun
+    plate(0.58,0.86,.42,.06,.34,.05,{y:.235,mat:H2,ch:.3,greeble:false});                  // pulse battery on the prow
+    [-1,1].forEach(sd=>{ pulseTurret(1,sd*.12,.265,.7,1,1.3);
+      plate(0.5,0.86,.12,.13,.1,.12,{x:sd*.27,y:-.1,mat:H2,ch:.25}); tubeMouth(2,sd*.27,-.1,.861,.035); });   // torpedo blisters
+    pdc(.26,.25,-0.62,1); pdc(-.26,.25,-0.62,1); pdc(.25,.25,0.3,1); pdc(-.25,.25,0.3,1);    // 4 dorsal, 4 flank, 2 ventral
+    pdc(.36,0,-0.32,1,'x'); pdc(-.36,0,-0.32,-1,'x'); pdc(.355,-.05,0.42,1,'x'); pdc(-.355,-.05,0.42,-1,'x'); pdc(.2,-.25,-0.5,-1); pdc(-.2,-.25,0.3,-1);
+    number(idn,.352,.06,0.1,.09,'r'); number(idn,-.352,.06,0.1,.09,'l'); number(idn,0,.36,-0.45,.08,'top');
+    light(.36,.2,-0.85,nav); light(-.36,.2,-0.85,nav); light(0,0,1.51,0xffffff); rcs(.3,.15,1.0); rcs(-.3,.15,1.0); rcs(.3,-.2,-0.7); rcs(-.3,-.2,-0.7);
   } else if(cls==='cruiser'){
-    // four drives in a 2x2 cluster, heavy midships, long gun spine to a launcher head
-    [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(([sx,sy])=>{ drum(.16,.3,-1.4,sx*.2,sy*.18); });
-    struts(-1.4,-1.28,.34,.36,0,0,8);
-    plate(-1.28,-0.7,.9,.62,.86,.58,{mat:H2}); sidePlates(-1.2,-0.8,.9,.4);
-    [-1,1].forEach(s=>{ plate(-1.1,-0.1,.22,.34,.2,.3,{x:s*.56,y:-.04,mat:HULL,ch:.25}); topPlate(-1.0,-0.2,.14,.12,.13,PL);
-      const fin=plate(-1.0,-0.45,.02,.3,.02,.14,{x:s*.66,y:.22,mat:H2,ch:.1,greeble:false}); fin.rotation.z=s*0.3; });
-    plate(-0.7,0.25,.6,.52,.5,.44); plate(-0.55,0.05,.26,.16,.22,.12,{y:.34,ch:.3,mat:H2}); windows(0,.42,-.25,.4,6); dish(.18,.3,-.4,.1);
-    collar(0.25,0.32,.3,.3);
-    plate(0.32,1.55,.28,.28,.26,.26,{ch:.22}); topPlate(0.35,1.5,.1,.1,.14,PL); stripes(0.35,1.5,.145,.1,.014);
-    [-1,1].forEach(s=>{ plate(0.4,1.3,.05,.12,.05,.1,{x:s*.17,y:-.02,mat:H2,ch:.2}); });
-    plate(1.55,1.86,.38,.36,.36,.34,{ch:.15,mat:H2}); sidePlates(1.58,1.82,.38,.26);
-    for(let r=0;r<3;r++) for(let c=0;c<3;c++){ const t=new THREE.Mesh(new THREE.CircleGeometry(.038,16),M.dark); add(t,(c-1)*.1,(r-1)*.095,1.865); if(r!==1||c!==1) mount(2,(c-1)*.1,(r-1)*.095,1.875); }   // torpedo tubes round the bore
-    const bore=new THREE.Mesh(new THREE.CircleGeometry(.025,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,0,1.868); mount(0,0,0,1.875);   // spinal railgun
-    [-1,1].forEach(s=>emitter(1,s*.2,.29,.28,.32,.03));   // heavy beam emitters on the shoulders
-    pdc(.3,.28,-.3,1); pdc(-.3,.28,-.3,1); pdc(.46,-.05,-1.0,1,'x'); pdc(-.46,-.05,-1.0,-1,'x'); pdc(0,.15,.9,1); pdc(0,-.15,1.2,-1); pdc(.2,.2,1.7,1); pdc(-.2,.2,1.7,1); pdc(.68,-.05,-.6,1,'x'); pdc(-.68,-.05,-.6,-1,'x');
-    number(idn,0,.285,-1.0,.09,'top'); number(idn,.195,0,1.72,.06,'r'); number(idn,-.195,0,1.72,.06,'l');
-    light(.46,.2,-1.25,nav); light(-.46,.2,-1.25,nav); light(0,.36,1.84,0xffffff); rcs(.2,.2,1.6); rcs(-.2,.2,1.6);
+    // v54, from reference/heavy-cruiser.png: one great drive drum, an open truss round the tanks, a broad body with
+    // beam emitters on its shoulders, then a long gun spine to a launcher head: the spinal railgun's bore in the
+    // middle of a 3x3 grid, eight torpedo tubes round it
+    drive(.4,.7,-1.15,0,0,{bands:[[0.22,0.44,PL],[0.47,0.52,ST],[0.6,0.8,PL]]});
+    collar(-1.17,-1.12,.5,.5);
+    truss(-1.12,-0.76,.46,.36); [-1,1].forEach(sd=>tank(sd*.12,-.04,-0.94,.07,.24,H2)); tank(0,.1,-0.94,.06,.24,M.metal);
+    const body=sec(-0.78,0.25,.6,.46,.56,.44,{ch:.22}), neck=sec(0.25,0.7,.56,.44,.32,.3,{ch:.25}), spine=sec(0.7,1.55,.32,.3,.3,.28,{ch:.25}), head=sec(1.55,1.85,.4,.34,.38,.32,{ch:.18});
+    [-1,1].forEach(sd=>{ const sh=sec(-0.7,0.1,.24,.3,.2,.26,{x:sd*.42,y:-.02,ch:.25});      // shoulder pods with the heavy beams
+      band(sh,-0.5,-0.36); band(sh,-0.36,-0.32,ST);
+      plate(-0.25,0.0,.14,.08,.12,.07,{x:sd*.42,y:.16,mat:H2,ch:.3}); emitter(1,sd*.42,.22,0.22,.32,.035); });
+    band(body,-0.6,-0.45); band(body,-0.45,-0.41,ST); band(body,-0.1,0.05); band(neck,0.36,0.42,ST); band(spine,0.95,1.1); band(spine,1.1,1.14,ST); band(spine,1.22,1.34); band(head,1.6,1.65,ST);
+    plate(-0.45,-0.12,.24,.08,.2,.07,{y:.265,mat:H2,ch:.3}); windows(0,.31,-0.28,.25,5);  // bridge
+    [-.04,.04].forEach(x=>rod(new THREE.Vector3(x,.3,-0.4),new THREE.Vector3(x,.48,-0.4),.005,M.metal));
+    tube(.035,0.3,1.55,0,.17,M.dark,12); for(let i=0;i<8;i++){ const c=new THREE.Mesh(new THREE.TorusGeometry(.04,.008,6,16),M.metal); add(c,0,.17,0.4+i*.15); }   // spinal conduit
+    for(let r=0;r<3;r++) for(let c=0;c<3;c++) if(r!==1||c!==1) tubeMouth(2,(c-1)*.1,(r-1)*.09,1.852,.032);
+    tube(.04,1.82,1.86,0,0,M.metal,16); { const bore=new THREE.Mesh(new THREE.CircleGeometry(.025,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,0,1.862); mount(0,0,0,1.87); }
+    pdc(.2,.23,-0.62,1); pdc(-.2,.23,-0.62,1); pdc(0,.23,0.1,1); pdc(.1,.155,0.85,1); pdc(-.1,.155,1.3,1);   // 5 dorsal, 4 flank, 1 ventral
+    pdc(.545,0,-0.5,1,'x'); pdc(-.545,0,-0.5,-1,'x'); pdc(.165,0,1.4,1,'x'); pdc(-.165,0,1.4,-1,'x'); pdc(0,-.24,-0.3,-1);
+    number(idn,.163,.0,0.95,.06,'r'); number(idn,-.163,.0,0.95,.06,'l'); number(idn,0,.232,-0.6,.08,'top');
+    light(.3,.2,-0.75,nav); light(-.3,.2,-0.75,nav); light(0,.2,1.86,0xffffff); rcs(.2,.12,1.6); rcs(-.2,.12,1.6);
   } else if(cls==='carrier'){
-    // broad-beamed flight hull in the same yard style: three drives, launch bays down both flanks and in the bow
-    drum(.2,.3,-1.4,.34,0); drum(.2,.3,-1.4,-.34,0); drum(.24,.34,-1.4,0,.02);
-    struts(-1.4,-1.26,.3,.46,0,0,8);
-    plate(-1.26,-0.8,.9,.56,.94,.56,{mat:H2}); sidePlates(-1.2,-0.86,.94,.36);
-    plate(-0.8,1.2,1.0,.5,1.0,.5,{ch:.18});
-    [-1,1].forEach(s=>{ for(let i=0;i<5;i++){ const slot=new THREE.Mesh(new THREE.PlaneGeometry(.26,.12),M.bay); slot.rotation.y=s*Math.PI/2; add(slot,s*.503,-.06,-.6+i*.38); mount(0,s*.52,-.06,-.6+i*.38,s,0,0.4); }
-      plate(-0.7,1.1,.02,.08,.02,.08,{x:s*.51,y:.12,mat:PL,ch:.1,greeble:false}); });
-    topPlate(-0.7,1.1,.56,.56,.25,M.deckTop); stripes(-0.7,1.1,.268,.2,.012);
-    for(let i=0;i<6;i++){ const m=new THREE.Mesh(new THREE.BoxGeometry(.06,.006,.02),ST); add(m,0,.268,-0.5+i*.3); }
-    plate(-0.35,0.25,.16,.26,.14,.2,{x:.38,y:.38,ch:.25,mat:H2}); windows(.38,.5,-.05,.4,5); dish(.38,.52,-.25,.1);
-    plate(1.2,1.62,1.0,.5,.86,.42,{ch:.22}); sidePlates(1.25,1.55,.98,.3,-.02);
-    const bb=new THREE.Mesh(new THREE.PlaneGeometry(.56,.2),M.bay); add(bb,0,-.03,1.625); mount(0,0,-.03,1.64);   // launch bays: flanks and bow
-    [-1,1].forEach(s=>pulseTurret(1,s*.25,.235,1.33));
-    grille(1.625,.13,.5,.08);
-    pdc(.4,.27,.9,1); pdc(-.4,.27,.9,1); pdc(-.3,.27,-.3,1); pdc(.53,.1,-.8,1,'x'); pdc(-.53,.1,-.8,-1,'x'); pdc(.46,.1,1.4,1,'x'); pdc(-.46,.1,1.4,-1,'x'); pdc(0,-.27,.4,-1); pdc(.3,-.27,-.4,-1); pdc(-.3,-.27,-.4,-1);
-    number(idn,-.2,.27,.4,.12,'top'); number(idn,.52,.15,1.4,.08,'r'); number(idn,-.52,.15,1.4,.08,'l');
-    light(.5,.2,-1.2,nav); light(-.5,.2,-1.2,nav); light(.38,.52,.2,0xff3030); rcs(.5,.25,1.5); rcs(-.5,.25,1.5);
+    // v54, from reference/fleet-carrier.png: three drives abreast, a slab-sided hull under a flight deck with an island
+    // aft to starboard, five lit launch bays down each flank and one in the bow, pulse turrets on the bow deck
+    [-1,0,1].forEach(sx=>drive(.2,.5,-1.15,sx*.34,0,{bands:[[0.35,0.6,PL],[0.63,0.69,ST]]}));
+    plate(-1.18,-0.98,1.0,.5,1.02,.54,{mat:H2,ch:.12});
+    const main=sec(-0.98,1.3,1.0,.56,1.0,.56,{ch:.1}), bow=sec(1.3,1.62,1.0,.56,.78,.44,{ch:.22});
+    band(main,-0.85,-0.75); band(main,-0.75,-0.71,ST); band(main,0.92,0.98,ST); band(main,0.98,1.06); band(bow,1.4,1.46);
+    topPlate(-0.92,1.25,.72,.72,.28,M.deckTop);                                           // flight deck and markings
+    for(let i=0;i<9;i++){ const m=new THREE.Mesh(new THREE.BoxGeometry(.012,.006,.1),ST); add(m,0,.3,-0.7+i*.18); }
+    [-1,1].forEach(sd=>{ for(let i=0;i<14;i++){ const w=new THREE.Mesh(new THREE.BoxGeometry(.012,.008,.012),M.window); add(w,sd*.33,.3,-0.85+i*.15); } });
+    { const sq=new THREE.Mesh(new THREE.BoxGeometry(.34,.006,.34),PL); add(sq,0,.299,0.82);
+      const a=new THREE.Mesh(new THREE.BoxGeometry(.3,.007,.07),ST), b=new THREE.Mesh(new THREE.BoxGeometry(.07,.007,.3),ST); add(a,0,.301,0.82); add(b,0,.301,0.82); }
+    plate(-0.98,-0.42,.24,.22,.2,.2,{x:-.38,y:.38,mat:H2,ch:.25});                       // island
+    plate(-0.86,-0.58,.18,.12,.16,.1,{x:-.38,y:.54,ch:.3}); windows(-.38,.6,-0.72,.24,5);
+    [-.42,-.36,-.33].forEach((x,i)=>rod(new THREE.Vector3(x,.58,-0.8+i*.06),new THREE.Vector3(x,.78-i*.04,-0.8+i*.06),.006,M.metal)); dish(-.38,.6,-0.48,.08);
+    [-1,1].forEach(sd=>{ for(let i=0;i<5;i++){ const z=-0.55+i*.3;                           // flank launch bays
+      plate(z-.12,z+.12,.02,.16,.02,.16,{x:sd*.505,y:-.08,mat:M.dark,ch:.1,greeble:false});
+      const slot=new THREE.Mesh(new THREE.PlaneGeometry(.2,.1),M.bay); slot.rotation.y=sd*Math.PI/2; add(slot,sd*.517,-.08,z); mount(0,sd*.53,-.08,z,sd,0,0.4); } });
+    { const fr=new THREE.Mesh(new THREE.BoxGeometry(.48,.18,.02),M.dark); add(fr,0,-.03,1.62);   // bow bay
+      const bb=new THREE.Mesh(new THREE.PlaneGeometry(.42,.12),M.bay); add(bb,0,-.03,1.632); mount(0,0,-.03,1.645); }
+    [-1,1].forEach(sd=>pulseTurret(1,sd*.3,.296,1.18,1,1.3));
+    pdc(.43,.29,-0.3,1); pdc(.43,.29,0.5,1); pdc(-.43,.29,0.9,1);                             // 3 dorsal, 4 flank, 3 ventral
+    pdc(.51,.12,-0.85,1,'x'); pdc(-.51,.12,-0.85,-1,'x'); pdc(.51,.12,1.1,1,'x'); pdc(-.51,.12,1.1,-1,'x'); pdc(.3,-.29,-0.5,-1); pdc(-.3,-.29,-0.5,-1); pdc(0,-.29,0.6,-1);
+    number(idn,.25,.297,-0.55,.11,'top'); number(idn,.511,.13,-0.4,.09,'r'); number(idn,-.511,.13,-0.4,.09,'l');
+    light(.5,.25,-0.95,nav); light(-.5,.25,-0.95,nav); light(-.38,.8,-0.75,0xff3030); rcs(.5,.2,1.4); rcs(-.5,.2,1.4);
   } else if(cls==='fastattack'){
     // v53, from Jon's reference art (reference/fast-attack-*.png): a fat drive drum, an open truss round the fuel
     // tanks, then an arrowhead hull with a missile pod on each flank, a raised armoured block with a sensor dome, and a
     // twin pulse turret ahead of it. Proportions are the plan view's, as fractions of length from the stern.
     { // 0 to 22%: the drive, a solid armoured cylinder (not the open drum other hulls use) with orange and white
       // bands, armour rings, and a glowing aft rim round the nozzle
-      const zf=-0.54, zb=-0.95, r=.27, cyl=(r0,z0,z1,mat,open=false)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r0,r0,z1-z0,48,1,open),mat); m.rotation.x=Math.PI/2; return add(m,0,0,(z0+z1)/2,true); };
+      const zf=-0.54, zb=-0.95, r=.27;
       cyl(r,zb+0.03,zf,HULL); cyl(r*1.012,-0.84,-0.71,PL,true); cyl(r*1.014,-0.70,-0.675,ST,true); cyl(r*1.012,-0.64,-0.58,PL,true);
       [zb+0.035,-0.775,-0.61,zf].forEach(z=>{ const t=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,.012,8,48),M.dark); add(t,0,0,z); });
       for(let i=0;i<10;i++){ const a=i/10*Math.PI*2, b=new THREE.Mesh(new THREE.BoxGeometry(.045,.03,.36),M.dark); b.position.set(Math.cos(a)*r*1.03,Math.sin(a)*r*1.03,(zb+zf)/2+0.02); b.rotation.z=a; body.add(b); }
@@ -502,63 +557,75 @@ function buildShip(cls, side, copy=0){
     pdc(0,-.13,.05,-1);
     light(0,.0,.955,0xffffff); light(.22,.1,-0.72,nav); light(-.22,.1,-0.72,nav); light(0,-.27,-0.7,0xff3020); rcs(.2,.06,.4); rcs(-.2,.06,.4);
   } else if(cls==='dreadnought'){
-    // the largest hull afloat: six drives, armored belts, a bridge tower, a spinal railgun running the length of
-    // a thick armored prow, light railguns on its flanks and two heavy beam emitters
-    [[-1,1],[0,1],[1,1],[-1,-1],[0,-1],[1,-1]].forEach(([sx,sy])=>drum(.17,.34,-1.95,sx*.34,sy*.2));
-    struts(-1.95,-1.8,.5,.5,0,0,10);
-    plate(-1.8,-1.1,1.2,.72,1.16,.7,{mat:H2}); sidePlates(-1.72,-1.2,1.2,.46);
-    collar(-1.1,-1.02,.9,.6);
-    plate(-1.02,0.9,1.1,.66,1.06,.62);
-    [-1,1].forEach(s=>plate(-0.95,0.85,.12,.5,.12,.46,{x:s*.6,y:-.02,mat:PL,ch:.2}));   // armor belts
-    topPlate(-0.95,0.85,.7,.66,.31,PL); stripes(-0.9,0.8,.325,.3,.02);
-    plate(-0.8,0.1,.4,.3,.34,.24,{y:.46,ch:.28,mat:H2}); windows(0,.62,-.35,.5,7); dish(.2,.6,-.65,.12); dish(-.2,.6,-.2,.09);   // bridge tower
-    plate(0.9,2.2,1.06,.62,.5,.34,{ch:.26}); sidePlates(1.0,2.0,1.0,.36,-.02); chevron(1.9,.2,.6); chevron(2.05,.16,.46);   // armored prow
-    tube(.1,-0.6,2.45,0,.43,M.dark,20);   // spinal railgun
-    for(let i=0;i<15;i++){ const c=new THREE.Mesh(new THREE.TorusGeometry(.105,.016,6,20),M.metal); add(c,0,.43,-0.5+i*.2); }
-    { const mz=new THREE.Mesh(new THREE.CylinderGeometry(.085,.12,.12,20),M.metal); mz.rotation.x=Math.PI/2; add(mz,0,.43,2.5);
-      const bore=new THREE.Mesh(new THREE.CircleGeometry(.045,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,.43,2.562); mount(0,0,.43,2.57); }
-    barrels([-.44,.44],.1,1.3,2.25,.018); mount(1,-.44,.1,2.26); mount(2,.44,.1,2.26);   // light railguns along the prow flanks
-    [-1,1].forEach(s=>pulseTurret(5,s*.2,.326,.5));
-    [-1,1].forEach(s=>{ plate(0.95,1.35,.2,.1,.18,.08,{x:s*.36,y:.36,mat:H2,ch:.3,greeble:false});   // heavy beam emitters
-      tube(.045,1.3,1.62,s*.36,.42,M.metal,16); const lens=new THREE.Mesh(new THREE.CircleGeometry(.032,16),new THREE.MeshBasicMaterial({color:P?0xffb44a:0xff5a3a})); add(lens,s*.36,.42,1.625); mount(s<0?3:4,s*.36,.42,1.63); });
-    [[.45,.33,-0.8],[-.45,.33,-0.8],[.45,.33,.6],[-.45,.33,.6],[.35,.2,1.5],[-.35,.2,1.5]].forEach(([x,y,z])=>pdc(x,y,z,1));
-    [[.66,0,-0.3],[.66,0,.5],[.6,0,1.3]].forEach(([x,y,z])=>{ pdc(x,y,z,1,'x'); pdc(-x,y,z,-1,'x'); });
-    pdc(0,-.33,-0.4,-1); pdc(0,-.33,.8,-1); pdc(0,-.2,1.7,-1);
-    number(idn,0,.335,.3,.14,'top'); number(idn,.52,.05,1.35,.1,'r'); number(idn,-.52,.05,1.35,.1,'l');
-    light(.6,.25,-1.7,nav); light(-.6,.25,-1.7,nav); light(0,.64,-.2,0xffffff); rcs(.4,.3,2.0); rcs(-.4,.3,2.0); rcs(.6,.3,-1.0); rcs(-.6,.3,-1.0);
+    // v54, from reference/dreadnought.png: six drives in a 2x3 block, a massive armoured hull with belts down both
+    // flanks, a deckhouse and bridge tower, a spinal railgun along the dorsal centreline to the prow, heavy beam
+    // emitters on raised blocks, light railguns on the prow flanks
+    [[-1,1],[0,1],[1,1],[-1,-1],[0,-1],[1,-1]].forEach(([sx,sy])=>drive(.21,.65,-1.62,sx*.43,sy*.22,{bands:[[0.3,0.55,PL],[0.58,0.64,ST]]}));
+    plate(-1.65,-1.35,1.2,.76,1.24,.74,{mat:H2,ch:.15});                                   // drive mount
+    const main=sec(-1.35,0.85,1.24,.74,1.18,.7,{ch:.2}), prow=sec(0.85,2.3,1.18,.7,.08,.1,{ch:.3});
+    [-1,1].forEach(sd=>{ const belt=sec(-1.2,0.75,.08,.5,.08,.46,{x:sd*.64,y:-.04,mat:H2,ch:.2});   // armour belts
+      band(belt,-0.85,-0.65); band(belt,-0.65,-0.6,ST); band(belt,0.25,0.4); });
+    band(main,-1.1,-0.88); band(main,-0.88,-0.83,ST); band(main,0.35,0.41,ST); band(main,0.41,0.62); band(prow,1.2,1.27,ST); band(prow,1.27,1.42);
+    plate(-1.25,0.2,.7,.14,.6,.12,{y:.42,mat:H2,ch:.3});                                   // deckhouse
+    plate(-0.7,-0.2,.4,.2,.34,.16,{y:.58,ch:.3}); windows(0,.68,-0.45,.4,7);                // bridge tower
+    plate(-0.62,-0.36,.2,.1,.16,.08,{y:.72,mat:H2,ch:.3}); dish(.24,.5,-1.0,.12);
+    [-.06,0,.06].forEach((x,i)=>rod(new THREE.Vector3(x,.76,-0.55+i*.07),new THREE.Vector3(x,.98-i*.05,-0.55+i*.07),.007,M.metal));
+    tube(.05,0.2,2.0,0,.45,M.dark,20); for(let i=0;i<10;i++){ const c=new THREE.Mesh(new THREE.TorusGeometry(.055,.01,6,20),M.metal); add(c,0,.45,0.3+i*.18); }   // spinal railgun
+    plate(0.75,1.95,.05,.24,.04,.32,{y:.31,mat:H2,ch:.3,greeble:false});                  // its pylon down the prow
+    { const mz=new THREE.Mesh(new THREE.CylinderGeometry(.05,.07,.1,20),M.metal); mz.rotation.x=Math.PI/2; add(mz,0,.45,2.05);
+      const bore=new THREE.Mesh(new THREE.CircleGeometry(.03,16),new THREE.MeshBasicMaterial({color:0x7fd0ff})); add(bore,0,.45,2.102); mount(0,0,.45,2.11); }
+    [-1,1].forEach(sd=>{ plate(1.15,1.5,.12,.12,.1,.1,{x:sd*.4,y:-.1,mat:H2,ch:.3}); });  // light railguns on the prow flanks
+    barrels([-.4,.4],-.1,1.45,1.85,.02); mount(1,-.4,-.1,1.86); mount(2,.4,-.1,1.86);
+    [-1,1].forEach(sd=>{ plate(0.35,0.75,.24,.14,.22,.12,{x:sd*.4,y:.42,mat:H2,ch:.3}); band({z0:0.35,z1:0.75,w0:.24,h0:.14,w1:.22,h1:.12,x:sd*.4,y:.42,ch:.3},0.45,0.55);   // heavy beam emitters on raised blocks
+      emitter(sd<0?3:4,sd*.4,.52,0.98,.38,.045); });
+    [-1,1].forEach(sd=>pulseTurret(5,sd*.2,.49,0.02,1,1.5));
+    [[.45,.37,-1.0],[-.45,.37,-1.0],[.45,.37,0.2],[-.45,.37,0.2],[.26,.27,1.3],[-.26,.27,1.3]].forEach(([x,y,z])=>pdc(x,y,z,1));   // 6 dorsal, 6 flank, 3 ventral
+    [-0.9,-0.2,0.5].forEach(z=>{ pdc(.685,-.16,z,1,'x'); pdc(-.685,-.16,z,-1,'x'); });
+    pdc(0,-.37,-0.9,-1); pdc(0,-.37,0.0,-1); pdc(0,-.3,1.1,-1);
+    number(idn,.683,.1,-0.55,.12,'r'); number(idn,-.683,.1,-0.55,.12,'l'); number(idn,.3,.375,-1.15,.14,'top');
+    light(.62,.3,-1.4,nav); light(-.62,.3,-1.4,nav); light(0,1.0,-0.55,0xffffff); light(0,0,2.31,0xffffff); rcs(.45,.3,1.6); rcs(-.45,.3,1.6); rcs(.62,.3,-1.0); rcs(-.62,.3,-1.0);
   } else if(cls==='tender'){
-    // a working yard ship: two drives, a boxy cargo spine lined with pods, gantry cranes over an open repair bay
-    drum(.2,.3,-1.35,.26,0); drum(.2,.3,-1.35,-.26,0);
-    struts(-1.35,-1.2,.3,.34,0,0,8);
-    plate(-1.2,-0.7,.8,.5,.8,.5,{mat:H2}); sidePlates(-1.15,-0.75,.8,.34);
-    plate(-0.7,0.9,.9,.44,.9,.44,{ch:.12});
-    [-1,1].forEach(s=>{ for(let i=0;i<4;i++) tank(s*.52,.02,-0.5+i*.36,.12,.16,H2); });
-    const bay=new THREE.Mesh(new THREE.PlaneGeometry(.6,.7),M.bay); bay.rotation.x=-Math.PI/2; add(bay,0,.226,.2);
-    [-.1,.5].forEach(z=>{ [-1,1].forEach(s=>rod(new THREE.Vector3(s*.34,.22,z),new THREE.Vector3(s*.34,.54,z),.016,M.metal));
-      rod(new THREE.Vector3(-.34,.54,z),new THREE.Vector3(.34,.54,z),.016,M.metal); rod(new THREE.Vector3(.1,.54,z),new THREE.Vector3(.1,.47,z),.005,M.dark);
-      const hook=new THREE.Mesh(new THREE.BoxGeometry(.06,.05,.06),PL); add(hook,.1,.45,z); });
-    plate(-0.6,-0.1,.3,.2,.26,.16,{y:.32,ch:.28,mat:H2}); windows(0,.42,-.35,.4,5); dish(.2,.42,-.6,.1);
-    plate(0.9,1.45,.9,.44,.6,.32,{ch:.24}); sidePlates(0.95,1.35,.86,.26,-.02); grille(1.45,0,.44,.18);
-    stripes(0.95,1.4,.225,.28,.02); chevron(1.3,.23,.5); [-1,1].forEach(s=>pulseTurret(0,s*.15,.2,1.06));
-    pdc(.3,.24,-.9,1); pdc(-.3,.24,-.9,1); pdc(0,-.23,.3,-1); pdc(.46,0,1.1,1,'x'); pdc(-.46,0,1.1,-1,'x');
-    number(idn,-.25,.225,-.45,.09,'top'); number(idn,.458,.05,1.15,.07,'r'); number(idn,-.458,.05,1.15,.07,'l');
-    light(.42,.2,-1.1,nav); light(-.42,.2,-1.1,nav); light(0,.57,.2,0x7fff9f); rcs(.4,.2,1.3); rcs(-.4,.2,1.3);
+    // v54, from reference/repair-tender.png: four drives, a working spine flanked by banded cargo tanks, yellow gantry
+    // cranes over an open repair bay with a hull in the dock, and a sharp bow carrying the pulse turrets
+    [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(([sx,sy])=>drive(.16,.45,-1.05,sx*.17,sy*.16,{bands:[[0.35,0.6,PL],[0.63,0.69,ST]]}));
+    const aft=sec(-1.07,-0.55,.7,.46,.72,.46,{mat:H2,ch:.15}), spine=sec(-0.55,0.7,.36,.36,.36,.36,{ch:.2});
+    const fore=sec(0.7,1.1,.74,.44,.66,.4,{ch:.2}), bow=sec(1.1,1.5,.66,.4,.12,.1,{ch:.3});
+    band(aft,-0.85,-0.75); band(aft,-0.75,-0.72,ST); band(fore,0.76,0.8,ST); band(bow,1.16,1.28);
+    [-1,1].forEach(sd=>[[-0.52,-0.04],[0.1,0.66]].forEach(([z0,z1])=>{ const x=sd*.37, r=.17, at=t=>lerp(z0,z1,t);   // cargo tanks
+      cyl(r,z0+.04,z1-.04,HULL,{x}); cyl(r,z1-.04,z1,H2,{x,r1:r*.7}); cyl(r*.7,z0,z0+.04,H2,{x,r1:r});
+      [[0.12,0.4,PL],[0.43,0.5,ST],[0.58,0.88,PL]].forEach(([a,b,m])=>cyl(r*1.012,at(a),at(b),m,{x,open:true}));
+      [0.1,0.52,0.9].forEach(t=>{ const tr=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,.009,8,40),M.dark); add(tr,x,0,at(t)); }); }));
+    plate(-0.5,0.62,.26,.02,.26,.02,{y:.18,mat:M.dark,ch:.05,greeble:false});             // repair bay, with a hull in the dock
+    plate(-0.35,0.45,.12,.08,.04,.04,{y:.23,mat:H2,ch:.3,greeble:false}); light(0,.25,-0.36,0x7fff9f);
+    [-0.25,0.4].forEach(z=>{ [-1,1].forEach(sd=>rod(new THREE.Vector3(sd*.42,.14,z),new THREE.Vector3(sd*.42,.52,z),.016,M.crane));   // gantry cranes
+      rod(new THREE.Vector3(-.44,.52,z),new THREE.Vector3(.44,.52,z),.016,M.crane); });
+    [-1,1].forEach(sd=>rod(new THREE.Vector3(sd*.42,.52,-0.25),new THREE.Vector3(sd*.42,.52,0.4),.014,M.crane));
+    [0.0,0.25].forEach((z,i)=>{ const tr=new THREE.Mesh(new THREE.BoxGeometry(.9,.03,.05),M.crane); add(tr,0,.5,z); const hk=new THREE.Mesh(new THREE.BoxGeometry(.05,.05,.05),PL); add(hk,i?-.12:.15,.42,z);
+      rod(new THREE.Vector3(i?-.12:.15,.49,z),new THREE.Vector3(i?-.12:.15,.44,z),.004,M.dark); });
+    plate(0.62,0.9,.3,.12,.26,.1,{y:.27,ch:.3}); windows(0,.33,.76,.22,4);                // bridge
+    [-.05,.05].forEach(x=>rod(new THREE.Vector3(x,.32,.7),new THREE.Vector3(x,.5,.7),.005,M.metal));
+    [-1,1].forEach(sd=>pulseTurret(0,sd*.14,.17,1.16,1,1.3));
+    pdc(.22,.24,-0.88,1); pdc(-.22,.24,-0.88,1); pdc(.37,-.08,0.82,1,'x'); pdc(-.37,-.08,0.82,-1,'x'); pdc(0,-.19,0.3,-1);   // 2 dorsal, 2 flank, 1 ventral
+    number(idn,.371,.07,0.92,.08,'r'); number(idn,-.371,.07,0.92,.08,'l'); number(idn,0,.205,1.0,.07,'top');
+    light(.36,.2,-0.9,nav); light(-.36,.2,-0.9,nav); light(0,0,1.51,0xffffff); rcs(.36,.18,1.0); rcs(-.36,.18,1.0);
   } else if(cls==='ewar'){
-    // a slim sensor hull bristling with arrays: dishes, lattice masts with emitter bars, a long spike antenna forward
-    drum(.17,.26,-1.05);
-    struts(-1.05,-0.92,.15,.2,0,0,6);
-    plate(-0.92,0.5,.34,.3,.34,.3,{ch:.2});
-    plate(0.5,1.05,.34,.3,.1,.1,{ch:.35}); topPlate(-0.8,0.45,.2,.2,.15,PL); stripes(-0.8,0.45,.16,.12,.014);
-    dish(0,.3,-.55,.16); dish(.16,.24,0.05,.11); dish(-.16,.24,0.3,.09);
-    [-1,1].forEach(s=>{
-      rod(new THREE.Vector3(s*.17,.1,-0.2),new THREE.Vector3(s*.45,.42,-0.2),.012,M.metal);
-      rod(new THREE.Vector3(s*.45,.42,-0.2),new THREE.Vector3(s*.45,.42,0.25),.012,M.metal);
-      for(let i=0;i<4;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(.03,.09,.03),M.dark); add(b,s*.45,.42,-0.15+i*.12); }
-      const fin=plate(-0.8,-0.4,.012,.26,.012,.08,{x:s*.19,y:-.18,mat:H2,ch:.2,greeble:false}); fin.rotation.z=-s*0.35; });
-    rod(new THREE.Vector3(0,.02,1.05),new THREE.Vector3(0,.02,1.55),.012,M.metal);
-    pdc(0,-.15,.2,-1); emitter(0,0,-.12,.98,.42,.026);   // ventral beam emitter
-    windows(0,.155,.65,.3,4); number(idn,0,.152,-.2,.06,'top');
-    light(.2,0,-.85,nav); light(-.2,0,-.85,nav); light(0,.02,1.57,0xb88cff); light(0,.52,-.55,0xb88cff); rcs(.18,.1,.9); rcs(-.18,.1,.9);
+    // v54, from reference/ew-ship.png: four drives in a diamond, a slim hull to a needle bow and a long antenna,
+    // sensor dishes and radomes along the back, lattice masts with emitter bars out to both sides
+    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([sx,sy])=>drive(.12,.36,-0.84,sx*.17,sy*.17,{bands:[[0.3,0.6,PL],[0.63,0.7,ST]]}));
+    plate(-0.86,-0.7,.42,.42,.4,.38,{mat:H2,ch:.3});
+    const main=sec(-0.7,0.25,.36,.32,.34,.3,{ch:.3}), nose=sec(0.25,1.2,.34,.3,.03,.03,{ch:.35});
+    band(main,-0.55,-0.45); band(main,-0.45,-0.42,ST); band(main,-0.12,-0.08,ST); band(nose,0.45,0.58); band(nose,0.6,0.64,ST);
+    rod(new THREE.Vector3(0,0,1.18),new THREE.Vector3(0,0,1.7),.008,M.metal); [1.3,1.45].forEach(z=>{ const t=new THREE.Mesh(new THREE.TorusGeometry(.016,.004,6,12),M.metal); add(t,0,0,z); });
+    dish(.12,.16,-0.28,.2); dish(.1,.16,0.18,.13); dish(-.14,.1,-0.05,.14);
+    [[.1,-0.62],[-.1,-0.62],[-.08,0.35]].forEach(([x,z])=>{ const s=new THREE.Mesh(new THREE.SphereGeometry(.05,20,12),M.metal); add(s,x,.18,z); });
+    const X=new THREE.Vector3(1,0,0), Z=new THREE.Vector3(0,0,1), bar=(x,y,z)=>{ const b=new THREE.Mesh(new THREE.BoxGeometry(.02,.07,.02),M.dark); add(b,x,y,z); light(x,y+.04,z,0xffa040); };
+    lattice(new THREE.Vector3(0,.15,-0.45),new THREE.Vector3(0,.62,-0.45),.05,Z);           // dorsal mast with crossbars
+    [.36,.52].forEach(y=>{ lattice(new THREE.Vector3(-.36,y,-0.45),new THREE.Vector3(.36,y,-0.45),.03,Z); [-1,1].forEach(sd=>bar(sd*.36,y,-0.45)); });
+    [-1,1].forEach(sd=>{ lattice(new THREE.Vector3(sd*.17,0,-0.1),new THREE.Vector3(sd*.5,0,-0.1),.05,Z); bar(sd*.5,0,-0.1); bar(sd*.36,0,-0.1);   // flank outriggers
+      lattice(new THREE.Vector3(sd*.17,-.05,-0.55),new THREE.Vector3(sd*.42,-.05,-0.55),.04,Z); bar(sd*.42,-.05,-0.55); });
+    pdc(0,-.16,-0.15,-1); emitter(0,0,-.19,0.36,.3,.025);                                   // ventral PDC and light beam emitter
+    windows(0,.165,.3,.2,4); number(idn,.181,.0,-0.3,.06,'r'); number(idn,-.181,.0,-0.3,.06,'l');
+    light(.2,0,-0.75,nav); light(-.2,0,-0.75,nav); light(0,0,1.71,0xb88cff); light(0,.66,-0.45,0xb88cff); rcs(.17,.08,.2); rcs(-.17,.08,.2);
   }
   // greebles scattered over every armored deck
   for(const d of decks){
