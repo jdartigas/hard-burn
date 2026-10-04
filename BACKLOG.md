@@ -382,6 +382,38 @@ When the first model exists: 24 copies on the board, full effects, on Jon's iPad
 will use). That says in one sitting whether levels of detail are needed from day one or only later. `DEBUG` (main.js)
 already shows frame time, draw calls and buffer sizes.
 
+## Brightness, playability and fun (Jon, after v58)
+
+Options proposed after Jon found the screen too dark. **Chosen for the next round (Jon): B1, B2, B3, F1, F2, F4, F5,
+plus a redesigned intro screen with a Quick start.** The rest stay here.
+
+Why it is dark: the starfield uses real star magnitudes (`STAR_DATA`, ~8,900 stars), the v54 player livery is dark
+charcoal, the scene is lit by one sun with a weak fill (`fill` 0.8, ambient 0.55 in render.js), and the hex grid is
+drawn at 22% opacity (board.js).
+
+**Brightening**
+- **B1. Starfield 2–3× brighter**, more faint stars, stronger Milky Way band (`buildRealSky`, locations.js). *Chosen.*
+- **B2. Brightness slider in Settings** (tone-mapping exposure), remembered per browser. *Chosen.*
+- **B3. Lift ships' shadow side:** stronger fill light plus a soft rim light outlining hulls against space. *Chosen.*
+- **B4.** Slightly lighter player livery: mid grey instead of charcoal.
+- **B5.** More visible board: brighter hex grid, a faint glow on the board plane under the fleets.
+- **B6.** Brighter backdrops per location: nebula glow, planets or sun more present (the Shattered Reach has none).
+
+**Playability and ease of use**
+- **P1. Undo last move.** *Declined by Jon.*
+- **P2.** AI turn speed: 1×, 2×, or skip to the result.
+- **P3.** Enemy threat ranges toggle: show where enemy weapons can reach.
+- **P4.** First-battle tips: short prompts for select, move, fire, end turn.
+- **P5.** "Ships with orders left" reminder before ending the turn.
+- **P6.** Off-screen target markers (camera follow-up E, below).
+
+**Fun**
+- **F1. Improved sound effects** (see the sound section above). *Chosen.*
+- **F2. Big moments:** brief slow motion and camera push when a capital ship dies; victory and defeat stings. *Chosen.*
+- **F3.** Scenarios beyond "destroy everything": escort a tender, hold a point, survive an ambush for N turns.
+- **F4. Quick battle mode:** smaller fleets for a ten-minute game, started from the intro screen. *Chosen.*
+- **F5. Battle summary** at the end: damage per ship, MVP, missiles intercepted. *Chosen.*
+
 ## Camera follow-ups (after v56)
 
 Options E and F from the v56 camera plan, deferred when A–D were built:
