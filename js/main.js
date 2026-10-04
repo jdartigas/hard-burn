@@ -180,7 +180,7 @@ function frame(){
   Particles.update(dt);
   lightPool.forEach(L=>{ if(L.t>0){ L.t-=dt; L.l.intensity=L.i*Math.max(0,L.t/L.max); } else L.l.intensity=0; });
   // camera pan keys
-  if(keys.size && !cam.menu){ const sp=cam.radius*0.9*dt; cam.follow=null; if(keys.has('w')||keys.has('arrowup')) panBy(0,-sp); if(keys.has('s')||keys.has('arrowdown')) panBy(0,sp); if(keys.has('a')||keys.has('arrowleft')) panBy(-sp,0); if(keys.has('d')||keys.has('arrowright')) panBy(sp,0); }
+  if(keys.size && !cam.menu){ const sp=cam.radius*0.9*dt; cam.follow=null; cam.touched=true; if(keys.has('w')||keys.has('arrowup')) panBy(0,-sp); if(keys.has('s')||keys.has('arrowdown')) panBy(0,sp); if(keys.has('a')||keys.has('arrowleft')) panBy(-sp,0); if(keys.has('d')||keys.has('arrowright')) panBy(sp,0); }
   updateCamera(dt);
   updateShadowFrustum();
   if(gtao.enabled){ const aoR=clamp(cam.radius*0.02,0.06,1.2); if(!(Math.abs(aoR-lastAoR)/lastAoR<0.08)){ lastAoR=aoR; gtao.updateGtaoMaterial({radius:aoR, thickness:aoR*2.5, distanceExponent:1.4, scale:1.15, samples:16}); } }
@@ -210,7 +210,7 @@ function frame(){
   // rings
   const sel=state.selected; selRing.visible=!!sel && state.phase==='player';
   if(sel){ selRing.position.copy(hexToWorld(sel.q,sel.r,0.04)).lerp(new THREE.Vector3(sel.group.position.x,0.04,sel.group.position.z),1); selRing.material.opacity=0.6+Math.sin(elapsed*4)*0.3; }
-  if(state.acting && state.acting.alive){ actRing.position.set(state.acting.group.position.x,0.04,state.acting.group.position.z); actRing.material.opacity=0.5+Math.sin(elapsed*5)*0.3; camFocus(state.acting.group.position, dt*0.8); }
+  if(state.acting && state.acting.alive){ actRing.position.set(state.acting.group.position.x,0.04,state.acting.group.position.z); actRing.material.opacity=0.5+Math.sin(elapsed*5)*0.3; }
   if(state.hoverTarget && state.hoverTarget.alive && state.phase==='enemy'){ tgtRing.visible=true; tgtRing.position.set(state.hoverTarget.group.position.x,0.04,state.hoverTarget.group.position.z); }
   tgtRing.material.opacity=0.6+Math.sin(elapsed*6)*0.3;
   tiles.material.opacity=clamp(cam.radius/40,0.08,0.32);

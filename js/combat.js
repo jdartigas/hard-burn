@@ -10,6 +10,7 @@ async function fireWeapon(att, wi, tgt){
   if(!att.alive || !tgt.alive || !weaponReady(w)) return false;
   let p=hitChance(att,d,tgt); if(p<=0) return false;
   p=clamp(p+slotAcc(w),5,95);   // a damaged weapon aims worse
+  if(state.acting===att && !cam.touched && frameShot(att,tgt)) await wait(0.3);   // AI shots: frame both ends, unless the player has taken the camera
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
   const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8)*(att.fx.ambush?0.5:1) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
@@ -189,9 +190,9 @@ async function aiShip(s){
   if(s.ability.key==='overcharge' && abilityReady(s) && s.shield<s.shieldMax*0.5 && threatAt(s,s)>25) await useAbility(s);
 }
 async function runAITurn(side){
-  const order=alive(side).sort((a,b)=>ORDER.indexOf(a.cls)-ORDER.indexOf(b.cls));
+  const order=alive(side).sort((a,b)=>ORDER.indexOf(a.cls)-ORDER.indexOf(b.cls)); cam.touched=false;
   for(const s of order){ if(state.over) break; if(!s.alive) continue; state.acting=s; actRing.visible=true; actRing.material.color.set(side==='player'?COL.player:COL.enemy);
-    camFocus(s.group.position, 0.35); await aiShip(s); await wait(0.3); }
+    if(!cam.touched) keepInView([s]); await aiShip(s); await wait(0.3); }
   state.acting=null; actRing.visible=false; state.hoverTarget=null;
 }
 

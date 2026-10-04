@@ -89,8 +89,8 @@ function select(s, quiet=false){
   const prev=state.selected;
   state.selected=s && s.alive && s.side==='player' ? s : null; state.mode=null; state.weaponSel='all';
   if(state.selected && !quiet) Sound.select();
-  if(state.selected && (state.selected!==prev || !quiet)) focusShip(state.selected);   // re-selecting recenters too
   recomputeHighlights(); updateHUD();
+  if(state.selected && (state.selected!==prev || !quiet)) focusShip(state.selected);   // after updateHUD, so the safe area allows for the ship panel
 }
 function recomputeHighlights(){
   const map=new Map(); const s=state.selected;
@@ -119,6 +119,7 @@ async function playerAttack(tgt){
   const list=weaponsForAttack(s,tgt);
   if(!list.length){ Sound.deny(); log(`${tgt.name} is out of reach for ${state.weaponSel==='all'?'any ready weapon':s.weapons[state.weaponSel].def.name.toLowerCase()} on ${s.name}`,'sys'); return; }
   state.busy=true; hideTooltip(); recomputeHighlights();
+  if(frameShot(s,tgt)) await wait(0.35);   // both ends of the shot on screen before it fires
   if(state.weaponSel==='all') await fireAll(s,tgt); else await fireWeapon(s,state.weaponSel,tgt);
   state.busy=false;
   if(state.weaponSel!=='all' && !weaponReady(s.weapons[state.weaponSel])) state.weaponSel='all';
@@ -175,6 +176,7 @@ function updateHUD(){
   for(const s of state.ships.filter(s=>s.side==='enemy').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))){
     const d=document.createElement('div'); d.className='erow'+(s.alive?'':' dead');
     d.innerHTML=`<div class="row">${s.name}<span>${s.alive?s.C.label:'Destroyed'}</span></div><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div><div class="mbar hu"><i style="width:${pct(s.hull,s.hullMax)}"></i></div>${s.alive&&damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`;
+    if(s.alive) d.onclick=()=>{ const sel=state.selected; if(sel) frameShot(sel,s); else keepInView([s]); };   // picking a contact brings it into view, beside your selected ship
     d.onmouseenter=()=>{ state.rosterHover=s; }; d.onmouseleave=()=>{ state.rosterHover=null; };
     el.appendChild(d);
   }
