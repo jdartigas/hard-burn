@@ -170,10 +170,35 @@ async function sim(fleets, n=20, seed0=1){
   return out;
 }
 let elapsed=0;
+/* ---------------- big moments (v62, Jon) ----------------
+   Every ship's death slows time for a moment; medium and heavy hulls also pull the camera in on the explosion, then
+   hand it back. Scaled by hull size, so a battle's dozen kills don't each stop the game. Skipped in simulations, and
+   when the system asks for reduced motion; no camera push if the player has moved the camera this turn. */
+const MOMENT = { ease:0.3,
+  small:  {scale:0.55, hold:0.35, push:0},      // up to 150 m
+  medium: {scale:0.4,  hold:0.7,  push:0.8},    // 185 to 250 m
+  capital:{scale:0.25, hold:1.2,  push:0.62} }; // 275 m and up
+let moment=null;
+function bigMoment(s){
+  if(state.simulated || simRunning || window.__norender || REDUCED) return;
+  const tier= s.C.m>=275? 'capital' : s.C.m>=185? 'medium' : 'small', M=MOMENT[tier];
+  if(moment && moment.M.scale<=M.scale){ moment.t=Math.min(moment.t, MOMENT.ease); return; }   // a bigger one is running: just extend it
+  const back= moment && moment.back;   // a smaller one is running: take over, but keep its way back
+  moment={M, t:0, back};
+  if(M.push && !cam.touched && !cam.menu){ if(!moment.back) moment.back={goal:cam.goal.clone(), r:cam.rGoal};
+    const p=s.group.position; cam.follow=null; cam.goal.set(p.x,0,p.z); cam.rGoal=Math.max(MIN_ZOOM, s.len*4, cam.rGoal*M.push); }
+}
+function updateMoment(raw){
+  if(!moment) return;
+  moment.t+=raw; const M=moment.M, e=MOMENT.ease, t=moment.t;
+  const k= t<e? t/e : t<e+M.hold? 1 : Math.max(0, 1-(t-e-M.hold)/e);
+  timeScale=1+(M.scale-1)*k;
+  if(t>=e+M.hold+e){ timeScale=1; if(moment.back && !cam.touched){ cam.goal.copy(moment.back.goal); cam.rGoal=moment.back.r; } moment=null; }
+}
 function frame(){
   requestAnimationFrame(frame);
   const fT0=DEBUG? performance.now() : 0; if(DEBUG) renderer.info.reset();
-  const rawDt=clock.getDelta(), dt=Math.min(rawDt,0.05)*timeScale; elapsed+=dt;
+  const rawDt=clock.getDelta(); updateMoment(Math.min(rawDt,0.1)); const dt=Math.min(rawDt,0.05)*timeScale; elapsed+=dt;
   // one-time frame-rate check early in a battle: step graphics down if the machine is struggling (never overrides a manual choice)
   if(!perfCheck.done && state.phase==='player' && !document.hidden && !window.__norender && rawDt<0.5){ perfCheck.t+=rawDt; perfCheck.n++;
     if(perfCheck.t>6){ perfCheck.done=true; const ms=perfCheck.t/perfCheck.n*1000;

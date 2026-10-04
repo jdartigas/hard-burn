@@ -53,7 +53,7 @@ const pendingDeaths=[];
 function destroyShip(s, by){
   log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k');
   const wc=cellAt(s.q,s.r); if(wc && wc.t==='open') wc.t='debris';   // the wreck leaves a debris field: cover, double movement
-  const pr=explodeShip(s); pendingDeaths.push(pr);
+  const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s);
   if(state.selected===s) select(null);
   checkEnd();
 }
@@ -209,7 +209,7 @@ function beginSideTurn(side){
 }
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }
 function startPlayerTurn(){
-  state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle');
+  state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle'); cam.touched=false;
   banner(`Turn ${state.turn}`, state.turn>=turnLimit()?'Final turn: fleet value decides':'Your orders', 'p'); Sound.turn('player');
   const first=alive('player').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))[0];
   select(first||null, true); updateHUD();
