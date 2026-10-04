@@ -126,9 +126,12 @@ const Sound = (() => {
     // v66: the blasts running along a dying ship before it goes up
     burst(){ blast(0.35,{gain:0.15,lo:90,bright:2400,crack:0.4}); sample('pop',{gain:0.18,rate:0.9+Math.random()*0.4,vary:0}); },
     // v65 (Jon): shields crackle with static when hit; a beam holds them longer
-    shield(kind){ const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03});
-      // v67: a warhead bursting against the shield, over the static
-      if(kind==='torpedo') blast(0.6,{gain:0.16,lo:70,bright:2400,crack:0.5}); else if(kind==='missile' || kind==='fighter') blast(0.4,{gain:0.11,lo:90,bright:2800,crack:0.4}); },
+    shield(kind){
+      // v69 (Jon): a warhead on a shield is an explosion close to its hull hit, a little brighter and softer, with a
+      // short shield shimmer (a falling resonant tone) instead of the full static, which read as a crunch
+      if(kind==='torpedo' || kind==='missile' || kind==='fighter'){ const T=kind==='torpedo';
+        blast(T?0.8:0.5,{gain:T?0.24:0.17, lo:T?60:80, bright:T?2800:3200, crack:0.2}); tone(0.35,{type:'sine',f0:T?260:320,f1:T?120:150,gain:0.05}); crackle(0.15,{gain:0.07,f:4000,density:50}); return; }
+      const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03}); },
     boom(size=1){ duck(0.35,1.2);
       // size is about a ship's length over 2.2: Patrol craft ~0.5, Destroyer ~1.6, Dreadnought ~2.8; asteroids 1.1
       // v67 (Jon): every hull uses the capital explosion he liked, pitched up and quieter as ships get smaller; the short

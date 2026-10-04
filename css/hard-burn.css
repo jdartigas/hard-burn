@@ -437,3 +437,14 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 .eships .nm.lost{color:var(--dim);text-decoration:line-through;text-decoration-color:rgba(255,93,77,.6)}
 .eships .nm.lost small{text-decoration:none}
 @media (max-width:520px){ .eships{gap:5px 9px;font-size:13.5px} .eships .h{font-size:11.5px} .mvp b{font-size:16px} }
+
+/* ---- v69 (Jon): the intro title in a black weight, with a subtle gradient and glow. Michroma has no bold, so the
+   title alone uses Orbitron Black; the rest of the interface keeps Michroma. ---- */
+#title{font-family:"Orbitron",var(--display);font-weight:900;letter-spacing:.02em;text-shadow:none;
+  background:linear-gradient(180deg,#E6F7FF 0%,#9FE0FF 48%,#4FB7EE 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 14px rgba(111,208,255,.35)) drop-shadow(0 0 2px rgba(189,235,255,.4))}
+#title span{background:inherit;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}   /* each line gets its own light-to-blue sweep */
+/* v69: Orbitron runs about 6.2em for LANIAKEA'S where Michroma ran 8.2em, so the title can be larger in the same column */
+#title{font-size:clamp(40px,min(8.4vw,10vh),100px);line-height:1}
+@media (max-height:900px) and (min-width:761px){ #title{font-size:clamp(32px,min(7vw,7.6vh),76px)} }
+@media (max-width:760px){ #title{font-size:clamp(34px,13vw,64px)} }
