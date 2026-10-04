@@ -290,6 +290,25 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
+## Improved sound effects (Jon, during v52)
+
+Today every sound is synthesized in `js/audio.js` (Web Audio oscillators and filtered noise), mixed through one
+effects bus and one music bus. It works, but the effects are thin next to the visuals the game has grown.
+
+Ideas to scope with Jon:
+- **A distinct voice per weapon:** railgun crack and slug whine, beam hum that holds for the shot, pulse thumps per
+  bolt, missile launch and motor roar, torpedo launch thud, fighters, PDC buzz-saw on intercepts.
+- **Impacts that tell you what was hit:** shield ripple versus hull strike versus armor ping; a heavier layer for
+  railgun and torpedo hits.
+- **Explosions with weight:** layered ship deaths (crack, roar, debris rattle, a low tail), scaled by hull size.
+- **Space for it:** pan by screen position and soften by camera distance, so a fight on the left sounds on the left
+  and a close-up is louder than a distant exchange.
+- **New game events:** system damage and offline alarms (v52 damage model), repairs, turret traverse, the turn banner,
+  low-hull warnings.
+- **Synthesized or recorded:** v48 allowed real files in `assets/`. Recorded or designed samples (CC0 sources, listed
+  in `assets/CREDITS.md`) could sit alongside synthesis. Weigh download size; keep everything working with sound off.
+- Keep it under the Effects slider and mute (v44).
+
 ## Combat: damage model and railgun range (Jon, after v49)
 
 ### Damage model: weapons and systems knocked out
