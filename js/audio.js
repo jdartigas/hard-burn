@@ -106,7 +106,13 @@ const Sound = (() => {
     // v65: a fast missile leaving the tube: a quick rising whoosh and a whine, a little of the thruster recording for body
     missile(){ noise(0.45,{type:'bandpass',f0:900,f1:5200,q:2.5,gain:0.22,attack:0.02}); noise(0.3,{type:'highpass',f0:6000,f1:3000,gain:0.07}); tone(0.35,{type:'sawtooth',f0:420,f1:1700,gain:0.018}); sample('launch',{gain:0.22,rate:2.2,dur:0.35,vary:0.1}); },
     fighter(){ noise(1.0,{type:'bandpass',f0:1200,f1:3200,q:4,gain:0.12,attack:0.2}); },
-    pdc(){ if(!ctx) return; for(let i=0;i<9;i++) noise(0.03,{type:'highpass',f0:2500,f1:2000,gain:0.12,delay:i*0.035}); },
+    // v68 (Jon): point defense as a gatling: the barrels spin up with a motor whine, then a fast, even stream of rounds
+    // (each a sharp crack with a little low thump), slightly uneven in pitch and level, and a spin-down
+    pdc(){ if(!ctx) return; const n=18, gap=0.038, spin=0.12, len=spin+n*gap;
+      tone(len+0.3,{type:'sawtooth',f0:110,f1:230,gain:0.018,attack:spin}); tone(len+0.3,{type:'triangle',f0:220,f1:460,gain:0.012,attack:spin});
+      for(let i=0;i<n;i++){ const d=spin+i*gap+(Math.random()-0.5)*0.006, v=0.75+Math.random()*0.35;
+        noise(0.03,{type:'bandpass',f0:2200+Math.random()*1400,f1:900,q:1.4,gain:0.17*v,attack:0.002,delay:d});
+        tone(0.035,{type:'square',f0:190+Math.random()*40,f1:70,gain:0.028*v,attack:0.002,delay:d}); } },
     // v65 (Jon): what a hull hit sounds like depends on what hit it
     hit(kind){
       if(kind==='torpedo'){ blast(0.95,{gain:0.3,lo:55,bright:2000,crack:0.8}); blast(0.45,{gain:0.12,lo:90,bright:2600,crack:0.3,delay:0.14}); return; }   // v66: a heavy warhead, its own sound

@@ -401,7 +401,7 @@ drawn at 22% opacity (board.js).
 
 **Playability and ease of use**
 - **P1. Undo last move.** *Declined by Jon.*
-- **P2.** AI turn speed: 1×, 2×, or skip to the result.
+- **P2. AI turn speed.** *Declined by Jon (after v67): he likes watching the enemy's turns.*
 - **P3.** Enemy threat ranges toggle: show where enemy weapons can reach.
 - **P4.** First-battle tips: short prompts for select, move, fire, end turn.
 - **P5.** "Ships with orders left" reminder before ending the turn.
@@ -425,8 +425,7 @@ Options E and F from the v56 camera plan, deferred when A–D were built:
 - **F. Camera setting: Follow action / Manual.** Manual turns off all automatic framing (`keepInView`, `frameShot`,
   AI framing). Less needed since the camera already stops framing AI shots once the player moves it (`cam.touched`).
   Small; keep in reserve until someone asks.
-- **Zoom back after AI turns.** AI framing can zoom out for long shots, and nothing zooms back in. Ease back to the
-  player's zoom when their turn starts.
+- ~~**Zoom back after AI turns.**~~ **Done in v68:** at the start of the player's turn the camera eases back to the view they had before the AI turn, unless they moved it during that turn.
 
 ## Ship lore (Jon, during v57)
 

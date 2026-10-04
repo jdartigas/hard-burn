@@ -191,6 +191,7 @@ async function aiShip(s){
 }
 async function runAITurn(side){
   const order=alive(side).sort((a,b)=>ORDER.indexOf(a.cls)-ORDER.indexOf(b.cls)); cam.touched=false;
+  cam.before={goal:cam.goal.clone(), r:cam.rGoal};   // v68: the view to hand back when the player's turn starts
   for(const s of order){ if(state.over) break; if(!s.alive) continue; state.acting=s; actRing.visible=true; actRing.material.color.set(side==='player'?COL.player:COL.enemy);
     if(!cam.touched) keepInView([s]); await aiShip(s); await wait(0.3); }
   state.acting=null; actRing.visible=false; state.hoverTarget=null;
@@ -209,7 +210,9 @@ function beginSideTurn(side){
 }
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }
 function startPlayerTurn(){
-  state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle'); cam.touched=false;
+  state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle');
+  // v68 (Jon): AI framing zooms out for long shots; ease back to the view the player had, unless they moved the camera during the AI turn
+  if(cam.before && !cam.touched && !cam.menu){ cam.follow=null; cam.goal.copy(cam.before.goal); cam.rGoal=cam.before.r; } cam.before=null; cam.touched=false;
   banner(`Turn ${state.turn}`, state.turn>=turnLimit()?'Final turn: fleet value decides':'Your orders', 'p'); Sound.turn('player');
   const first=alive('player').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))[0];
   select(first||null, true); updateHUD();
