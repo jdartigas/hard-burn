@@ -28,8 +28,12 @@ const Sound = (() => {
   const SFX = { pulse:['pulse1','pulse2','pulse3'], beam:['beam1','beam2'], rail:['rail1'], launch:['launch1','launch2'], shield:['shield1','shield2'],
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomS:['boom1','boom2'], boomM:['boom3'], boomL:['boom4'], rumble:['rumble'] };
   const bufs={};
-  function loadSfx(){ for(const n of new Set(Object.values(SFX).flat()))
-    fetch(`assets/sfx/${n}.m4a?v=${GAME_VERSION}`).then(r=>r.ok? r.arrayBuffer() : Promise.reject()).then(b=>new Promise((ok,no)=>ctx.decodeAudioData(b,ok,no))).then(b=>{ bufs[n]=b; }).catch(()=>{}); }
+  // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
+  // were silently missing there
+  const b64=s=>{ const bin=atob(s), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a.buffer; };
+  function loadSfx(){ if(typeof SFX_DATA==='undefined') return;
+    for(const n of new Set(Object.values(SFX).flat())) if(SFX_DATA[n])
+      new Promise((ok,no)=>ctx.decodeAudioData(b64(SFX_DATA[n]),ok,no)).then(b=>{ bufs[n]=b; }).catch(()=>{}); }
   function sample(key, {gain=1, rate=1, vary=0.06, delay=0}={}){
     if(!ctx) return false; const list=SFX[key].filter(n=>bufs[n]); if(!list.length) return false;
     const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*(1+(Math.random()*2-1)*vary);

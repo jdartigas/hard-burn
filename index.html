@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '63';
+const GAME_VERSION = '64';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -229,7 +229,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
 // The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
-for(const f of ['core','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
+for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
   const s=document.createElement('script'); s.src=`js/${f}.js?v=${GAME_VERSION}`; s.onload=ok;
   s.onerror=()=>fail(new Error(`Could not load js/${f}.js`)); document.body.appendChild(s); });
 </script>
