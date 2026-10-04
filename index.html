@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '69';
+const GAME_VERSION = '70';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -228,10 +228,21 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
-// The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
-for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
-  const s=document.createElement('script'); s.src=`js/${f}.js?v=${GAME_VERSION}`; s.onload=ok;
-  s.onerror=()=>fail(new Error(`Could not load js/${f}.js`)); document.body.appendChild(s); });
+// v70: say so plainly when the game can't start, instead of leaving a menu whose buttons do nothing. Without WebGL
+// (hardware acceleration off, some headless or locked-down browsers) the renderer can't be created and every later
+// script fails on names it never got to define.
+function cantStart(title, body){ const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;background:#02060c;color:#D9F0FF;font:500 17px/1.5 Rajdhani,system-ui,sans-serif;text-align:center';
+  d.innerHTML=`<div style="max-width:30em"><h1 style="font:400 22px Michroma,Arial,sans-serif;letter-spacing:.08em;color:#6FD0FF;margin:0 0 14px">${title}</h1><p style="margin:0;color:#b4cddc">${body}</p></div>`;
+  document.body.appendChild(d); }
+const webgl=(()=>{ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }catch(e){ return false; } })();
+if(!webgl) cantStart("This browser can't show 3D graphics", "Laniakea's Edge needs WebGL. Turn on hardware acceleration (graphics acceleration) in your browser's settings and reload, or try another browser.");
+else try{
+  // The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
+  for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
+    const s=document.createElement('script'); s.src=`js/${f}.js?v=${GAME_VERSION}`; s.onload=ok;
+    s.onerror=()=>fail(new Error(`Could not load js/${f}.js`)); document.body.appendChild(s); });
+} catch(e){ cantStart("The game couldn't load", `${e.message}. Check your connection and reload the page.`); }
 </script>
 </body>
 </html>

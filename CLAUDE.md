@@ -221,6 +221,7 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 ## 7. Testing
 
 **First choice: a real browser on Jon's Mac.** In the Claude Code desktop app, open the page in the built-in browser pane. It runs on the real GPU, so it renders at full speed and can show the driver bugs in §6 that SwiftShader can't.
+- **When the game can't start (v70):** the loader in index.html checks for WebGL first and, if there is none, shows a plain full-screen message (turn on hardware acceleration or try another browser) instead of loading the game; a script that fails to load shows a message too. Without this, a browser with no WebGL (an AI reviewer's headless browser, in Jon's case) got a dead menu and errors like `scene is not defined` and `Cannot access 'MAX_ANISO' before initialization`, because render.js stops at its first line (`new THREE.WebGLRenderer`) and nothing it defines ever exists.
 - `index.html` loads Three.js from the CDN as an ES module. If `file://` refuses to load it, serve the folder instead: `python3 -m http.server 8000`, then open `http://localhost:8000/`.
 - Hard-refresh after every edit, and check that the version on the intro screen matches `GAME_VERSION`.
 - Add `?debug` to see GPU, render scale and GL errors. Add `?shadows=0`, `?aa=0`, `?ao=0` or `?pr=1` to isolate a rendering fault.
