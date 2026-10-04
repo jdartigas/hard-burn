@@ -290,6 +290,112 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
+## Ship models made by Jon (after v58)
+
+Jon wants to model the ships himself instead of using AI-generated art. Today every hull is built in code from
+the kit in `buildShip` (js/ships.js). This section is the plan for loading his models instead, class by class, with
+the code-built hull kept as the fallback for any class without a model yet.
+
+### File format: glTF (.glb), not STL
+
+The game can load either with Three.js's own loaders (`GLTFLoader`, `STLLoader`, from the same CDN as the rest of
+three/addons), so there is still no build step. STL carries shape only.
+
+| | STL | glTF / GLB |
+|---|---|---|
+| Shape | Yes | Yes |
+| Materials and colours (charcoal hull, orange bands, white stripes, glowing lights) | No | Yes |
+| Texture coordinates, so the riveted plating can be applied | No (a triplanar shader can fake it, more crudely) | Yes |
+| Separate named parts (turrets, drives, sections) | No: one mesh per file | Yes |
+| Marker points for weapon mounts and drive nozzles | No | Yes, as empties |
+
+STL is workable only as one file per part (hull, orange livery, white livery, each turret). Recommend .glb exported
+from Blender.
+
+### What each model needs
+
+- **Orientation and size:** the bow along one agreed axis, at true length (`m` in `CLASSES`). The game rescales by
+  measured length anyway, as it does now (`modelLen`).
+- **Weapon mounts:** named empties, e.g. `rail_0`, `pulse_1`, `pdc_3`, mapped to the class's weapon slots, so shots
+  leave from the real hardpoints (`mounts.w[slot]`, `mounts.pdc`) and the damage model's smoke and sparks still find them.
+- **Turrets:** separate objects with their pivot at the base, so they keep traversing (`rigTurret`, `MAX_TURRETS`).
+- **Drives:** nozzle empties for the plumes (`makePlume`), pointing aft.
+- **Lights:** emissive materials for ports and running lights, and nav lights as named empties if they should blink.
+- **Triangle budget:** about 20,000–60,000 per ship at full detail (see levels of detail below). Print-ready models
+  often run to millions.
+
+### Breaking up on destruction
+
+`breakUpShip` (js/wrecks.js) splits a ship into 2–5 sections along the keel, cutting between the deck modules the
+code-built hulls are made of. Meshes that span a cut are stretched to fit each side. Small debris is a stock kit
+(plates, girders, pipes) from `DebrisKit`, not pieces of the ship. A model that arrives as one mesh would therefore
+go into one section and not break at all. Two changes keep it working, and they combine:
+
+1. **Automatic cutting:** each section draws the whole model through clipping planes, so it shows only its slice.
+   The planes follow the section as it tumbles. The existing glowing torn edges (`tornEdge`) cover the open cut.
+   This works with any model, a single STL included, with nothing special for Jon to do.
+2. **Modelled parts as debris:** separate objects in the model (turrets, dishes, antennas, armour panels) below a
+   size threshold fly off as real debris, alongside or instead of the stock shards. With glTF Jon only has to leave
+   them as separate objects.
+
+Together: large sections tumbling apart, with the ship's own fittings scattering.
+
+### Suggested path
+
+1. Jon models one ship first. The Frigate is a good test: mid-sized, with a mix of fittings. Export as .glb with
+   mount empties.
+2. Build the loader, mount and turret mapping, automatic cutting and parts-as-debris on that one ship.
+3. Run the stress test below.
+4. Publish a short modelling guide (naming, orientation, triangle and texture budgets) for the other nine classes.
+
+### Engine: stay with Three.js (assessed after v58)
+
+The question was whether Three.js is the best engine for many detailed models on screen at once. It is not the limit:
+every browser engine hands the GPU the same work through WebGL or WebGPU, so the same models are not meaningfully
+faster elsewhere. What decides speed is triangle count, draw calls (ships are already merged to a handful each,
+`mergeShipParts`), texture memory, and post-effects (bloom, ambient occlusion, shadows, anti-aliasing), which probably
+cost more than the ships on today's board.
+
+- **Babylon.js:** the only serious alternative. More is built in (levels of detail, inspector, mature WebGPU), but no
+  real speed advantage at this scale, and switching means rewriting the renderer, effects, ships, wrecks, sky and every
+  shader.
+- **PlayCanvas:** a good engine built around its own online editor. Same performance story, same rewrite.
+- **Unity or Godot web exports:** large downloads, slow loading, weak on iPhone and iPad Safari, and no longer "it's
+  just a web page". Ruled out.
+- **Three.js WebGPU renderer:** an upgrade within Three.js, not a change of engine. Safari supports WebGPU now.
+  Revisit once it is mature.
+
+### What actually matters for detailed models
+
+1. **Levels of detail (the big one).** On the board ships are 30–200 pixels long, so full detail is mostly wasted
+   there. Each ship exported at two or three levels: full for the ship viewer and close zoom, about 10,000 triangles for
+   normal board view, a very simple one far out. Three.js's `LOD` swaps them by distance.
+2. **Shared copies.** Five Frigates load the geometry once and draw it five times.
+3. **Compression for download size:** Draco or meshopt for geometry, KTX2 for textures, both supported by Three.js, so
+   the game still loads quickly on a phone connection.
+4. **Texture memory budget.** iPhones and iPads cap memory per tab. Large textures on ten classes add up fast; agree a
+   size per ship.
+
+### Stress test before committing to budgets
+
+When the first model exists: 24 copies on the board, full effects, on Jon's iPad (likely the weakest device people
+will use). That says in one sitting whether levels of detail are needed from day one or only later. `DEBUG` (main.js)
+already shows frame time, draw calls and buffer sizes.
+
+## Camera follow-ups (after v56)
+
+Options E and F from the v56 camera plan, deferred when A–D were built:
+
+- **E. Markers for off-screen targets.** While a ship is selected, enemies it can hit that are off screen get an arrow
+  at the screen edge with the hit chance; tapping it aims at that ship. v56 covered part of this (tapping an Enemy
+  contact frames it beside the selected ship), but markers would help most on phones, where the enemy list is in a
+  drawer. Medium-sized. Best done the next time the battle interface is touched.
+- **F. Camera setting: Follow action / Manual.** Manual turns off all automatic framing (`keepInView`, `frameShot`,
+  AI framing). Less needed since the camera already stops framing AI shots once the player moves it (`cam.touched`).
+  Small; keep in reserve until someone asks.
+- **Zoom back after AI turns.** AI framing can zoom out for long shots, and nothing zooms back in. Ease back to the
+  player's zoom when their turn starts.
+
 ## Ship lore (Jon, during v57)
 
 Each class gets lore for the ship viewer: who builds it, its history, famous hulls, how crews talk about it.
