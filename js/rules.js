@@ -22,7 +22,7 @@ function createShip(cls, side, q, r, copy=0){
   s.pickMesh.scale.setScalar(Math.max(1, 0.9/(C.len*0.5*s.group.scale.x)));   // small hulls keep a finger-sized target
   s.group.position.copy(hexToWorld(q,r,s.baseY));
   s.group.rotation.y = side==='player'? Math.PI/2 : -Math.PI/2;
-  s.pickMesh.userData.ship=s;
+  s.pickMesh.userData.ship=s; initSystems(s);
   scene.add(s.group);
   // label
   const el=document.createElement('div'); el.className='tag '+side;
@@ -34,7 +34,7 @@ const ROMAN = ['','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const alive = side => state.ships.filter(s=>s.alive && s.side===side);
 const other = side => side==='player'?'enemy':'player';
 function shipAt(q,r){ return state.ships.find(s=>s.alive && s.q===q && s.r===r) || null; }
-function weaponReady(w){ return w.wait===0 && (w.ammo===undefined || w.ammo>0); }
+function weaponReady(w){ return w.wait===0 && (w.ammo===undefined || w.ammo>0) && !weaponOffline(w); }
 function abilityReady(s){ return s.ability.wait===0; }
 
 /* ---------------- rules ---------------- */
@@ -68,10 +68,10 @@ function abilityTargets(s){ const d=s.ability.def; if(!d.targeted) return [];
 // Whose point defense protects tgt: its own, or an escort's screen when that is stronger. `by` is the ship doing
 // the shooting, so the interception can be drawn from it and credited to it.
 function pdCover(tgt){
-  let p=tgt.pdc, by=tgt;
+  let p=effPdc(tgt), by=tgt;   // a damaged point-defense system intercepts less (damage.js)
   if(tgt.fx.pdsurge) p=Math.min(0.85,p*1.6);
-  let best=null; for(const a of alive(tgt.side)) if(a.C.pdnet && a!==tgt && hdist(a,tgt)<=PD_NET.radius && (!best || a.pdc>best.pdc)) best=a;
-  if(best){ const sp=best.pdc*PD_NET.share;
+  let best=null; for(const a of alive(tgt.side)) if(a.C.pdnet && a!==tgt && hdist(a,tgt)<=PD_NET.radius && (!best || effPdc(a)>effPdc(best))) best=a;
+  if(best){ const sp=effPdc(best)*PD_NET.share;
     if(PD_NET.stack){ p=1-(1-p)*(1-sp); by=best; } else if(sp>p){ p=sp; by=best; } }
   return {p, by};
 }

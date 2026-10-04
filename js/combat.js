@@ -8,7 +8,8 @@ function newStats(){ const z=()=>({dealt:0,taken:0,shots:0,hits:0,kills:0,ints:0
 async function fireWeapon(att, wi, tgt){
   const w=att.weapons[wi], d=w.def;
   if(!att.alive || !tgt.alive || !weaponReady(w)) return false;
-  const p=hitChance(att,d,tgt); if(p<=0) return false;
+  let p=hitChance(att,d,tgt); if(p<=0) return false;
+  p=clamp(p+slotAcc(w),5,95);   // a damaged weapon aims worse
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
   const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8)*(att.fx.ambush?0.5:1) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
@@ -18,7 +19,8 @@ async function fireWeapon(att, wi, tgt){
   // their (cosmetic) flight paths make them, so each impact only applies its precomputed share: subtraction is the
   // same in any order, and the shot that kills is fixed here rather than by which effect arrives first.
   const sim={shield:tgt.shield, hull:tgt.hull, armor:tgt.armor, fx:tgt.fx}; let killShot=-1;
-  const res=outcomes.map((o,i)=>{ if(o!=='hit' || killShot>=0) return {s:0,h:0}; const r=applyDamage(sim,d,dmgRoll[i]); if(sim.hull<=0.5) killShot=i; return r; });
+  const simSys={};   // criticals are decided here too, in shot order, so a seed always plays out the same (damage.js)
+  const res=outcomes.map((o,i)=>{ if(o!=='hit' || killShot>=0) return {s:0,h:0}; const r=applyDamage(sim,d,dmgRoll[i]); if(sim.hull<=0.5) killShot=i; else r.crit=rollCrit(tgt,r.h,simSys,sim.hull); return r; });
   const st=state.stats[att.side]; st.shots+=d.shots;
   let S=0,H=0,hits=0,ints=0,misses=0, missShown=false;
   const onEvent=(i,o)=>{
@@ -29,6 +31,7 @@ async function fireWeapon(att, wi, tgt){
       tgt.shield=Math.max(0,tgt.shield-r.s); tgt.hull-=r.h; if(tgt.isRock) rockDamaged(tgt);
       impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1);
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
+      if(r.crit && i!==killShot) applyCrit(tgt, r.crit);
       if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; destroyShip(tgt, att); } }
       refreshTags(); updateHUD();
     } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++;
@@ -72,11 +75,11 @@ async function useAbility(s, target=null){
   else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
   else if(k==='resupply'){ if(!target) return false;
     const hull=Math.min(a.def.amount, target.hullMax-target.hull), sh=Math.min(target.shieldMax/2, target.shieldMax-target.shield); let salvos=0;
-    target.hull+=hull; target.shield+=sh; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } });
+    target.hull+=hull; target.shield+=sh; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } }); const fixed=repairAll(target);
     const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.55,.9,1),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
-    floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
+    floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:'', fixed?`${fixed} system${fixed>1?'s':''} repaired`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
   else if(k==='blackout'){ if(!target) return false; target.blackout=s.side;   // lasts until this side's next turn begins
     const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
     for(let i=0;i<30;i++){ after(i*0.02,()=>{ const p=a0.clone().lerp(b0,i/30); Particles.emit(p.setY(p.y+0.3),new THREE.Vector3().randomDirection().multiplyScalar(0.6),new THREE.Color(.75,.5,1),0.22,0.5,0.4); }); }
@@ -194,7 +197,7 @@ async function runAITurn(side){
 
 /* ---------------- turn flow ---------------- */
 function beginSideTurn(side){
-  for(const s of alive(side)){ s.shield=Math.min(s.shieldMax, s.shield+s.regen); s.fx={}; s.mp=s.mpMax; s.moved=false; s.engines.forEach(e=>e.boost=0);
+  for(const s of alive(side)){ tickSystems(s); s.shield=Math.min(s.shieldMax, s.shield+regenOf(s)); s.fx={}; s.mp=moveAllowance(s); s.moved=false; s.engines.forEach(e=>e.boost=0);
     s.weapons.forEach(w=>w.wait=Math.max(0,w.wait-1)); s.ability.wait=Math.max(0,s.ability.wait-1); }
   // a blackout this side cast runs out now that its enemy has had its turn
   for(const e of state.ships) if(e.blackout===side) e.blackout=null;

@@ -313,6 +313,12 @@ Ideas to scope with Jon:
 
 ### Damage model: weapons and systems knocked out
 
+**Done in v52**, as proposed below. Tuning: the first formula gave about 24 criticals a battle (the cap applied before
+the bonus for a damaged ship, so a big hit on a hurt ship ran to 80%), which buried the player in notices; retuned to
+about 7 (rate 0.6 x hull damage / max hull, up to 1.6x on a hurt hull, capped at 25%, none under 4 hull damage).
+Round robin against v50, same seeds: Classic 48 (52), Gunline 51 (48), Swarm 50 (47), Carrier 48 (49), Wolfpack 51 (53),
+Dreadnought 56 (57), Raiders 57 (57), Support 39 (38); 20.2 turns (20.3). No measurable snowballing at this rate.
+
 **Jon:** when ships take damage, some weapons may stop working properly, with a notification that they are offline or
 damaged.
 

@@ -199,6 +199,7 @@ function frame(){
     if(s.mats.bellIn){ if(!s.bellBase) s.bellBase=s.mats.bellIn.color.clone(); s.mats.bellIn.color.copy(s.bellBase).multiplyScalar(1+heat*2.2); }
     if(s.fineMesh) s.fineMesh.visible = camera.position.distanceTo(s.group.position) < 13;
     if(s.turrets && s.turrets.length) updateTurrets(s, dt);
+    updateDamageFx(s, dt);
     s.lights.forEach((l,i)=>{ l.visible=((elapsed*1.3+i*0.5+s.phase)%1.6)<0.12 || i===2; });
     const u=s.shMat.uniforms; u.uTime.value=elapsed; if(u.uFlash.value>0){ u.uFlash.value=Math.max(0,u.uFlash.value-dt*1.8); if(u.uFlash.value===0) s.shieldMesh.visible=false; }
   }

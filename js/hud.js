@@ -152,8 +152,8 @@ function nextShip(){
 function log(msg, cls=''){ const d=document.createElement('div'); d.className=cls; d.textContent=msg; const b=$('#logbody'); b.prepend(d); while(b.children.length>50) b.lastChild.remove(); }
 function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
 function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
-  const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); s.tagFx.textContent=fx.join(', '); } }
-function weaponStatus(w){ if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
+  const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }
+function weaponStatus(w){ if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 function updateHUD(){
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${BATTLE_TURNS}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
@@ -166,7 +166,7 @@ function updateHUD(){
     const ready=s.weapons.filter(weaponReady).length;
     b.innerHTML=`<div class="row"><span class="nm">${s.name}</span><span class="cl">${s.C.label}</span></div>
       <div class="bars"><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
-      <div class="st">${s.alive?`<span class="${s.mp>0?'ok':''}">Move ${s.mp}/${s.mpMax}</span><span class="${ready?'ok':''}">${ready} weapon${ready!==1?'s':''} ready</span>`:'<span>Destroyed</span>'}</div>`;
+      <div class="st">${s.alive?`<span class="${s.mp>0?'ok':''}">Move ${s.mp}/${s.mpMax}</span><span class="${ready?'ok':''}">${ready} weapon${ready!==1?'s':''} ready</span>`:'<span>Destroyed</span>'}</div>${s.alive&&damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`;
     if(s.alive) b.onclick=()=>{ if(state.phase==='player'&&!state.busy){ select(s); } };
     b.onmouseenter=()=>{ state.rosterHover=s; }; b.onmouseleave=()=>{ state.rosterHover=null; };
     ro.appendChild(b);
@@ -174,7 +174,7 @@ function updateHUD(){
   const el=$('#elist'); el.innerHTML='';
   for(const s of state.ships.filter(s=>s.side==='enemy').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))){
     const d=document.createElement('div'); d.className='erow'+(s.alive?'':' dead');
-    d.innerHTML=`<div class="row">${s.name}<span>${s.alive?s.C.label:'Destroyed'}</span></div><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div><div class="mbar hu"><i style="width:${pct(s.hull,s.hullMax)}"></i></div>`;
+    d.innerHTML=`<div class="row">${s.name}<span>${s.alive?s.C.label:'Destroyed'}</span></div><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div><div class="mbar hu"><i style="width:${pct(s.hull,s.hullMax)}"></i></div>${s.alive&&damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`;
     d.onmouseenter=()=>{ state.rosterHover=s; }; d.onmouseleave=()=>{ state.rosterHover=null; };
     el.appendChild(d);
   }
@@ -186,10 +186,10 @@ function updateHUD(){
     $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`; $('#sp-class').title=s.C.passive||'';
     $('#sp-stats').innerHTML=`<div class="sr"><span>Hull</span><b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
       <div class="sr" title="Regenerates ${s.regen} a turn"><span>Shields</span><b>${Math.round(s.shield)} / ${s.shieldMax}</b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
-      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>`;
+      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>${damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`;
     const wc=$('#sp-weapons'); wc.innerHTML='';
-    s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
-      b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">${isFinite(d.range)? 'Range '+d.range : 'Range '+d.reach+'+'}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}</span>`;
+    s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':'')+(w.sys&&w.sys.state!=='ok'?' sys-'+w.sys.state:''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
+      b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">${isFinite(d.range)? 'Range '+d.range : 'Range '+d.reach+'+'}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}${w.sys&&w.sys.state==='damaged'?' · damaged':''}</span>`;
       b.onclick=()=>setWeapon(i); b.title=weaponBlurb(d); wc.appendChild(b); });
     const ab=document.createElement('button'); ab.className='wbtn'+(state.weaponSel==='all'?' on':''); ab.disabled=state.busy||state.phase!=='player'||!s.weapons.some(weaponReady);
     ab.innerHTML=`<span class="k">F</span><span class="wn">All weapons</span><span class="wd">Fire everything in reach</span><span class="ws">${s.weapons.filter(weaponReady).length} ready</span>`; ab.onclick=()=>setWeapon('all'); wc.appendChild(ab);
@@ -214,7 +214,7 @@ function updateHover(){
   if(state.phase==='player' && s && !state.busy && !state.mode){
     for(const t of alive('enemy')){ const list=weaponsForAttack(s,t); if(!list.length) continue;
       if(state.weaponSel==='all'){ const e=list.reduce((a,i)=>a+expected(s,s.weapons[i].def,t).dmg,0); t.tagHit.textContent='~'+Math.round(e); }
-      else t.tagHit.textContent=hitChance(s,s.weapons[state.weaponSel].def,t)+'%';
+      else { const w=s.weapons[state.weaponSel], p=hitChance(s,w.def,t); t.tagHit.textContent=(p?clamp(p+slotAcc(w),5,95):0)+'%'; }
       t.tagHit.classList.add('show'); }
   }
   if(!h || state.phase==='menu'){ hideTooltip(); return; }
@@ -225,7 +225,7 @@ function updateHover(){
     if(s && state.mode==='target' && s.ability.def.target==='enemy' && !h.isRock) html+= abilityTargets(s).includes(h)? (h.blackout?`<div class="hint">Already blacked out</div>`:`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`) : `<div class="hint">Out of range</div>`;
     if(s && state.phase==='player' && !state.mode){
       html+=`<div style="height:5px"></div>`; let tot=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
-      for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p;
+      for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p? clamp(e.p+slotAcc(w),5,95) : 0;
         let note= !ready?weaponStatus(w).toLowerCase(): !p ? (hdist(s,h)>d.range?'out of range':'no line of sight') : `${p}% · ~${Math.round(e.dmg)}`;
         if(ready&&p) tot+=e.dmg;
         html+=`<div class="tr ${ready&&p?'':'off'}"><span>${d.name}</span><b>${note}</b></div>`; }
@@ -234,6 +234,7 @@ function updateHover(){
       else html+=`<div class="hint">Nothing can reach this target from here</div>`;
     } else if(h.isRock) html+=`<div class="hint">Select a ship, then click to shoot it apart</div>`;
     else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.map(w=>w.def.name).join(', ')}</span></div>`;
+    if(!h.isRock && damagedSystems(h).length) html+=`<div class="hint dmgl">${damageSummary(h)}</div>`;
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
