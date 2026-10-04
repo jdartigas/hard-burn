@@ -65,7 +65,9 @@ function screenBox(pts, vc){ let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Inf
 let boardExt=null;
 function boardBounds(){ if(boardExt) return boardExt; let x0=Infinity, x1=-Infinity, z0=Infinity, z1=-Infinity;
   for(const c of board.list){ const p=hexToWorld(c.q,c.r); x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); z0=Math.min(z0,p.z); z1=Math.max(z1,p.z); }
-  const m=HEX*0.9; return boardExt={x0:x0-m, x1:x1+m, z0:z0-m, z1:z1+m}; }
+  // v57: the margin past the outermost cell centres. One hex (v56) cut edge ships in half when zoomed in: a
+  // Dreadnought is over three hexes long and its tag sits above it, so the view may run about 2.5 hexes past the cells.
+  const m=HEX*2.5; return boardExt={x0:x0-m, x1:x1+m, z0:z0-m, z1:z1+m}; }
 // Keep the board under the safe area: shift the goal so the safe area's edges, on the ground, stay inside the
 // board, and centre it on an axis where the view is wider than the board.
 function clampToBoard(goal, r){
@@ -86,7 +88,8 @@ function framePoints(pts, zoomOut=false){
   const shift=(lo,hi,a,b)=> hi-lo>b-a ? (a+b)/2-(lo+hi)/2 : lo<a ? a-lo : hi>b ? b-hi : 0;
   for(let it=0; it<14; it++){
     clampToBoard(goal, r);   // judge the fit where the camera will really end up
-    const vc=camAt(goal,r), B=screenBox(pts,vc); if(!B) break;
+    const vc=camAt(goal,r), B=screenBox(pts,vc);
+    if(!B){ if(it) break; goal.x=pts.reduce((a,p)=>a+p.x,0)/pts.length; goal.z=pts.reduce((a,p)=>a+p.z,0)/pts.length; continue; }   // behind the camera: start from centred
     const bw=B.x1-B.x0, bh=B.y1-B.y0;
     if(zoomOut && (bw>sw || bh>sh) && r<maxR-0.01){ r=Math.min(maxR, r*Math.max(bw/sw,bh/sh)*1.08); continue; }
     const tx=shift(B.x0,B.x1,S.l,S.r), ty=shift(B.y0,B.y1,S.t,S.b);
