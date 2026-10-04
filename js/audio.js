@@ -29,8 +29,8 @@ const Sound = (() => {
   /* v63 (Jon): recorded effects (Kenney, CC0, see assets/CREDITS.md) over or instead of the synthesized ones, which
      stay as the fallback when a file can't load or decode. SFX lists the files for each sound; one is picked at random
      and its pitch varied a little, so repeats don't sound mechanical. */
-  const SFX = { pulse:['pulse1','pulse2','pulse3'], beam:['beam1','beam2'], rail:['rail1'], launch:['launch1','launch2'], shield:['shield1','shield2'],
-    hull:['hull1','hull2','hull3'], pop:['pop1'], boomS:['boom1','boom2'], boomM:['boom3'], boomL:['boom4'], rumble:['rumble'] };
+  const SFX = { pulse:['pulse1','pulse2','pulse3'], rail:['rail1'], launch:['launch1','launch2'],
+    hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
   const bufs={};
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
   // were silently missing there
@@ -93,10 +93,16 @@ const Sound = (() => {
       const o1=ctx.createOscillator(), o2=ctx.createOscillator(), o3=ctx.createOscillator(); o1.type='sawtooth'; o2.type='sawtooth'; o3.type='sine'; o1.frequency.value=98; o2.frequency.value=98.8; o3.frequency.value=49;
       const f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=6; f.frequency.value=900;
       const flfo=ctx.createOscillator(); flfo.frequency.value=7; const fg=ctx.createGain(); fg.gain.value=260; flfo.connect(fg); fg.connect(f.frequency);
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.13,t+0.08); g.gain.setValueAtTime(0.13,t+dur-0.15); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      const tail=0.7;   // v67: the hum trails off after the beam instead of stopping with it
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.13,t+0.08); g.gain.setValueAtTime(0.13,t+dur*0.75); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
       const tl=ctx.createOscillator(); tl.frequency.value=38; const tg=ctx.createGain(); tg.gain.value=0.025; tl.connect(tg); tg.connect(g.gain);
-      o1.connect(f); o2.connect(f); o3.connect(f); f.connect(g); g.connect(sfx); [o1,o2,o3,flfo,tl].forEach(o=>{ o.start(t); o.stop(t+dur+0.05); });
-      tone(dur,{type:'sine',f0:1568,f1:1490,gain:0.012,attack:0.1}); crackle(dur*0.9,{gain:0.05,f:6000,density:25}); },
+      o1.connect(f); o2.connect(f); o3.connect(f); f.connect(g); g.connect(sfx); [o1,o2,o3,flfo,tl].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
+      // v67 (Jon): a high shimmer over the hum: two detuned sines with a slow vibrato, trailing off with it
+      const h1=ctx.createOscillator(), h2=ctx.createOscillator(); h1.type=h2.type='sine'; h1.frequency.value=2093; h2.frequency.value=2111;
+      const vib=ctx.createOscillator(); vib.frequency.value=5; const vg=ctx.createGain(); vg.gain.value=9; vib.connect(vg); vg.connect(h1.frequency); vg.connect(h2.frequency);
+      const hg=ctx.createGain(); hg.gain.setValueAtTime(0.0001,t); hg.gain.exponentialRampToValueAtTime(0.03,t+0.12); hg.gain.setValueAtTime(0.03,t+dur*0.75); hg.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
+      h1.connect(hg); h2.connect(hg); hg.connect(sfx); [h1,h2,vib].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
+      crackle(dur*0.9,{gain:0.05,f:6000,density:25}); },
     // v65: a fast missile leaving the tube: a quick rising whoosh and a whine, a little of the thruster recording for body
     missile(){ noise(0.45,{type:'bandpass',f0:900,f1:5200,q:2.5,gain:0.22,attack:0.02}); noise(0.3,{type:'highpass',f0:6000,f1:3000,gain:0.07}); tone(0.35,{type:'sawtooth',f0:420,f1:1700,gain:0.018}); sample('launch',{gain:0.22,rate:2.2,dur:0.35,vary:0.1}); },
     fighter(){ noise(1.0,{type:'bandpass',f0:1200,f1:3200,q:4,gain:0.12,attack:0.2}); },
@@ -114,10 +120,15 @@ const Sound = (() => {
     // v66: the blasts running along a dying ship before it goes up
     burst(){ blast(0.35,{gain:0.15,lo:90,bright:2400,crack:0.4}); sample('pop',{gain:0.18,rate:0.9+Math.random()*0.4,vary:0}); },
     // v65 (Jon): shields crackle with static when hit; a beam holds them longer
-    shield(kind){ const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03}); },
+    shield(kind){ const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03});
+      // v67: a warhead bursting against the shield, over the static
+      if(kind==='torpedo') blast(0.6,{gain:0.16,lo:70,bright:2400,crack:0.5}); else if(kind==='missile' || kind==='fighter') blast(0.4,{gain:0.11,lo:90,bright:2800,crack:0.4}); },
     boom(size=1){ duck(0.35,1.2);
       // size is about a ship's length over 2.2: Patrol craft ~0.5, Destroyer ~1.6, Dreadnought ~2.8; asteroids 1.1
-      if(sample(size<0.9?'boomS': size<1.8?'boomM':'boomL', {gain:0.9, rate:size<0.9?1.1:1})){ if(size>=1.8) sample('rumble',{gain:0.8,vary:0}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.45}); return; }
+      // v67 (Jon): every hull uses the capital explosion he liked, pitched up and quieter as ships get smaller; the short
+      // recordings used for small and medium hulls clipped and cut off. Levels are lower all round so stacks don't clip.
+      const tier= size<0.9? 0 : size<1.8? 1 : 2, P=[{rate:1.45,gain:0.36,rumble:0,sub:0.16},{rate:1.2,gain:0.48,rumble:0.3,sub:0.22},{rate:1,gain:0.6,rumble:0.5,sub:0.3}][tier];
+      if(sample('boomL',{gain:P.gain, rate:P.rate, vary:0.05})){ if(P.rumble) sample('rumble',{gain:P.rumble, rate:tier===1?1.2:1, vary:0}); tone(0.9+0.5*size,{type:'sine',f0:70,f1:22,gain:P.sub,attack:0.01}); if(tier===0) blast(0.6,{gain:0.12,lo:90,bright:2400,crack:0.4}); return; }
       noise(1.2+size, {type:'lowpass',f0:1400,f1:40,gain:0.7,attack:0.01}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.7}); noise(0.3,{type:'highpass',f0:3000,f1:800,gain:0.25}); },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
     turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
