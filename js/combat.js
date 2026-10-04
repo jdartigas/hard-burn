@@ -30,7 +30,7 @@ async function fireWeapon(att, wi, tgt){
       if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; att.st.dealt+=r.s+r.h; tgt.st.taken+=r.s+r.h; }
       if(!tgt.alive) return;
       tgt.shield=Math.max(0,tgt.shield-r.s); tgt.hull-=r.h; if(tgt.isRock) rockDamaged(tgt);
-      impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1, d.kind);
+      impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1, d.big? 'torpedo' : d.kind);
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
       if(r.crit && i!==killShot) applyCrit(tgt, r.crit);
       if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; att.st.kills++; destroyShip(tgt, att); } }

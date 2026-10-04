@@ -14,7 +14,10 @@ const Sound = (() => {
   function init(){
     if(ctx) { if(ctx.state==='suspended') ctx.resume(); return; }
     try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
-    master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = 0.8;
+    // v66: a limiter last in line, so stacked hits and explosions can't clip
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value=-3; lim.knee.value=0; lim.ratio.value=20; lim.attack.value=0.002; lim.release.value=0.12;
+    master.connect(lim); lim.connect(ctx.destination);
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; comp.connect(master);
     sfx = ctx.createGain(); sfx.gain.value=on?fv():0; sfx.connect(comp);
     music = ctx.createGain(); music.gain.value=0.0; music.connect(comp);
@@ -40,6 +43,14 @@ const Sound = (() => {
     const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*(1+(Math.random()*2-1)*vary);
     const g=ctx.createGain(), t=now()+delay; g.gain.setValueAtTime(gain,t); src.connect(g); g.connect(sfx); src.start(t);
     if(dur){ g.gain.setTargetAtTime(0.0001, t+dur*0.55, dur*0.15); src.stop(t+dur+0.1); } return true; }
+  // v66: a synthesized explosion: a short crack, a band of rumbling noise that darkens as it decays, a falling sub tone,
+  // and a crackle of debris. Used for warhead and torpedo hits and the blasts inside a dying ship, so none of them
+  // share the recorded explosions that a ship's death uses.
+  function blast(dur, {gain=0.3, lo=60, bright=3000, crack=0.5, delay=0}={}){
+    noise(0.08,{type:'highpass',f0:2500,f1:900,gain:gain*0.45,delay});
+    noise(dur,{type:'lowpass',f0:bright,f1:150,gain,attack:0.015,delay});
+    tone(dur*0.9,{type:'sine',f0:lo,f1:lo*0.45,gain:gain*1.1,attack:0.012,delay});
+    if(crack) crackle(dur*0.8,{gain:gain*crack*0.5,f:1400,density:28,delay:delay+0.05}); }
   // electric crackle: a spray of tiny band-passed noise bursts at random moments
   function crackle(dur, {gain=0.15, f=3500, density=50, delay=0}={}){ const n=Math.max(3,Math.round(dur*density));
     for(let i=0;i<n;i++){ const k=Math.random(); noise(0.008+Math.random()*0.025, {type:'bandpass', f0:f*(0.6+Math.random()*0.9), f1:f*0.5, q:1.2, gain:gain*(0.3+Math.random()*0.7)*(1-k*0.5), delay:delay+k*dur}); } }
@@ -74,7 +85,7 @@ const Sound = (() => {
     // v65 (Jon): the railgun charges (a rising whine over RAIL_CHARGE seconds, fxRail waits as long), then fires with a thump
     rail(){ duck(0.55,RAIL_CHARGE+0.5); const c=RAIL_CHARGE;
       tone(c,{type:'sine',f0:180,f1:2600,gain:0.05,attack:c*0.8}); tone(c,{type:'square',f0:90,f1:1300,gain:0.012,attack:c*0.8}); noise(c,{type:'bandpass',f0:600,f1:5000,q:4,gain:0.08,attack:c*0.85});
-      sample('rail',{gain:1,rate:0.7,delay:c,vary:0.04}); tone(0.6,{type:'sine',f0:110,f1:30,gain:0.6,delay:c}); noise(0.18,{type:'highpass',f0:5000,f1:1500,gain:0.18,delay:c}); noise(0.5,{type:'lowpass',f0:1500,f1:100,gain:0.35,delay:c+0.01}); },
+      sample('rail',{gain:0.75,rate:0.55,delay:c,vary:0.04}); tone(0.7,{type:'sine',f0:75,f1:26,gain:0.75,attack:0.006,delay:c}); noise(0.45,{type:'lowpass',f0:700,f1:60,gain:0.4,delay:c}); },   // v66: a low thump
     pulse(){ if(sample('pulse',{gain:0.5,vary:0.1})) return; tone(0.1,{type:'square',f0:980,f1:180,gain:0.09}); noise(0.08,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.12}); },
     // v65: an energy beam: a short ignition, a detuned resonant hum with a slow filter sweep, and a fizz of energy over it
     beam(dur=0.9){ if(!ctx) return; const t=now();
@@ -92,13 +103,16 @@ const Sound = (() => {
     pdc(){ if(!ctx) return; for(let i=0;i<9;i++) noise(0.03,{type:'highpass',f0:2500,f1:2000,gain:0.12,delay:i*0.035}); },
     // v65 (Jon): what a hull hit sounds like depends on what hit it
     hit(kind){
-      if(kind==='missile' || kind==='fighter'){ sample('boomS',{gain:0.55,rate:1.3,vary:0.1}); tone(0.35,{type:'sine',f0:90,f1:32,gain:0.35}); noise(0.4,{type:'lowpass',f0:2500,f1:150,gain:0.3}); return; }   // a small explosion
+      if(kind==='torpedo'){ blast(0.95,{gain:0.3,lo:55,bright:2000,crack:0.8}); blast(0.45,{gain:0.12,lo:90,bright:2600,crack:0.3,delay:0.14}); return; }   // v66: a heavy warhead, its own sound
+      if(kind==='missile' || kind==='fighter'){ blast(0.55,{gain:0.2,lo:75,bright:2600}); return; }   // v66: a small explosion, gentler, no recording
       if(kind==='beam'){ noise(0.7,{type:'highpass',f0:3500,f1:2500,gain:0.12,attack:0.05}); crackle(0.65,{gain:0.12,f:2500,density:45}); noise(0.6,{type:'bandpass',f0:900,f1:500,q:3,gain:0.06,attack:0.05}); return; }   // burning, sizzling
       if(kind==='pulse'){ sample('hull',{gain:0.6,rate:0.85,vary:0.12}); sample('pop',{gain:0.25,rate:1.8,vary:0.15}); noise(0.12,{type:'lowpass',f0:4000,f1:400,gain:0.35}); tone(0.14,{type:'sine',f0:140,f1:55,gain:0.3}); return; }   // a punchy blast
-      if(kind==='rail'){ sample('hull',{gain:0.9,rate:0.6,vary:0.08}); tone(0.4,{type:'sine',f0:80,f1:28,gain:0.5}); noise(0.35,{type:'lowpass',f0:2000,f1:120,gain:0.35}); return; }
+      if(kind==='rail'){ sample('pop',{gain:0.35,rate:0.75,vary:0.1}); noise(0.45,{type:'bandpass',f0:3200,f1:500,q:2.5,gain:0.25,attack:0.005}); tone(0.3,{type:'sawtooth',f0:260,f1:70,gain:0.06}); tone(0.35,{type:'sine',f0:95,f1:35,gain:0.4}); crackle(0.35,{gain:0.15,f:2200,density:60}); return; }   // v66: a slug ripping into metal
       if(sample('hull',{gain:0.75,rate:0.72,vary:0.1})){ tone(0.2,{type:'sine',f0:90,f1:40,gain:0.18}); return; } noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3}); tone(0.2,{type:'sine',f0:90,f1:40,gain:0.3}); },
     intercept(){ if(sample('pop',{gain:0.45,rate:1.35,vary:0.12})) return; noise(0.2,{type:'lowpass',f0:3000,f1:300,gain:0.2}); },
-    alarm(){ [0,0.16].forEach((d,i)=>tone(0.13,{type:'square',f0:i?660:880,gain:0.045,delay:d})); },
+    alarm(){ crackle(0.3,{gain:0.14,f:3000,density:60}); tone(0.3,{type:'square',f0:62,f1:48,gain:0.03}); },   // v66: a system shorting out (was a two-tone beep that read as a doorbell)
+    // v66: the blasts running along a dying ship before it goes up
+    burst(){ blast(0.35,{gain:0.15,lo:90,bright:2400,crack:0.4}); sample('pop',{gain:0.18,rate:0.9+Math.random()*0.4,vary:0}); },
     // v65 (Jon): shields crackle with static when hit; a beam holds them longer
     shield(kind){ const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03}); },
     boom(size=1){ duck(0.35,1.2);

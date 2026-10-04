@@ -200,7 +200,7 @@ async function explodeShip(s){
   const n=3+Math.round(L);
   for(let i=0;i<n;i++){ after(i*0.2+rand(0,.08), ()=>{ if(!s.group.visible) return; const q=p.clone().addScaledVector(f, rand(-.45,.45)*L).add(new THREE.Vector3(rand(-.2,.2),rand(0,.25),rand(-.2,.2)));
       Particles.burst(q,34,{speed:6,color:C_SPARK,size:0.4,life:0.6}); Particles.burst(q,10,{speed:2,color:C_FIRE,size:0.9,life:0.5,grow:1.2});
-      flash(q,0xff8844,4,0.3); Sound.hit(); addShake(0.12); s.body.position.set(rand(-.04,.04),rand(-.04,.04),rand(-.04,.04)); }); }
+      flash(q,0xff8844,4,0.3); Sound.burst(); addShake(0.12); s.body.position.set(rand(-.04,.04),rand(-.04,.04),rand(-.04,.04)); }); }
   await wait(n*0.2+0.15);
   s.body.position.set(0,0,0);
   // main detonation
