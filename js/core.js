@@ -79,6 +79,30 @@ const CLASSES = {
              passive:'Field repairs: allies within 2 hexes regain 10 hull each turn'},
   carrier:  {label:'Fleet carrier', role:'Strike and support',     m:275, cost:150, hull:250, armor:7, shield:80, regen:20, mp:3, ev:4,  pdc:0.55, weapons:['wing','pulse'],         ability:'repair',     len:3.3, y:1.0},
 };
+// v57 (Jon): what each class is for, in words, for the fleet builder, the ship viewer and the help chart. `best` is a
+// short phrase; `purpose` two or three sentences. The numbers they describe live in CLASSES, WEAPONS and ABIL.
+const CLASS_INFO = {
+  patrol:     {best:'Screening the fleet: its ECM screen makes nearby ships hard to hit',
+               purpose:'The smallest hull in the fleet and the hardest to pin down. It runs ahead of the line, harries with its pulse turret and missiles, and its ECM screen makes the ships around it much harder to hit. It cannot take a beating.'},
+  fastattack: {best:'Opening a fight with a missile ambush',
+               purpose:'An oversized drive with a missile pod on each flank. It closes fast, and when it springs an ambush its strike missiles are half as likely to be shot down. Two salvos, then it is down to its pulse turret.'},
+  corvette:   {best:'Getting into position fast and finishing off damaged ships',
+               purpose:'A quick, well-armed skirmisher. Twin light railguns reach anywhere on the board, its missiles finish off weakened targets, and a hard burn throws it three hexes further when it needs to flank or escape.'},
+  frigate:    {best:'Shooting down missiles aimed at the ships around it',
+               purpose:'The fleet\'s escort. Its point defense covers nearby allies as well as itself, and a point defense surge makes that screen far stronger for a turn. Twin beam projectors under the bow make it dangerous up close.'},
+  ewar:       {best:'Making every enemy shot worse, and silencing its most dangerous ship',
+               purpose:'Nearly unarmed, and often the most valuable ship in the fleet. It jams enemies within 4 hexes and sharpens the aim of allies within 3, and its sensor blackout stops a chosen enemy firing missiles or fighters for a turn. The enemy will hunt it first.'},
+  destroyer:  {best:'Trading blows at medium range',
+               purpose:'The line combatant. A keel railgun, a heavy pulse battery and torpedoes give it an answer at every range, and when its shields fail it can overcharge them back to strength mid-fight.'},
+  tender:     {best:'Keeping damaged ships in the fight and rearming missile boats',
+               purpose:'A working ship, lightly armed. Ships near it repair a little every turn, and its resupply patches up one ally and reloads its missile launchers: the only way to rearm mid-battle.'},
+  cruiser:    {best:'Hitting hard from long range',
+               purpose:'Long-range artillery. Its spinal railgun reaches across the board, and heavy beams and a torpedo bay take over closer in. Slow and easy to hit, it braces for impact when it has to take punishment.'},
+  carrier:    {best:'Striking anywhere on the board, and repairing its escorts',
+               purpose:'A flight deck over a heavy hull. Its strike wing reaches 12 hexes and is hard to intercept, though it needs a turn to rearm after each sortie. Repair drones patch up allies within 3 hexes.'},
+  dreadnought:{best:'Absorbing punishment and out-gunning anything at range',
+               purpose:'The capital of the line. Six weapons, the heaviest armor and shields afloat, and almost no evasion: it does not dodge, it endures. Brace for impact makes it harder still to kill.'},
+};
 const ORDER = ['fastattack','patrol','corvette','ewar','frigate','destroyer','tender','cruiser','carrier','dreadnought'];   // lightest to heaviest
 // Each class's model seed. Fixed, so adding a class to ORDER never reshuffles how the existing ships look.
 const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7, tender:8, ewar:9 };

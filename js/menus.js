@@ -116,8 +116,10 @@ function renderBuilder(){
   $('#bl-budget').innerHTML=Object.keys(BUDGETS).map(k=>`<button class="fchip${k===draft.budget?' on':''}" role="radio" aria-checked="${k===draft.budget}" data-b="${k}"><b>${BUDGET_LABEL[k]}</b><span>${BUDGETS[k]} points</span></button>`).join('');
   const classes=Object.keys(CLASSES).sort((a,b)=>CLASSES[b].cost-CLASSES[a].cost);
   $('#bl-rows').innerHTML=classes.map(c=>{ const C=CLASSES[c], k=count(c);
-    return `<div class="bl-row${k?' has':''}"><div><b>${C.label}</b><span class="r">${C.role}</span>
-      <div class="st">${C.m} m · Hull ${C.hull} · Shields ${C.shield} · ${Math.round(classDpt(c))} damage/turn · Move ${C.mp} · ${C.weapons.map(w=>WEAPONS[w].name).join(', ')} · ${ABIL[C.ability].name}${C.passive?`<br>${C.passive}`:''}</div></div>
+    return `<div class="bl-row${k?' has':''}"><button class="bl-pic" data-v="${c}" aria-label="View the ${C.label} in 3D"><img data-thumb="${c}" alt="" ${SV.thumb(c)?`src="${SV.thumb(c)}"`:''}></button>
+      <div><b>${C.label}</b><span class="r">${C.role}</span>
+      <div class="st">${C.m} m · Hull ${C.hull} · Shields ${C.shield} · ${Math.round(classDpt(c))} damage/turn · Move ${C.mp} · ${weaponNames(c)}</div>
+      <div class="st ab">${abilityLine(c)}${C.passive?`<br>Always on: ${C.passive}.`:''}</div></div>
       <span class="c">${C.cost} pts</span>
       <div class="bl-step"><button data-c="${c}" data-d="-1" aria-label="One fewer ${C.label}" ${k?'':'disabled'}>−</button><span>${k}</span><button data-c="${c}" data-d="1" aria-label="One more ${C.label}" ${spent+C.cost<=B && n<MAX_FLEET?'':'disabled'}>+</button></div></div>`; }).join('');
   const over=spent>B; $('.bl-meter').classList.toggle('over',over);
@@ -126,7 +128,8 @@ function renderBuilder(){
   $('#bl-presets').innerHTML=PRESETS.map(p=>`<button class="bl-link" data-p="${p.id}">${p.name}</button>`).join(' ');
   $('#bl-done').disabled= over || n===0;
   $('#bl-budget').querySelectorAll('button').forEach(b=>b.onclick=()=>{ Sound.ui(); draft.budget=b.dataset.b; renderBuilder(); });
-  $('#bl-rows').querySelectorAll('button').forEach(b=>b.onclick=()=>{ Sound.ui(); const c=b.dataset.c;
+  $('#bl-rows').querySelectorAll('.bl-pic').forEach(b=>b.onclick=()=>{ Sound.ui(); SV.open(b.dataset.v, 'builder'); });
+  $('#bl-rows').querySelectorAll('.bl-step button').forEach(b=>b.onclick=()=>{ Sound.ui(); const c=b.dataset.c;
     if(+b.dataset.d>0) draft.fleet.push(c); else draft.fleet.splice(draft.fleet.lastIndexOf(c),1); renderBuilder(); });
   $('#bl-presets').querySelectorAll('button').forEach(b=>b.onclick=()=>{ Sound.ui(); const p=PRESETS.find(x=>x.id===b.dataset.p); draft.fleet=p.fleet.slice(); if(fleetCost(draft.fleet)>BUDGETS[draft.budget]) draft.budget='standard'; renderBuilder(); });
 }

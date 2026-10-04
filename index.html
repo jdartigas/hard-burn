@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '56';
+const GAME_VERSION = '57';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -143,6 +143,9 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <tr><td>Missiles and torpedoes</td><td>Guided, fly over asteroids, heavy damage</td><td>Limited ammo, point defense can shoot them down</td></tr>
       <tr><td>Strike wing</td><td>Carrier fighters, huge reach, hard to intercept</td><td>Needs a turn to rearm</td></tr>
     </table>
+    <h3>Ships</h3>
+    <p>What each class is for. Tap a ship to look it over in 3D, with its full specifications.</p>
+    <div class="hs-wrap"><table class="wt hs" id="help-ships"></table></div>
     <h3>Terrain</h3>
     <p>Large asteroids block movement and line of sight for direct-fire weapons, but they can be shot apart. Click one with a ship selected to fire on it; a shattered asteroid leaves a debris field behind. Debris fields cost double movement but give ships inside them cover. Destroyed ships break apart and leave a wreck field of the same kind. Frigates screen allies within 3 hexes with their full point defense: watch for the tracer fire from the escort when it knocks down a missile.</p>
     <h3>Keys</h3>
@@ -162,6 +165,16 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     </div>
     <div class="cta"><button class="btn-primary" data-close>Back to the fight</button></div>
   </div>
+</div>
+
+<div id="shipview" class="screen" role="dialog" aria-label="Ship viewer">
+  <div id="sv-stage" aria-hidden="true"></div>
+  <div class="sv-bar">
+    <button id="sv-prev" class="btn-ghost" aria-label="Previous class">‹</button><span id="sv-count"></span><button id="sv-next" class="btn-ghost" aria-label="Next class">›</button>
+    <button id="sv-livery" class="btn-ghost"></button><button id="sv-close" class="btn-primary">Close</button>
+  </div>
+  <aside id="sv-panel" class="panel" aria-live="polite"></aside>
+  <p class="sv-hint">Drag to rotate · scroll or pinch to zoom · Shift-drag or two fingers to pan · double-click to reset</p>
 </div>
 
 <div id="pause" class="screen" role="dialog" aria-label="Menu">
@@ -209,7 +222,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const THREE = { ...THREE_NS, EffectComposer, RenderPass, UnrealBloomPass, GTAOPass, OutputPass, Pass, FullScreenQuad, CopyShader, SMAAPass, mergeGeometries };
 window.THREE = THREE;
 // The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
-for(const f of ['core','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','main']) await new Promise((ok,fail)=>{
+for(const f of ['core','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
   const s=document.createElement('script'); s.src=`js/${f}.js?v=${GAME_VERSION}`; s.onload=ok;
   s.onerror=()=>fail(new Error(`Could not load js/${f}.js`)); document.body.appendChild(s); });
 </script>

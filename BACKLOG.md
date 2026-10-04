@@ -290,6 +290,15 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
 - **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
 
+## Ship lore (Jon, during v57)
+
+Each class gets lore for the ship viewer: who builds it, its history, famous hulls, how crews talk about it.
+The viewer already has the slot: add `lore` to the class's entry in `CLASS_INFO` (js/core.js) and a **Lore**
+section appears in the viewer's spec panel. Until a class has lore the section stays hidden (Jon's call, v57).
+Open questions: the setting's factions and history (Laniakea's Edge Fleet Yards appears on the blueprint sheets),
+whether lore unlocks through play or is always there, and whether named hulls (the "Swift Remit" on the cruiser
+sheet) become part of the game.
+
 ## Improved sound effects (Jon, during v52)
 
 Today every sound is synthesized in `js/audio.js` (Web Audio oscillators and filtered noise), mixed through one

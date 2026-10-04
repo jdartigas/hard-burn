@@ -224,6 +224,7 @@ function frame(){
     const zf=clamp((cam.radius-12)/8,0,1);
     setTag(s, +Math.max(state.hoverShip===s?0.9:0, zf*(focus?1:0.85)).toFixed(2),
       `translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`); }
+  SV.update(dt);   // ship pictures and the viewer aim the scene pass before the frame renders
   if(!window.__norender) composer.render();
   if(DEBUG){ dbgFrames.push([rawDt*1000, performance.now()-fT0, renderer.info.render.calls, renderer.info.render.triangles]); debugTick(); }
 }
