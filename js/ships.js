@@ -460,16 +460,47 @@ function buildShip(cls, side, copy=0){
     number(idn,-.2,.27,.4,.12,'top'); number(idn,.52,.15,1.4,.08,'r'); number(idn,-.52,.15,1.4,.08,'l');
     light(.5,.2,-1.2,nav); light(-.5,.2,-1.2,nav); light(.38,.52,.2,0xff3030); rcs(.5,.25,1.5); rcs(-.5,.25,1.5);
   } else if(cls==='fastattack'){
-    // a needle hull bolted to an oversized drive: nearly all engine, two missile pods, very little armor
-    drum(.18,.34,-0.6);
-    struts(-0.6,-0.44,.16,.12,0,0,6);
-    plate(-0.44,0.22,.2,.17,.2,.17,{mat:H2}); topPlate(-0.36,0.18,.12,.12,.085,PL);
-    plate(0.22,0.95,.2,.17,.03,.04,{ch:.42}); stripes(-0.3,0.7,.1,.045,.012); chevron(0.7,.07,.12);
-    [-1,1].forEach(s=>{ plate(-0.3,0.42,.1,.11,.1,.09,{x:s*.17,y:-.02,mat:M.dark,ch:.25});   // missile pods, two tubes each
-      [.026,-.026].forEach(dy=>{ const t=new THREE.Mesh(new THREE.CircleGeometry(.024,12),M.metal); add(t,s*.17,-.02+dy,.422); mount(0,s*.17,-.02+dy,.43); });
-      const fin=plate(-0.55,-0.25,.012,.16,.012,.05,{x:s*.14,y:.12,mat:H2,ch:.2,greeble:false}); fin.rotation.z=s*0.5; });
-    pdc(0,.1,-.15,1); pulseTurret(1,0,.1,.1,1,.8); windows(0,.09,.6,.14,3); number(idn,0,.087,-.05,.05,'top');
-    light(.26,0,-.5,nav); light(-.26,0,-.5,nav); rcs(.12,.08,.5); rcs(-.12,.08,.5);
+    // v53, from Jon's reference art (reference/fast-attack-*.png): a fat drive drum, an open truss round the fuel
+    // tanks, then an arrowhead hull with a missile pod on each flank, a raised armoured block with a sensor dome, and a
+    // twin pulse turret ahead of it. Proportions are the plan view's, as fractions of length from the stern.
+    { // 0 to 22%: the drive, a solid armoured cylinder (not the open drum other hulls use) with orange and white
+      // bands, armour rings, and a glowing aft rim round the nozzle
+      const zf=-0.54, zb=-0.95, r=.27, cyl=(r0,z0,z1,mat,open=false)=>{ const m=new THREE.Mesh(new THREE.CylinderGeometry(r0,r0,z1-z0,48,1,open),mat); m.rotation.x=Math.PI/2; return add(m,0,0,(z0+z1)/2,true); };
+      cyl(r,zb+0.03,zf,HULL); cyl(r*1.012,-0.84,-0.71,PL,true); cyl(r*1.014,-0.70,-0.675,ST,true); cyl(r*1.012,-0.64,-0.58,PL,true);
+      [zb+0.035,-0.775,-0.61,zf].forEach(z=>{ const t=new THREE.Mesh(new THREE.TorusGeometry(r*1.02,.012,8,48),M.dark); add(t,0,0,z); });
+      for(let i=0;i<10;i++){ const a=i/10*Math.PI*2, b=new THREE.Mesh(new THREE.BoxGeometry(.045,.03,.36),M.dark); b.position.set(Math.cos(a)*r*1.03,Math.sin(a)*r*1.03,(zb+zf)/2+0.02); b.rotation.z=a; body.add(b); }
+      const face=new THREE.Mesh(new THREE.CircleGeometry(r,48),M.dark); face.rotation.y=Math.PI; add(face,0,0,zb+0.031);
+      const rim=new THREE.Mesh(new THREE.RingGeometry(r*0.62,r*0.82,48),M.glow); rim.rotation.y=Math.PI; add(rim,0,0,zb+0.028);   // the glowing aft ring
+      const bell=new THREE.Mesh(new THREE.CylinderGeometry(r*0.5,r*0.6,.06,32),M.bell); bell.rotation.x=Math.PI/2; add(bell,0,0,zb+0.0);
+      const front=new THREE.Mesh(new THREE.CircleGeometry(r*0.98,48),M.dark); add(front,0,0,zf+0.001);
+      engines.push(makePlume(r*0.55,0,0,zb-0.02));
+    }
+    collar(-0.56,-0.52,.30,.30);
+    truss(-0.53,-0.18,.26,.16);                                                   // 22 to 41%: open truss
+    tank(0,.005,-0.355,.052,.2,H2); tank(.07,-.03,-0.355,.028,.2,M.metal); tank(-.07,-.03,-0.355,.028,.2,M.metal);
+    plate(-0.19,0.23,.50,.15,.48,.15,{ch:.18});                                    // 41% to the bow: the hull
+    plate(0.23,0.95,.48,.15,.02,.03,{ch:.35});
+    plate(-0.1,0.6,.22,.07,.1,.04,{y:-.095,mat:H2,ch:.3});                         // keel
+    [-1,1].forEach(sd=>{                                                          // missile pods, 2 x 2 tubes each
+      const x=sd*.255;
+      plate(-0.17,0.23,.14,.12,.14,.12,{x,mat:M.dark,ch:.15,greeble:false});
+      plate(-0.22,-0.16,.12,.1,.12,.1,{x,mat:M.dark,ch:.2,greeble:false});
+      deck(-0.12,0.21,.13,.016,.13,.016,{x,y:.068,mat:PL,ch:.05,greeble:false});
+      const st=new THREE.Mesh(new THREE.BoxGeometry(.13,.008,.025),ST); add(st,x,.078,-0.04);
+      [[-.032,.03],[.032,.03],[-.032,-.03],[.032,-.03]].forEach(([dx,dy])=>tubeMouth(0,x+dx,dy,.232,.022));
+    });
+    plate(-0.15,0.15,.24,.08,.20,.07,{y:.11,mat:H2,ch:.3});                        // armoured block, sensor dome, antennas
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(.042,20,14),M.dark); add(dome,0,.19,-0.05); light(0,.235,-0.05,nav);
+    [-.025,.025].forEach(x=>rod(new THREE.Vector3(x,.15,-0.11),new THREE.Vector3(x,.27,-0.11),.005,M.metal));
+    pulseTurret(1,0,.075,.21,1,1.15);                                             // twin pulse turret
+    // livery: white stripes and orange panels running down the sloping bow
+    const slope=Math.atan2(.075-.015,0.95-0.23);
+    [-.022,.022].forEach(x=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(.014,.006,.66),ST); m.rotation.x=slope; add(m,x,.0465,.6); });
+    const topAt=z=>.075-(.075-.015)*(z-0.23)/0.72;   // the bow's top surface, for flush livery
+    [-1,1].forEach(sd=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(.06,.006,.22),PL); m.rotation.x=slope; add(m,sd*.06,topAt(.62)+.004,.62); });
+    number(idn,0,.079,.33,.055,'top');
+    pdc(0,-.13,.05,-1);
+    light(0,.0,.955,0xffffff); light(.22,.1,-0.72,nav); light(-.22,.1,-0.72,nav); light(0,-.27,-0.7,0xff3020); rcs(.2,.06,.4); rcs(-.2,.06,.4);
   } else if(cls==='dreadnought'){
     // the largest hull afloat: six drives, armored belts, a bridge tower, a spinal railgun running the length of
     // a thick armored prow, light railguns on its flanks and two heavy beam emitters
