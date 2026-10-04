@@ -164,11 +164,11 @@ function addShake(v){ if(!REDUCED) shake=Math.min(1.2, shake+v); }
 function shieldFlash(s, from){ s.shieldMesh.visible=true; const dir=V.copy(from).sub(s.group.position); dir.applyQuaternion(s.group.quaternion.clone().invert());
   dir.set(dir.x/s.shieldMesh.scale.x, dir.y/s.shieldMesh.scale.y, dir.z/s.shieldMesh.scale.z).normalize(); s.shMat.uniforms.uHit.value.copy(dir); s.shMat.uniforms.uFlash.value=1.2; }
 const C_SPARK=new THREE.Color(1,.62,.25), C_FIRE=new THREE.Color(1,.42,.12), C_WHITE=new THREE.Color(1,.95,.85), C_CYAN=new THREE.Color(.4,.8,1), C_SMOKE=new THREE.Color(.12,.1,.09);
-function impactFx(tgt, res, from, heavy=1){
+function impactFx(tgt, res, from, heavy=1, kind=null){   // kind: the weapon's, so the impact sounds like what hit
   const p=hitPoint(tgt);
-  if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); Sound.shield(); }
+  if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); Sound.shield(kind); }
   if(res.h>0.5){ Particles.burst(p,24*heavy,{speed:7,color:C_SPARK,size:0.35,life:0.7}); Particles.burst(p,8*heavy,{speed:1.5,color:C_FIRE,size:1.1*heavy,life:0.5,grow:1});
-    Particles.burst(p,6,{speed:0.8,color:C_SMOKE,size:1.2,life:1.4,drag:0.5,grow:1}); flash(p,0xff9944,4*heavy,0.35); Sound.hit(); addShake(0.12*heavy); }
+    Particles.burst(p,6,{speed:0.8,color:C_SMOKE,size:1.2,life:1.4,drag:0.5,grow:1}); flash(p,0xff9944,4*heavy,0.35); Sound.hit(kind); addShake(0.12*heavy); }
 }
 function floatText(s, text, cls, dy=0){
   const el=document.createElement('div'); el.className='ftxt '+cls; el.textContent=text; $('#labels').appendChild(el);
@@ -183,9 +183,9 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
     const a=mp(0).p, hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
     if(!hit){ const dir=b.clone().sub(a).normalize(); const perp=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(1.2,2.2)*(Math.random()<.5?-1:1)); b=b.add(perp).addScaledVector(dir,60); }
     Sound.rail();
-    // charge
-    for(let i=0;i<30;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.55); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
-    await wait(0.25);
+    // charge, as long as the sound's charge-up (RAIL_CHARGE): energy drawn into the muzzle, faster as it builds
+    for(let s=0;s<5;s++){ for(let i=0;i<6+s*3;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.55); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
+      await wait(RAIL_CHARGE/5); }
     const core=beamMesh(a,b,0.05,0xffffff,1), glow=beamMesh(a,b,0.22,0x7fd0ff,0.55);
     flash(a,0x9fd8ff,5,0.25); Particles.burst(a,20,{speed:5,color:C_WHITE,size:0.3,life:0.3});
     const dir=b.clone().sub(a); const n=Math.min(60,Math.floor(dir.length()*2));
