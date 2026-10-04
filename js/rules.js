@@ -258,7 +258,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
             if(o==='int' && !pdcStarted && e>cutK-0.22){ pdcStarted=true; Sound.pdc(); }
             if(o==='int' && pdcStarted && e<cutK){ const src=pdcPoint(screen||tgt, p);   // the turret nearest the warhead: a screening escort's own, or the target's
               const v=p.clone().sub(src); const dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src,v,new THREE.Color(1,.85,.4),0.12,dd/40,0); }
-            if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); onEvent(i,o); return false; }
+            if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); Sound.intercept(); onEvent(i,o); return false; }
             if(e>=1){ if(o==='hit') onEvent(i,o); else onEvent(i,o); return false; }
             return true; }, dispose(){ disposeMesh(m); if(--left===0) res(); }});
       });

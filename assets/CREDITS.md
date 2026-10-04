@@ -1,5 +1,10 @@
 # Credits for files in assets/ and js/stardata.js
 
+- **Sound effects** (`assets/sfx/*.m4a`, v63): from Kenney's "Sci-Fi Sounds" and "Impact Sounds" packs, by Kenney
+  (www.kenney.nl), Creative Commons Zero (CC0, public domain). Trimmed, faded, mixed to mono and converted to AAC.
+  Sources: laserSmall, laserLarge, thrusterFire, forceField, explosionCrunch and lowFrequency_explosion (Sci-Fi Sounds);
+  impactPunch_heavy, impactPlate_heavy and impactMetal_heavy (Impact Sounds).
+
 Everything else in Laniakea's Edge is generated in code. These are real data, used so the sky and the planets
 are where and what they really are.
 

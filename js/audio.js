@@ -19,9 +19,21 @@ const Sound = (() => {
     music = ctx.createGain(); music.gain.value=0.0; music.connect(comp);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
     const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    startMusic();
+    startMusic(); loadSfx();
   }
   const now = () => ctx.currentTime;
+  /* v63 (Jon): recorded effects (Kenney, CC0, see assets/CREDITS.md) over or instead of the synthesized ones, which
+     stay as the fallback when a file can't load or decode. SFX lists the files for each sound; one is picked at random
+     and its pitch varied a little, so repeats don't sound mechanical. */
+  const SFX = { pulse:['pulse1','pulse2','pulse3'], beam:['beam1','beam2'], rail:['rail1'], launch:['launch1','launch2'], shield:['shield1','shield2'],
+    hull:['hull1','hull2','hull3'], pop:['pop1'], boomS:['boom1','boom2'], boomM:['boom3'], boomL:['boom4'], rumble:['rumble'] };
+  const bufs={};
+  function loadSfx(){ for(const n of new Set(Object.values(SFX).flat()))
+    fetch(`assets/sfx/${n}.m4a?v=${GAME_VERSION}`).then(r=>r.ok? r.arrayBuffer() : Promise.reject()).then(b=>new Promise((ok,no)=>ctx.decodeAudioData(b,ok,no))).then(b=>{ bufs[n]=b; }).catch(()=>{}); }
+  function sample(key, {gain=1, rate=1, vary=0.06, delay=0}={}){
+    if(!ctx) return false; const list=SFX[key].filter(n=>bufs[n]); if(!list.length) return false;
+    const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*(1+(Math.random()*2-1)*vary);
+    const g=ctx.createGain(); g.gain.value=gain; src.connect(g); g.connect(sfx); src.start(now()+delay); return true; }
   function noise(dur, {type='lowpass', f0=2000, f1=200, q=1, gain=0.5, attack=0.005, delay=0}={}){
     if(!ctx) return; const t=now()+delay;
     const src=ctx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
@@ -39,7 +51,7 @@ const Sound = (() => {
     init,
     get on(){ return on; },
     get musicOn(){ return musicOn; },
-    _dbg(){ return {ctx, music, sfx}; },
+    _dbg(){ return {ctx, music, sfx, samples:Object.keys(bufs).length}; },
     toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?fv():0, now(), 0.05); return on; },
     get musicLevel(){ return musicLevel; }, get fxLevel(){ return fxLevel; },
     setMusicLevel(v){ musicLevel=clamp(v,0,1); store.set('musicVol',musicLevel); if(music && musicOn) music.gain.setTargetAtTime(mv(), now(), 0.08); },
@@ -50,24 +62,32 @@ const Sound = (() => {
     select(){ tone(0.09,{type:'triangle',f0:660,f1:990,gain:0.1}); tone(0.07,{type:'sine',f0:1320,gain:0.05,delay:0.05}); },
     deny(){ tone(0.14,{type:'square',f0:140,f1:110,gain:0.06}); },
     move(){ noise(1.1,{type:'lowpass',f0:300,f1:120,gain:0.35,attack:0.15}); tone(1.0,{type:'sawtooth',f0:55,f1:48,gain:0.06,attack:0.2}); },
-    rail(){ duck(0.55,0.5); tone(0.25,{type:'sine',f0:180,f1:900,gain:0.08}); noise(0.35,{type:'highpass',f0:6000,f1:1500,gain:0.35,delay:0.25}); tone(0.5,{type:'sine',f0:120,f1:35,gain:0.6,delay:0.25}); noise(0.6,{type:'lowpass',f0:1800,f1:120,gain:0.4,delay:0.26}); },
-    pulse(){ tone(0.1,{type:'square',f0:980,f1:180,gain:0.09}); noise(0.08,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.12}); },
-    beam(dur=0.9){ if(!ctx) return; const t=now();
+    rail(){ duck(0.55,0.5); sample('rail',{gain:0.9,rate:0.78,delay:0.24}); tone(0.25,{type:'sine',f0:180,f1:900,gain:0.08}); noise(0.35,{type:'highpass',f0:6000,f1:1500,gain:0.35,delay:0.25}); tone(0.5,{type:'sine',f0:120,f1:35,gain:0.6,delay:0.25}); noise(0.6,{type:'lowpass',f0:1800,f1:120,gain:0.4,delay:0.26}); },
+    pulse(){ if(sample('pulse',{gain:0.5,vary:0.1})) return; tone(0.1,{type:'square',f0:980,f1:180,gain:0.09}); noise(0.08,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.12}); },
+    beam(dur=0.9){ if(!ctx) return; const t=now(); sample('beam',{gain:0.55,rate:0.85});
       const o1=ctx.createOscillator(), o2=ctx.createOscillator(); o1.type='sawtooth'; o2.type='sawtooth'; o1.frequency.value=110; o2.frequency.value=221;
       const f=ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=3; f.frequency.setValueAtTime(400,t); f.frequency.exponentialRampToValueAtTime(2200,t+dur);
       const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16,t+0.06); g.gain.setValueAtTime(0.16,t+dur-0.12); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
       const lfo=ctx.createOscillator(); lfo.frequency.value=22; const lg=ctx.createGain(); lg.gain.value=0.05; lfo.connect(lg); lg.connect(g.gain);
       o1.connect(f); o2.connect(f); f.connect(g); g.connect(sfx); [o1,o2,lfo].forEach(o=>{o.start(t); o.stop(t+dur+0.05);}); },
-    missile(){ noise(0.7,{type:'bandpass',f0:500,f1:2600,q:1.5,gain:0.25,attack:0.05}); tone(0.12,{type:'triangle',f0:300,f1:120,gain:0.08}); },
+    missile(){ if(sample('launch',{gain:0.42,vary:0.1})) return; noise(0.7,{type:'bandpass',f0:500,f1:2600,q:1.5,gain:0.25,attack:0.05}); tone(0.12,{type:'triangle',f0:300,f1:120,gain:0.08}); },
     fighter(){ noise(1.0,{type:'bandpass',f0:1200,f1:3200,q:4,gain:0.12,attack:0.2}); },
     pdc(){ if(!ctx) return; for(let i=0;i<9;i++) noise(0.03,{type:'highpass',f0:2500,f1:2000,gain:0.12,delay:i*0.035}); },
-    hit(){ noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3}); tone(0.2,{type:'sine',f0:90,f1:40,gain:0.3}); },
-    shield(){ tone(0.35,{type:'sine',f0:880,f1:660,gain:0.07}); tone(0.35,{type:'sine',f0:1320,f1:990,gain:0.05}); noise(0.2,{type:'bandpass',f0:4000,f1:2000,q:3,gain:0.08}); },
-    boom(size=1){ duck(0.35,1.2); noise(1.2+size, {type:'lowpass',f0:1400,f1:40,gain:0.7,attack:0.01}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.7}); noise(0.3,{type:'highpass',f0:3000,f1:800,gain:0.25}); },
+    hit(){ if(sample('hull',{gain:0.75,rate:0.72,vary:0.1})){ tone(0.2,{type:'sine',f0:90,f1:40,gain:0.18}); return; } noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3}); tone(0.2,{type:'sine',f0:90,f1:40,gain:0.3}); },
+    intercept(){ if(sample('pop',{gain:0.45,rate:1.35,vary:0.12})) return; noise(0.2,{type:'lowpass',f0:3000,f1:300,gain:0.2}); },
+    alarm(){ [0,0.16].forEach((d,i)=>tone(0.13,{type:'square',f0:i?660:880,gain:0.045,delay:d})); },
+    shield(){ if(sample('shield',{gain:0.4,rate:1.15,vary:0.1})) return; tone(0.35,{type:'sine',f0:880,f1:660,gain:0.07}); tone(0.35,{type:'sine',f0:1320,f1:990,gain:0.05}); noise(0.2,{type:'bandpass',f0:4000,f1:2000,q:3,gain:0.08}); },
+    boom(size=1){ duck(0.35,1.2);
+      // size is about a ship's length over 2.2: Patrol craft ~0.5, Destroyer ~1.6, Dreadnought ~2.8; asteroids 1.1
+      if(sample(size<0.9?'boomS': size<1.8?'boomM':'boomL', {gain:0.9, rate:size<0.9?1.1:1})){ if(size>=1.8) sample('rumble',{gain:0.8,vary:0}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.45}); return; }
+      noise(1.2+size, {type:'lowpass',f0:1400,f1:40,gain:0.7,attack:0.01}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.7}); noise(0.3,{type:'highpass',f0:3000,f1:800,gain:0.25}); },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
     turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
-    win(){ [392,494,587,784].forEach((f,i)=>tone(0.9,{type:'triangle',f0:f,gain:0.1,delay:i*0.14})); },
-    lose(){ [330,277,247,196].forEach((f,i)=>tone(1.0,{type:'sawtooth',f0:f,gain:0.05,delay:i*0.2})); },
+    // v63 stings: a rising fanfare that resolves into a held chord; defeat falls to a low minor chord over a rumble
+    win(){ duck(0.2,3.5); [392,494,587,784].forEach((f,i)=>tone(0.9,{type:'triangle',f0:f,gain:0.1,delay:i*0.14}));
+      [392,494,587,784,988].forEach(f=>{ tone(2.6,{type:'triangle',f0:f,gain:0.06,attack:0.25,delay:0.6}); tone(2.6,{type:'sine',f0:f*2,gain:0.02,attack:0.3,delay:0.6}); }); tone(2.8,{type:'sine',f0:98,gain:0.12,attack:0.3,delay:0.6}); },
+    lose(){ duck(0.2,3.5); sample('rumble',{gain:0.6,rate:0.8,vary:0}); [330,277,247,196].forEach((f,i)=>tone(1.0,{type:'sawtooth',f0:f,gain:0.04,delay:i*0.2}));
+      [196,233,294].forEach(f=>tone(3.0,{type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
   };
   /* ---------- cinematic score: generative, scheduled with lookahead ---------- */
   function startMusic(){

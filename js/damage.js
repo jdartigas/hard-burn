@@ -59,7 +59,7 @@ function applyCrit(tgt, c){
   const s=sysOf(tgt, c.key); if(!s) return;
   if(SEVERITY[c.state]>=SEVERITY[s.state]){ s.state=c.state; if(c.state==='offline') s.t=CRIT.offlineTurns; }
   const name=sysName(tgt, c.key);
-  floatText(tgt, `${name} ${c.state}`, c.state==='offline'?'crit off':'crit', 0.8);
+  floatText(tgt, `${name} ${c.state}`, c.state==='offline'?'crit off':'crit', 0.8); if(tgt.side==='player') Sound.alarm();
   log(`${tgt.name}: ${name.toLowerCase()} ${c.state==='offline'?'knocked offline':'damaged'}.`, tgt.side==='player'?'e':'p');
 }
 // the start of a side's turn: offline systems count down, damaged ones may be repaired by the crew
