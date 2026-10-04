@@ -4,6 +4,7 @@
 'use strict';
 
 /* ---------------- game state ---------------- */
+const turnLimit = () => state.quick ? QUICK.turns : BATTLE_TURNS;   // v60: Quick battles are shorter
 const state = {
   diff: store.get('diff','normal'), turn:0, phase:'menu', ships:[], selected:null, weaponSel:'all', mode:null,
   busy:false, over:false, reach:null, hoverCell:null, hoverShip:null, stats:null, acting:null,

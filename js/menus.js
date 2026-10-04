@@ -10,10 +10,16 @@ function closeScreen(){ document.querySelectorAll('.screen').forEach(s=>{ if(s.i
   canvas.focus(); }
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{ Sound.ui(); closeScreen(); });
 const DIFF_DESC={easy:'Loose enemy formation, poor gunnery.', normal:'A capable commander who focuses fire.', hard:'Tougher hulls, sharper guns, no mercy.'};
-function showDiff(){ document.querySelectorAll('.diff').forEach(x=>{ const on=x.dataset.d===state.diff; x.classList.toggle('on',on); x.setAttribute('aria-checked',on); }); $('#diff-desc').textContent=DIFF_DESC[state.diff]; }
+function showDiff(){ document.querySelectorAll('.diff').forEach(x=>{ const on=x.dataset.d===state.diff; x.classList.toggle('on',on); x.setAttribute('aria-checked',on); }); $('#diff-desc').textContent=DIFF_DESC[state.diff];
+  $('#quick-sub').textContent=`Four ships a side · about ten minutes · ${state.diff[0].toUpperCase()+state.diff.slice(1)}`; }
 document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); state.diff=b.dataset.d; store.set('diff',state.diff); showDiff(); });
 showDiff();
 $('#btn-start').onclick=()=>startGame(chosenFleets());
+// v60 Quick battle: one tap. Both sides get the same random lineup (QUICK in core.js), a random location, the chosen difficulty.
+function quickFleets(){ const q=QUICK.fleets[Math.floor(Math.random()*QUICK.fleets.length)];
+  return {player:q.fleet, enemy:q.fleet, enemyName:q.name, youId:'quick', enemyId:'quick-'+q.id, budget:'quick', quick:true, location:LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)].id}; }
+$('#btn-quick').onclick=()=>startGame(quickFleets());
+$('#btn-ships').onclick=()=>{ Sound.init(); Sound.ui(); SV.open(ORDER[ORDER.length-1], 'menu'); };
 // ---- records panel ----
 function renderRecords(){
   const d=loadScores(), games=d.games, wins=games.filter(g=>g.result==='win').length;

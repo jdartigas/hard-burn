@@ -134,7 +134,7 @@ function evalCell(s, cell, D){
   // the turn limit decides on fleet value: in the last three turns a side that is ahead protects its lead and a
   // side that is behind presses, instead of both playing as if the battle had no end
   let press=1, guard=1;
-  if(BATTLE_TURNS-state.turn<=2){ const lead=fleetValue(s.side)-fleetValue(other(s.side)); if(lead>0) guard=2.5; else if(lead<0){ press=1.3; guard=0.3; } }
+  if(turnLimit()-state.turn<=2){ const lead=fleetValue(s.side)-fleetValue(other(s.side)); if(lead>0) guard=2.5; else if(lead<0){ press=1.3; guard=0.3; } }
   let score=off*D.aggr*press - threatAt(s,cell)*D.caution*late*guard*(s.hull/s.hullMax<0.4?1.5:1);
   const c=cellAt(cell.q,cell.r); if(c.t==='debris') score+=4;
   // stand-off preference for fragile artillery, closing pressure for everyone else
@@ -210,7 +210,7 @@ function beginSideTurn(side){
 function banner(title, sub, cls){ const b=$('#banner'); b.className=''; void b.offsetWidth; b.querySelector('.t').textContent=title; b.querySelector('.s').textContent=sub; b.className='show '+cls; }
 function startPlayerTurn(){
   state.turn++; state.phase='player'; beginSideTurn('player'); Sound.setMood('battle');
-  banner(`Turn ${state.turn}`, state.turn>=BATTLE_TURNS?'Final turn: fleet value decides':'Your orders', 'p'); Sound.turn('player');
+  banner(`Turn ${state.turn}`, state.turn>=turnLimit()?'Final turn: fleet value decides':'Your orders', 'p'); Sound.turn('player');
   const first=alive('player').sort((a,b)=>ORDER.indexOf(b.cls)-ORDER.indexOf(a.cls))[0];
   select(first||null, true); updateHUD();
 }
@@ -223,7 +223,7 @@ async function endPlayerTurn(){
   await runAITurn('enemy');
   await Promise.all(pendingDeaths.splice(0));
   state.busy=false;
-  if(!state.over && state.turn>=BATTLE_TURNS){ endOnTurnLimit(); return; }
+  if(!state.over && state.turn>=turnLimit()){ endOnTurnLimit(); return; }
   if(!state.over){ await wait(0.3); startPlayerTurn(); }
 }
 function checkEnd(){

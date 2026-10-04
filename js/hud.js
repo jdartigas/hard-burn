@@ -15,7 +15,7 @@ const DIFF_MULT = { easy:0.75, normal:1, hard:1.5 };
 function scoreBattle(g){
   const win=g.result==='win';
   const parts={ victory:win?1000:0, fleetKept:Math.round(1000*g.valueLeft/Math.max(1,g.valueStart)),
-    enemyDestroyed:Math.round(500*g.enemyDestroyed), speed:win? Math.max(0,(g.limit||BATTLE_TURNS)-g.turns)*20 : 0 };
+    enemyDestroyed:Math.round(500*g.enemyDestroyed), speed:win? Math.max(0,(g.limit||30)-g.turns)*20 : 0 };
   if(g.result==='surrender') parts.fleetKept=0;
   const raw=parts.victory+parts.fleetKept+parts.enemyDestroyed+parts.speed;
   const mult=DIFF_MULT[g.diff]||1;
@@ -23,7 +23,8 @@ function scoreBattle(g){
 }
 const validGame=g=> !!g && typeof g==='object' && typeof g.score==='number' && isFinite(g.score) && typeof g.date==='string';
 const fillGame=g=>({diff:'normal', result:'loss', turns:0, you:'custom', enemy:'custom', left:0, of:0, ...g});
-function considerBest(d,g){ if(!DIFF[g.diff]) return false; const b=d.bests[g.diff]; if(!b || g.score>b.score){ d.bests[g.diff]=g; return true; } return false; }
+function considerBest(d,g){ if(!DIFF[g.diff] || g.quick) return false;   // v60: Quick battles are listed but don't set bests
+  const b=d.bests[g.diff]; if(!b || g.score>b.score){ d.bests[g.diff]=g; return true; } return false; }
 function loadScores(){
   let d=store.get('scores',null);
   if(!d || typeof d!=='object' || !Array.isArray(d.games)) d={format:SCORES_FORMAT, games:[], bests:{}};
@@ -41,19 +42,19 @@ function recordBattle(result){
   if(simRunning || state.simulated || state.recorded) return null; state.recorded=true;
   const mine=state.ships.filter(s=>s.side==='player'), theirs=state.ships.filter(s=>s.side==='enemy');
   const cost=l=>l.reduce((a,s)=>a+s.C.cost,0);
-  const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, location:state.location, limit:BATTLE_TURNS,
+  const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, location:state.location, limit:turnLimit(),
     you:lastFleets.youId||'custom', enemy:lastFleets.enemyId||'custom', result, turns:Math.max(1,state.turn),
     left:alive('player').length, of:mine.length,
     hullPct:Math.round(100*mine.reduce((a,s)=>a+Math.max(0,s.hull),0)/Math.max(1,mine.reduce((a,s)=>a+s.hullMax,0))),
     valueStart:cost(mine), valueLeft:Math.round(fleetValue('player')), enemyStart:cost(theirs),
     enemyDestroyed:+Math.max(0,1-fleetValue('enemy')/Math.max(1,cost(theirs))).toFixed(3),
     dealt:Math.round(state.stats.player.dealt), taken:Math.round(state.stats.enemy.dealt),
-    budget:lastFleets.budget||'standard', fleetYou:mine.map(x=>x.cls), fleetEnemy:theirs.map(x=>x.cls) };   // with the seed, enough to replay the setup
+    budget:lastFleets.budget||'standard', fleetYou:mine.map(x=>x.cls), fleetEnemy:theirs.map(x=>x.cls), ...(state.quick?{quick:true}:{}) };   // with the seed, enough to replay the setup
   Object.assign(g, scoreBattle(g));
   const d=loadScores(); d.games.push(g); const best=considerBest(d,g); saveScores(d); requestPersist();
   return {g, best};
 }
-const fleetName=id=> id==='custom'? 'Custom' : String(id).startsWith('ai-')? `AI ${(AI_PLANS[String(id).slice(3)]||{label:'build'}).label}` : (PRESETS.find(p=>p.id===id)||{name:String(id)}).name;
+const fleetName=id=> id==='custom'? 'Custom' : id==='quick'? 'Quick battle' : String(id).startsWith('quick-')? (QUICK.fleets.find(q=>'quick-'+q.id===id)||{name:'Quick'}).name : String(id).startsWith('ai-')? `AI ${(AI_PLANS[String(id).slice(3)]||{label:'build'}).label}` : (PRESETS.find(p=>p.id===id)||{name:String(id)}).name;
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtN=n=>Math.round(n).toLocaleString('en-US');
 const DIFF_LABEL={easy:'Easy', normal:'Normal', hard:'Hard'};
@@ -65,7 +66,7 @@ function showEnd(win, byValue=null, surrendered=false){
   const lostP=state.ships.filter(s=>s.side==='player').length-alive('player').length;
   const leftP=alive('player').length, allP=state.ships.filter(s=>s.side==='player').length;
   $('#end-sub').textContent = surrendered ? `You surrendered on turn ${Math.max(1,state.turn)} with ${leftP} of ${allP} ship${allP>1?'s':''} still in the fight. The enemy holds the field.`
-    : byValue ? `Turn limit reached after ${BATTLE_TURNS} turns. Fleet value left: yours ${byValue.p}, the enemy's ${byValue.e}. `+
+    : byValue ? `Turn limit reached after ${turnLimit()} turns. Fleet value left: yours ${byValue.p}, the enemy's ${byValue.e}. `+
         (win?'You hold the field.': draw?'Neither side can claim it.':'The enemy holds the field.')
     : win ? (lostP===0?`A clean sweep in ${state.turn} turns. Every ship is coming home.`:`The enemy line is broken after ${state.turn} turns, at the cost of ${lostP} ship${lostP>1?'s':''}.`)
                                   : `Your last ship went dark on turn ${state.turn}. The enemy holds the field.`;
@@ -156,7 +157,7 @@ function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.s
   const fx=[]; if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }
 function weaponStatus(w){ if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 function updateHUD(){
-  $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${BATTLE_TURNS}`;
+  $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${turnLimit()}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
   const str=side=>{ const all=state.ships.filter(s=>s.side===side); const t=all.reduce((a,s)=>a+s.hullMax,0); return all.reduce((a,s)=>a+Math.max(0,s.hull),0)/t*100; };
   $('#sb-p i').style.width=str('player')+'%'; $('#sb-e i').style.width=str('enemy')+'%';

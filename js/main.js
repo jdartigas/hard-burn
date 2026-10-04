@@ -20,11 +20,13 @@ function cleanFleet(list){
 // they get first pick. The first of each class takes its DEPLOY home; later copies take the free zone cell nearest
 // that home, keeping a one-hex gap from every placed ship when the zone allows it.
 function deployFleet(list){
-  const zone=board.list.filter(c=>c.q+c.r/2<=DEPLOY_MAX_X);
+  // Quick battles deploy closer to the centre, but never past QUICK.maxX, so the two fleets always start apart
+  const sh=state.quick? QUICK.shift : 0, maxX=state.quick? QUICK.maxX : DEPLOY_MAX_X;
+  const zone=board.list.filter(c=>c.q+c.r/2<=maxX);
   const cells=new Array(list.length), taken=[], firstSeen=new Set();
   const order=list.map((cls,i)=>i).sort((a,b)=>ORDER.indexOf(list[b])-ORDER.indexOf(list[a]) || a-b);
   for(const i of order){
-    const cls=list[i], [hq,hr]=DEPLOY[cls], home={q:hq,r:hr};
+    const cls=list[i], [hq0,hr]=DEPLOY[cls], hq=Math.min(hq0+sh, Math.floor(maxX-hr/2)), home={q:hq,r:hr};
     let pick=null;
     if(!firstSeen.has(cls) && !taken.some(t=>t.q===hq&&t.r===hr)) pick=home;
     for(const gap of [2,1]){
@@ -42,7 +44,7 @@ function deployFleet(list){
 }
 function setupBattle(seed, fleets={}){
   clearBattle(); board.seed=seed; seedGameRand(seed);
-  state.location=fleets.location||menuLocation(); Loc.set(state.location);
+  state.location=fleets.location||menuLocation(); Loc.set(state.location); state.quick=!!fleets.quick;
   const lists={player:cleanFleet(fleets.player), enemy:cleanFleet(fleets.enemy)};
   const cells={player:deployFleet(lists.player), enemy:deployFleet(lists.enemy).map(([q,r])=>[-q,-r])};
   board.deploy=[...cells.player, ...cells.enemy];
@@ -156,7 +158,7 @@ async function sim(fleets, n=20, seed0=1){
   const out={a:0, b:0, draw:0, byValue:0, turns:0, n, aLeft:0, bLeft:0, battles:[]};
   try{
     for(let i=0;i<n;i++){
-      const swap=i%2===1, f= swap? {player:fleets.east, enemy:fleets.west} : {player:fleets.west, enemy:fleets.east};
+      const swap=i%2===1, f= swap? {player:fleets.east, enemy:fleets.west, quick:fleets.quick} : {player:fleets.west, enemy:fleets.east, quick:fleets.quick};
       const r=await simBattle(f, seed0+i);
       const aWon= swap? r.winner==='east' : r.winner==='west', bWon= swap? r.winner==='west' : r.winner==='east';
       if(aWon) out.a++; else if(bWon) out.b++; else out.draw++;

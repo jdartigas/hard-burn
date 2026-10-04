@@ -121,6 +121,17 @@ const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
 // each surviving ship's cost times its fraction of hull remaining. Without a limit a standoff never ends.
 const BATTLE_TURNS = 30;
+// v60 (Jon): Quick battle, four ships a side. Both sides field the same lineup, picked at random: at this size equal
+// points are far from equal fights (measured at about 220 points, a Destroyer group won 67-100% of its matchups), so a
+// mirror is the fair test and the lineup and location supply the variety. Homes move `shift` hexes toward the centre but
+// never past world x = `maxX`, so the fleets start three to four hexes apart, and the turn limit is `turns`. Measured
+// mirror lengths (10 battles each): Line 9.9 turns, Electronic 11.0, Strike 12.1, Raiders 7.3. A Repair column and an
+// Escort group ran 17-18 turns and were dropped.
+const QUICK = { turns:15, shift:3, maxX:-1.5, fleets:[
+  {id:'line',    name:'Line patrol',       fleet:['destroyer','corvette','patrol','patrol']},
+  {id:'ewar',    name:'Electronic screen', fleet:['ewar','frigate','corvette','fastattack']},
+  {id:'strike',  name:'Strike group',      fleet:['destroyer','fastattack','corvette','patrol']},
+  {id:'raiders', name:'Raiders',           fleet:['fastattack','fastattack','corvette','patrol']} ]};
 // The Frigate's escort screen: allies within `radius` hexes intercept with `share` of the Frigate's point defense
 // (if that beats their own). Classes with pdnet:true provide it.
 // stack: false = the stronger of own and screen counts; true = both fire at the incoming round (1-(1-a)(1-b)), so an
