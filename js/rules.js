@@ -17,7 +17,8 @@ function createShip(cls, side, q, r, copy=0){
   const s={ id:shipId++, side, cls, C, name:NAMES[side][cls]+(copy?' '+ROMAN[copy]:''), copy, st:{dealt:0,taken:0,kills:0,ints:0,repaired:0},   // v61: this ship's battle summary
     hull:hullMax, hullMax, shield:C.shield, shieldMax:C.shield, armor:C.armor, regen:C.regen,
     mp:C.mp, mpMax:C.mp, ev:C.ev, pdc:C.pdc, q, r, alive:true, len:C.m/M_PER_UNIT*SHIP_SCALE, baseY:C.y, phase:Math.random()*6,
-    weapons:C.weapons.map(k=>({key:k, def:WEAPONS[k], wait:0, ammo:WEAPONS[k].ammo, firedTurn:-1})),
+    weapons:C.weapons.map(k=>({key:k, def:WEAPONS[k], wait:0, ammo:WEAPONS[k].ammo, firedTurn:-1}))
+      .concat([{key:'pdcGun', def:{...WEAPONS.pdcGun, shots:Math.max(PDC_GUNS.min, Math.round(C.pdc*PDC_GUNS.perRating))}, wait:0, ammo:undefined, firedTurn:-1}]),   // v74: PDC guns, always last
     ability:{key:C.ability, def:ABIL[C.ability], wait:0}, fx:{}, moved:false,
     ...m };
   s.group.scale.setScalar(SHIP_SCALE*(C.m/M_PER_UNIT)/s.modelLen);   // the built model, scaled to the class's length in metres
@@ -36,6 +37,7 @@ const ROMAN = ['','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 const alive = side => state.ships.filter(s=>s.alive && s.side===side);
 const other = side => side==='player'?'enemy':'player';
 function shipAt(q,r){ return state.ships.find(s=>s.alive && s.q===q && s.r===r) || null; }
+const isPdcGun = w => w.def.kind==='pdc';   // v74
 function weaponReady(w){ return w.wait===0 && (w.ammo===undefined || w.ammo>0) && !weaponOffline(w); }
 function abilityReady(s){ return s.ability.wait===0; }
 
@@ -265,6 +267,15 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
     });
   });
 }
+// v74: PDC guns: a stream of tracers from the turrets nearest the target, round by round
+function fxPdc(att, tgt, outcomes, onEvent){
+  return new Promise(async res=>{ Sound.pdc(); const col=new THREE.Color(1,.85,.4);
+    for(let i=0;i<outcomes.length;i++){ const src=pdcPoint(att, tgt.group.position), to=hitPoint(tgt);
+      if(outcomes[i]!=='hit') to.add(new THREE.Vector3(rand(-1.2,1.2),rand(-.3,.6),rand(-1.2,1.2)));
+      const v=to.clone().sub(src), dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src, v, col, 0.14, dd/40, 0);
+      const k=i; after(dd/40, ()=>onEvent(k, outcomes[k])); await wait(0.04); }
+    await wait(0.45); res(); });
+}
 async function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=null){
   const v=att.volleys=(att.volleys||0)+1, mp=i=>mountPoint(att, slot, v+i);
   // turreted weapons traverse onto the target first, as long as the slowest one needs (capped, so play keeps moving)
@@ -272,5 +283,5 @@ async function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=nu
   if(list && list.some(m=>m.t)){ let need=0; for(const m of list) if(m.t) need=Math.max(need, aimTurret(att, m.t, tgt.group.position, 3));
     if(need>0.05) await wait(Math.min(0.45, need/TURRET_SLEW)); }
   switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp);
-    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
+    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); case 'pdc': return fxPdc(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
 }

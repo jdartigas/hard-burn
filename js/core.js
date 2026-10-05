@@ -50,6 +50,7 @@ const WEAPONS = {
   wing:   {name:'Strike wing',   kind:'fighter',range:12,acc:90, dmg:9,  shots:6, sh:1, hu:1.0, pierce:0.6, reload:2, guided:true, pdcF:0.45},
   // v32: Fast Attack Ship; v34: Electronic warfare ship's self-defence beam
   beamL:  {name:'Light beam',    kind:'beam',  range:5, opt:2, acc:95, fall:8, dmg:14, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
+  pdcGun: {name:'PDC guns',     kind:'pdc',   range:2, opt:1, acc:78, fall:12, dmg:8, shots:10, sh:0.5, hu:1.0, pierce:0.5, reload:1},   // v74: shots set per ship from PDC_GUNS
   strikeM:{name:'Strike missiles',kind:'missile',range:9, acc:92, dmg:32, shots:2, sh:1, hu:1.0, pierce:0.35,reload:1, ammo:2, guided:true, pdcF:0.7},
 };
 const ABIL = {
@@ -121,6 +122,15 @@ const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
 // each surviving ship's cost times its fraction of hull remaining. Without a limit a standoff never ends.
 const BATTLE_TURNS = 30;
+// v74 (Jon): round 2 of the review roadmap. Two fixes for fights that dragged (Frigate mirrors averaged 19 turns
+// because shields fully regenerate every turn):
+// - Shields under fire: a ship damaged during the other side's turn regenerates only `regen` of its shields when its
+//   own turn begins.
+// - PDC guns: every ship can turn its point defense on an enemy at knife range (WEAPONS.pdcGun, added to each ship
+//   outside its class loadout). Rounds per volley scale with the ship's point defense rating. A ship that fires them
+//   has no point defense against missiles until its next turn. Never part of "All weapons".
+const UNDER_FIRE = { regen:0.5 };
+const PDC_GUNS = { perRating:18, min:3 };
 // v60 (Jon): Quick battle, four ships a side. Both sides field the same lineup, picked at random: at this size equal
 // points are far from equal fights (measured at about 220 points, a Destroyer group won 67-100% of its matchups), so a
 // mirror is the fair test and the lineup and location supply the variety. Homes move `shift` hexes toward the centre but

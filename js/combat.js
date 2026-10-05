@@ -13,6 +13,7 @@ async function fireWeapon(att, wi, tgt){
   if(state.acting===att && !cam.touched && frameShot(att,tgt)) await wait(0.3);   // AI shots: frame both ends, unless the player has taken the camera
   await faceTarget(att,tgt);
   w.wait=d.reload; w.firedTurn=state.turn; if(w.ammo!==undefined) w.ammo--;
+  if(d.kind==='pdc'){ att.fx.pdcFired=1; floatText(att,'PDCs turned on target','int',0.2); refreshTags(); }   // v74: no missile defense until its next turn
   const cover=d.guided? pdCover(tgt) : null, pInt=d.guided? clamp(cover.p*d.pdcF,0,0.8)*(att.fx.ambush?0.5:1) : 0, screen= cover && cover.by!==tgt ? cover.by : null;
   const outcomes=[], dmgRoll=[];
   for(let i=0;i<d.shots;i++){ let o=gameRand()*100<p?'hit':'miss'; if(o==='hit' && d.guided && gameRand()<pInt) o='int'; outcomes.push(o); dmgRoll.push(d.dmg*(0.85+gameRand()*0.3)); }
@@ -27,7 +28,7 @@ async function fireWeapon(att, wi, tgt){
   const onEvent=(i,o)=>{
     if(o==='hit'){ hits++; st.hits++;
       const r=res[i]; S+=r.s; H+=r.h;
-      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; att.st.dealt+=r.s+r.h; tgt.st.taken+=r.s+r.h; }
+      if(!tgt.isRock){ st.dealt+=r.s+r.h; state.stats[tgt.side].taken+=r.s+r.h; att.st.dealt+=r.s+r.h; tgt.st.taken+=r.s+r.h; if(r.s+r.h>0.5) tgt.underFire=true; }   // v74: under fire, half regen
       if(!tgt.alive) return;
       tgt.shield=Math.max(0,tgt.shield-r.s); tgt.hull-=r.h; if(tgt.isRock) rockDamaged(tgt);
       impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1, d.big? 'torpedo' : d.kind);
@@ -57,7 +58,8 @@ function destroyShip(s, by){
   if(state.selected===s) select(null);
   checkEnd();
 }
-function firingOrder(s){ const pri={pulse:0,beam:1,rail:2,missile:3,fighter:3}; return s.weapons.map((w,i)=>i).sort((a,b)=>pri[s.weapons[a].def.kind]-pri[s.weapons[b].def.kind]); }
+// the ship's main weapons in firing order; PDC guns (v74) are never part of a full volley and are fired on purpose
+function firingOrder(s){ const pri={pulse:0,beam:1,rail:2,missile:3,fighter:3}; return s.weapons.map((w,i)=>i).filter(i=>!isPdcGun(s.weapons[i])).sort((a,b)=>pri[s.weapons[a].def.kind]-pri[s.weapons[b].def.kind]); }
 async function fireAll(att, tgt){
   let any=false;
   for(const i of firingOrder(att)){ if(!tgt.alive || state.over) break; const w=att.weapons[i]; if(weaponReady(w) && hitChance(att,w.def,tgt)>0){ if(await fireWeapon(att,i,tgt)){ any=true; await wait(0.12); } } }
@@ -129,7 +131,7 @@ function threatAt(s, cell){
 function evalCell(s, cell, D){
   const from={q:cell.q, r:cell.r}; let off=0; const foes=alive(other(s.side));
   let ready=0, idle=0;
-  for(const w of s.weapons){ if(!weaponReady(w)) continue; let best=0; for(const t of foes) best=Math.max(best, scoreAttack(s,w.def,t,from,D)); off+=best; ready++; if(best===0) idle++; }
+  for(const w of s.weapons){ if(!weaponReady(w) || isPdcGun(w)) continue; let best=0; for(const t of foes) best=Math.max(best, scoreAttack(s,w.def,t,from,D)); off+=best; ready++; if(best===0) idle++; }
   const late=Math.max(0.3, 1-state.turn/10);
   // the turn limit decides on fleet value: in the last three turns a side that is ahead protects its lead and a
   // side that is behind presses, instead of both playing as if the battle had no end
@@ -155,7 +157,7 @@ async function aiShip(s){
   const D = s.side==='enemy'? DIFF[state.diff] : DIFF.normal;
   if(s.ability.key==='overcharge' && abilityReady(s) && s.shield<s.shieldMax*0.4) await useAbility(s);
   let reach=reachable(s);
-  const bestOffense = r => { let b=0; for(const [,c] of r){ if(c.blocked) continue; for(const w of s.weapons){ if(!weaponReady(w)) continue; for(const t of alive(other(s.side))) if(hitChance(s,w.def,t,c)>0) b=1; } if(b) break; } return b; };
+  const bestOffense = r => { let b=0; for(const [,c] of r){ if(c.blocked) continue; for(const w of s.weapons){ if(!weaponReady(w) || isPdcGun(w)) continue; for(const t of alive(other(s.side))) if(hitChance(s,w.def,t,c)>0) b=1; } if(b) break; } return b; };
   if(s.ability.key==='burn' && abilityReady(s) && !bestOffense(reach)){ await useAbility(s); reach=reachable(s); }
   // ambush when its missiles are loaded and an enemy is (or will be, with the extra speed) inside their reach
   if(s.ability.key==='ambush' && abilityReady(s) && s.weapons.some(w=>w.def.guided && weaponReady(w)) && alive(other(s.side)).some(t=>hdist(s,t)<=s.weapons.find(w=>w.def.guided).def.range+s.mp+2)){ await useAbility(s); reach=reachable(s); }
@@ -185,6 +187,13 @@ async function aiShip(s){
     if(tgt && w.ammo!==undefined && bv<8 && gameRand()<0.7) continue;
     if(tgt){ state.hoverTarget=tgt; await fireWeapon(s,i,tgt); await wait(0.15); }
   }
+  // v74: PDC guns, last. Turning them on a ship leaves no missile defense, so only when no enemy with loaded missiles
+  // or fighters could reach this ship next turn, or when they'd finish the target off.
+  { const pg=s.weapons.findIndex(isPdcGun), w=s.weapons[pg];
+    if(pg>=0 && weaponReady(w) && !state.over){
+      const threat=alive(other(s.side)).some(e=>e.weapons.some(x=>x.def.guided && x.ammo!==0 && hdist(e,s)<=x.def.range+e.mpMax));
+      let tgt=null, bv=0; for(const t of alive(other(s.side))){ const v=scoreAttack(s,w.def,t,s,D); if(v>bv){ bv=v; tgt=t; } }
+      if(tgt && (!threat || expected(s,w.def,tgt).kill)){ state.hoverTarget=tgt; await fireWeapon(s,pg,tgt); await wait(0.15); } } }
   if(state.over) return;
   if(s.ability.key==='brace' && abilityReady(s) && (threatAt(s,s)>45 || s.hull<s.hullMax*0.5)) await useAbility(s);
   if(s.ability.key==='overcharge' && abilityReady(s) && s.shield<s.shieldMax*0.5 && threatAt(s,s)>25) await useAbility(s);
@@ -199,7 +208,7 @@ async function runAITurn(side){
 
 /* ---------------- turn flow ---------------- */
 function beginSideTurn(side){
-  for(const s of alive(side)){ tickSystems(s); s.shield=Math.min(s.shieldMax, s.shield+regenOf(s)); s.fx={}; s.mp=moveAllowance(s); s.moved=false; s.engines.forEach(e=>e.boost=0);
+  for(const s of alive(side)){ tickSystems(s); s.shield=Math.min(s.shieldMax, s.shield+regenOf(s)*(s.underFire? UNDER_FIRE.regen : 1)); s.underFire=false; s.fx={}; s.mp=moveAllowance(s); s.moved=false; s.engines.forEach(e=>e.boost=0);
     s.weapons.forEach(w=>w.wait=Math.max(0,w.wait-1)); s.ability.wait=Math.max(0,s.ability.wait-1); }
   // a blackout this side cast runs out now that its enemy has had its turn
   for(const e of state.ships) if(e.blackout===side) e.blackout=null;

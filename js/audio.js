@@ -31,7 +31,7 @@ const Sound = (() => {
      and its pitch varied a little, so repeats don't sound mechanical. */
   const SFX = { pulse:['pulse1','pulse2','pulse3'], rail:['rail1'], launch:['launch1','launch2'],
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
-  const bufs={};
+  const bufs={}; let lastPdcHit=0, lastPdcShield=0;
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
   // were silently missing there
   const b64=s=>{ const bin=atob(s), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a.buffer; };
@@ -115,6 +115,7 @@ const Sound = (() => {
         tone(0.035,{type:'square',f0:190+Math.random()*40,f1:70,gain:0.028*v,attack:0.002,delay:d}); } },
     // v65 (Jon): what a hull hit sounds like depends on what hit it
     hit(kind){
+      if(kind==='pdc'){ if(!ctx) return; const t=now(); if(t-lastPdcHit<0.09) return; lastPdcHit=t; sample('hull',{gain:0.3,rate:1.25,vary:0.15}); noise(0.06,{type:'bandpass',f0:3000,f1:1200,q:1.5,gain:0.12}); return; }   // v74: PDC rounds, thinned so a burst doesn't stack up
       if(kind==='torpedo'){ blast(0.95,{gain:0.3,lo:55,bright:2000,crack:0.8}); blast(0.45,{gain:0.12,lo:90,bright:2600,crack:0.3,delay:0.14}); return; }   // v66: a heavy warhead, its own sound
       if(kind==='missile' || kind==='fighter'){ blast(0.55,{gain:0.2,lo:75,bright:2600}); return; }   // v66: a small explosion, gentler, no recording
       if(kind==='beam'){ noise(0.7,{type:'highpass',f0:3500,f1:2500,gain:0.12,attack:0.05}); crackle(0.65,{gain:0.12,f:2500,density:45}); noise(0.6,{type:'bandpass',f0:900,f1:500,q:3,gain:0.06,attack:0.05}); return; }   // burning, sizzling
@@ -127,6 +128,7 @@ const Sound = (() => {
     burst(){ blast(0.35,{gain:0.15,lo:90,bright:2400,crack:0.4}); sample('pop',{gain:0.18,rate:0.9+Math.random()*0.4,vary:0}); },
     // v65 (Jon): shields crackle with static when hit; a beam holds them longer
     shield(kind){
+      if(kind==='pdc'){ if(!ctx) return; const t=now(); if(t-lastPdcShield<0.1) return; lastPdcShield=t; crackle(0.08,{gain:0.1,f:4000,density:60}); return; }
       // v69 (Jon): a warhead on a shield is an explosion close to its hull hit, a little brighter and softer, with a
       // short shield shimmer (a falling resonant tone) instead of the full static, which read as a crunch
       if(kind==='torpedo' || kind==='missile' || kind==='fighter'){ const T=kind==='torpedo';

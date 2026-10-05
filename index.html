@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '73';
+const GAME_VERSION = '74';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -147,7 +147,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <ul>
       <li>Click one of your ships to select it. Highlighted hexes show where it can move; click one to burn there.</li>
       <li>Hover an enemy to see your odds. Click it to fire every ready weapon that can reach, or pick a single weapon first.</li>
-      <li>Shields absorb damage first and recharge each turn. Armor then blunts every hit to the hull.</li>
+      <li>Shields absorb damage first and recharge each turn, but only half as much after a turn under fire. Armor then blunts every hit to the hull.</li>
     </ul>
     <h3>Weapons</h3>
     <table class="wt">
@@ -156,6 +156,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <tr><td>Beam lasers</td><td>Very accurate, hits shields and hull evenly</td><td>Accuracy fades quickly with range</td></tr>
       <tr><td>Railguns</td><td>No range limit, punches through armor; at long range big ships can't dodge the slug</td><td>Poor against shields, needs clear line of sight; small, nimble ships dodge them far out</td></tr>
       <tr><td>Missiles and torpedoes</td><td>Guided, fly over asteroids, heavy damage</td><td>Limited ammo, point defense can shoot them down</td></tr>
+      <tr><td>PDC guns</td><td>Every ship can turn its point defense on an enemy two hexes away or closer: a storm of small rounds that chews up hulls</td><td>Weak against shields, and a ship that fires them has no missile defense until its next turn. Never part of All weapons: pick them on purpose</td></tr>
       <tr><td>Strike wing</td><td>Carrier fighters, huge reach, hard to intercept</td><td>Needs a turn to rearm</td></tr>
     </table>
     <h3>Ships</h3>

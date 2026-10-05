@@ -27,14 +27,17 @@ const SEVERITY = { ok:0, damaged:1, offline:2 };
 
 function initSystems(s){
   s.sys = { engines:{state:'ok', t:0}, shields:{state:'ok', t:0}, pdc:{state:'ok', t:0} };
-  s.weapons.forEach(w=>{ w.sys={state:'ok', t:0}; });
+  s.weapons.forEach(w=>{ w.sys={state:'ok', t:0}; }); linkPdcGun(s);
 }
+// v74: the PDC guns are the point defense system: they share its state (damaged fires fewer rounds' worth of accuracy,
+// offline can't fire) and are never a separate critical-hit target
+function linkPdcGun(s){ const g=s.weapons.find(isPdcGun); if(g) g.sys=s.sys.pdc; }
 // a system by key: 'engines' | 'shields' | 'pdc' | weapon index as a number
 const sysOf = (s, key) => typeof key==='number' ? s.weapons[key].sys : s.sys[key];
 const sysName = (s, key) => typeof key==='number' ? s.weapons[key].def.name : SYS_LABEL[key];
 function damagedSystems(s){
   const out=[]; for(const k of ['engines','shields','pdc']) if(s.sys && s.sys[k].state!=='ok') out.push({key:k, name:SYS_LABEL[k], ...s.sys[k]});
-  s.weapons.forEach((w,i)=>{ if(w.sys && w.sys.state!=='ok') out.push({key:i, name:w.def.name, ...w.sys}); });
+  s.weapons.forEach((w,i)=>{ if(!isPdcGun(w) && w.sys && w.sys.state!=='ok') out.push({key:i, name:w.def.name, ...w.sys}); });
   return out;
 }
 
@@ -46,7 +49,7 @@ function rollCrit(tgt, hullDmg, simSys, hullNow){
   const p=Math.min(CRIT.cap, hullDmg/tgt.hullMax*CRIT.perHull*(1+CRIT.hurt*hurt));
   if(gameRand()>=p) return null;
   // which system: a weapon (any of them, equally) or a ship system, by weight
-  const keys=[], w=[]; tgt.weapons.forEach((_,i)=>{ keys.push(i); w.push(CRIT.weights.weapon/tgt.weapons.length); });
+  const keys=[], w=[], main=tgt.weapons.filter(x=>!isPdcGun(x)).length; tgt.weapons.forEach((x,i)=>{ if(isPdcGun(x)) return; keys.push(i); w.push(CRIT.weights.weapon/main); });
   for(const k of ['engines','shields','pdc']) if(k!=='pdc' || tgt.pdc>0){ keys.push(k); w.push(CRIT.weights[k]); }
   let r=gameRand()*w.reduce((a,b)=>a+b,0), key=keys[keys.length-1]; for(let i=0;i<keys.length;i++){ r-=w[i]; if(r<=0){ key=keys[i]; break; } }
   const cur=simSys[key] || 'ok', roll=gameRand();
@@ -69,17 +72,18 @@ function tickSystems(s){
   const tick=(sys,name)=>{ if(sys.state==='offline'){ if(--sys.t<=0){ sys.state='damaged'; sys.t=0; } }
     else if(sys.state==='damaged' && gameRand()<CRIT.recover+(field?CRIT.fieldRecover:0)){ sys.state='ok'; fixed.push(name); } };
   for(const k of ['engines','shields','pdc']) tick(s.sys[k], SYS_LABEL[k]);
-  s.weapons.forEach(w=>tick(w.sys, w.def.name));
+  s.weapons.forEach(w=>{ if(!isPdcGun(w)) tick(w.sys, w.def.name); });
   if(fixed.length && !state.simulated){ floatText(s, `${fixed.join(', ')} repaired`, 'heal', 0.6); }
 }
-function repairAll(s){ const n=damagedSystems(s).length; for(const k of ['engines','shields','pdc']) s.sys[k]={state:'ok',t:0}; s.weapons.forEach(w=>{ w.sys={state:'ok',t:0}; }); return n; }
+function repairAll(s){ const n=damagedSystems(s).length; for(const k of ['engines','shields','pdc']) s.sys[k]={state:'ok',t:0}; s.weapons.forEach(w=>{ w.sys={state:'ok',t:0}; }); linkPdcGun(s); return n; }
 
 // effects
 const weaponOffline = w => !!(w.sys && w.sys.state==='offline');
 const slotAcc = w => w.sys && w.sys.state==='damaged' ? -CRIT.accDamaged : 0;
 function moveAllowance(s){ const st=s.sys? s.sys.engines.state : 'ok'; return st==='offline'? Math.max(1,Math.ceil(s.mpMax/2)) : st==='damaged'? Math.max(1,s.mpMax-1) : s.mpMax; }
 function regenOf(s){ const st=s.sys? s.sys.shields.state : 'ok'; return st==='offline'? 0 : st==='damaged'? s.regen*CRIT.regenDamaged : s.regen; }
-function effPdc(s){ const st=s.sys? s.sys.pdc.state : 'ok'; return st==='offline'? s.pdc*CRIT.pdcOffline : st==='damaged'? s.pdc*CRIT.pdcDamaged : s.pdc; }
+function effPdc(s){ if(s.fx && s.fx.pdcFired) return 0;   // v74: its PDCs are firing at a ship this turn
+  const st=s.sys? s.sys.pdc.state : 'ok'; return st==='offline'? s.pdc*CRIT.pdcOffline : st==='damaged'? s.pdc*CRIT.pdcDamaged : s.pdc; }
 // short status words for tags and lists
 function damageSummary(s){ const d=damagedSystems(s); if(!d.length) return '';
   return d.map(x=>`${x.name} ${x.state==='offline'?`offline (${x.t})`:'damaged'}`).join(' · '); }
@@ -90,7 +94,7 @@ function updateDamageFx(s, dt){
   if(!s.sys || window.__norender) return;
   const puff=(p,offline)=>{ if(offline) Particles.emit(p, new THREE.Vector3().randomDirection().multiplyScalar(rand(2,5)), C_DMG_SPARK, 0.1, rand(0.2,0.45), 2);
     else Particles.emit(p, new THREE.Vector3(rand(-.2,.2),rand(.3,.7),rand(-.2,.2)), C_DMG_SMOKE, rand(0.35,0.7), rand(1.2,2.2), 0.4, 0.6); };
-  s.weapons.forEach((w,i)=>{ if(!w.sys || w.sys.state==='ok') return; const off=w.sys.state==='offline';
+  s.weapons.forEach((w,i)=>{ if(isPdcGun(w) || !w.sys || w.sys.state==='ok') return; const off=w.sys.state==='offline';
     if(Math.random()<dt*(off?9:3)) puff(mountPoint(s,i,Math.floor(Math.random()*8)).p, off); });
   const eng=s.sys.engines; if(eng.state!=='ok' && s.engines.length && Math.random()<dt*(eng.state==='offline'?8:3)){
     const e=s.engines[Math.floor(Math.random()*s.engines.length)]; e.group.getWorldPosition(V); puff(V.clone(), eng.state==='offline'); }
