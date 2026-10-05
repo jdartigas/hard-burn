@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '72';
+const GAME_VERSION = '73';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -58,6 +58,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 </div>
 
 <div id="tooltip"></div>
+<div id="busy" role="status" aria-live="polite"></div>
 <div id="banner"><div class="t"></div><div class="s"></div></div>
 
 <div id="menu" class="screen on">
@@ -141,7 +142,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
   <div class="sheet">
     <h2>How to play</h2>
     <p>Ships take real damage: a hit that gets through to the hull can knock out a weapon, the engines, the shield generator or point defense. Damaged systems work worse; offline ones are out for a couple of turns. Crews patch things up over time, faster near a Repair tender, and its Resupply fixes everything.</p>
-    <p>Each turn every one of your ships can move up to its movement allowance, fire each of its ready weapons once, and use its special ability if charged. Move and fire in any order. When you end your turn, the enemy does the same. Destroy all six enemy ships to win.</p>
+    <p>Each turn every one of your ships can move up to its movement allowance, fire each of its ready weapons once, and use its special ability if charged. Move and fire in any order. When you end your turn, the enemy does the same. Destroy every enemy ship to win. If neither fleet is destroyed when the turn limit runs out (30 turns, 15 in a Quick battle), the side with more fleet value left holds the field.</p>
     <h3>Giving orders</h3>
     <ul>
       <li>Click one of your ships to select it. Highlighted hexes show where it can move; click one to burn there.</li>

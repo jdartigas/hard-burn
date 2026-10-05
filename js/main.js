@@ -237,6 +237,7 @@ function frame(){
   // rings
   const sel=state.selected; selRing.visible=!!sel && state.phase==='player';
   if(sel){ selRing.position.copy(hexToWorld(sel.q,sel.r,0.04)).lerp(new THREE.Vector3(sel.group.position.x,0.04,sel.group.position.z),1); selRing.material.opacity=0.6+Math.sin(elapsed*4)*0.3; }
+  updateBusy(Math.min(rawDt,0.1));
   if(state.acting && state.acting.alive){ actRing.position.set(state.acting.group.position.x,0.04,state.acting.group.position.z); actRing.material.opacity=0.5+Math.sin(elapsed*5)*0.3; }
   if(state.hoverTarget && state.hoverTarget.alive && state.phase==='enemy'){ tgtRing.visible=true; tgtRing.position.set(state.hoverTarget.group.position.x,0.04,state.hoverTarget.group.position.z); }
   tgtRing.material.opacity=0.6+Math.sin(elapsed*6)*0.3;

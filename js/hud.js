@@ -226,7 +226,24 @@ function weaponBlurb(d){ return {pulse:'Rapid bolts. Strong against shields, wea
 /* ---------------- tooltip & hover ---------------- */
 const tip=$('#tooltip'); let mouse={x:0,y:0};
 function hideTooltip(){ tip.style.display='none'; }
-function showTooltip(html){ tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14; if(x+w>innerWidth-8) x=mouse.x-w-14; if(y+h>innerHeight-8) y=innerHeight-h-8; tip.style.left=x+'px'; tip.style.top=y+'px'; }
+// v73 (Jon): the card follows the cursor but stays inside the area the docked panels leave free (safeRect, input.js),
+// so hovering a ship near the bottom no longer covers the weapon buttons or End turn
+/* v73: the busy chip. While your own move, volley or ability plays out the game takes no new orders; the chip says
+   so after a short delay (quick actions never flash it), and a click meanwhile, or during the enemy's turn, pulses it. */
+let busySince=-1, busyShown=false, nudgeT=0;
+function updateBusy(dt){
+  const el=$('#busy'), resolving=state.busy && state.phase==='player' && !cam.menu;
+  busySince= resolving? (busySince<0? 0 : busySince+dt) : -1; nudgeT=Math.max(0, nudgeT-dt);
+  const show=(resolving && busySince>0.35) || nudgeT>0;
+  if(show!==busyShown){ busyShown=show; el.classList.toggle('on', show); }
+  if(show && !nudgeT && el.textContent!=='Resolving…') el.textContent='Resolving…';
+}
+function nudgeBusy(text='Resolving…'){ const el=$('#busy'); el.textContent=text; nudgeT=1.1; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+function showTooltip(html){ tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14;
+  const S= typeof safeRect==='function' ? safeRect() : {l:8, t:8, r:innerWidth-8, b:innerHeight-8};
+  if(x+w>S.r) x=mouse.x-w-14; if(y+h>S.b) y=mouse.y-h-14;
+  if(S.r-S.l>=w) x=clamp(x, S.l, S.r-w); if(S.b-S.t>=h) y=clamp(y, S.t, S.b-h);
+  tip.style.left=x+'px'; tip.style.top=y+'px'; }
 function updateHover(){
   const h=state.hoverShip || state.hoverRock, s=state.selected; tgtRing.visible=false;
   for(const sh of state.ships) sh.tagHit.classList.remove('show');

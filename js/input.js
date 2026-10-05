@@ -152,6 +152,8 @@ function endPointer(e){
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', e=>{ pointers.delete(e.pointerId); drag=null; pinch=null; });
+// v73: the hover card goes away when the pointer moves onto the interface, so it never sits over a button
+canvas.addEventListener('pointerleave', ()=>{ if(drag || pinch) return; state.hoverShip=null; state.hoverRock=null; hideTooltip(); updateHover(); });
 canvas.addEventListener('contextmenu', e=>e.preventDefault());
 // Zoom by how far the wheel actually moved. A trackpad sends many tiny deltas per gesture; stepping a fixed 10%
 // per event made it lurch. A mouse notch (about 100) still moves about 12%. Trackpad pinch arrives with ctrlKey.
@@ -161,6 +163,8 @@ canvas.addEventListener('wheel', e=>{ e.preventDefault(); if(cam.menu) return;
 canvas.addEventListener('dblclick', e=>{ if(cam.menu) return; const {ship}=pickAt(e.clientX,e.clientY); if(ship) zoomTo(ship); });
 function zoomTo(s){ cam.thGoal=cam.phGoal=null; cam.follow=s; cam.touched=true; cam.rGoal=Math.max(MIN_ZOOM, s.len*1.9); cam.phi=Math.min(cam.phi,1.15); Sound.ui(); }
 function onClick(x,y){
+  if(state.phase==='enemy'){ nudgeBusy('Enemy turn'); return; }
+  if(state.phase==='player' && state.busy){ nudgeBusy(); return; }   // v73: say why the click did nothing
   if(state.phase!=='player' || state.busy) return;
   const {cell, ship}=pickAt(x,y); if(!cell) return;
   const s=state.selected;
