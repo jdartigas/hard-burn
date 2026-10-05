@@ -382,6 +382,29 @@ When the first model exists: 24 copies on the board, full effects, on Jon's iPad
 will use). That says in one sitting whether levels of detail are needed from day one or only later. `DEBUG` (main.js)
 already shows frame time, draw calls and buffer sizes.
 
+## Review roadmap (ChatGPT/Codex playtest + Jon's combat ideas, after v73)
+
+ChatGPT's review of a fresh-player Quick battle (Codex could run it; ChatGPT's own browser had no WebGL), filtered by
+Jon, plus three combat ideas of his. Rule: change the rules before building what explains them.
+
+1. ~~**Quick fixes**~~ **Done in v73:** objective text in How to play; the hover card kept clear of the interface; the
+   "Resolving…" busy chip.
+2. **Combat rules** (one batch, simulator balance pass at the end):
+   - **Shields under fire regenerate at half rate**, plus **PDC close-in fire**: every ship can turn its point defense on
+     an enemy at range 1-2 (many small rounds, weak against shields), but a ship that does can't intercept missiles
+     until its next turn. Measured first: Frigate mirrors ran 19 turns on average because shields fully regenerate.
+   - **Broader damage model:** rebalance critical odds (about 40% weapons), add **sensors** (accuracy) and a **magazine**
+     on missile ships (lose a salvo, small chance of an internal explosion), optionally bridge/command (ability recharge).
+   - **Explosion splash damage:** dying ships hurt adjacent hexes, friend and foe, about 12% of their maximum hull,
+     through shields and armor; the AI must avoid it.
+3. **Clarity:** threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
+   explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
+   because PDC brawls bring ships close.
+4. **Onboarding:** the first-battle tutorial (#1), written against the finished rules.
+5. **Polish:** Normal / Fast animation setting (#9; Normal stays the default), combat log type markers (#11).
+
+Skipped (Jon): #4 action-state labels, #7 move-bonus formatting.
+
 ## Brightness, playability and fun (Jon, after v58)
 
 Options proposed after Jon found the screen too dark. **Chosen for the next round (Jon): B1, B2, B3, F1, F2, F4, F5,
