@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '71';
+const GAME_VERSION = '72';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -65,20 +65,15 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <h1 id="title"><img src="assets/logo.webp" alt="Laniakea's Edge" width="1000" height="568"></h1>
     <div class="eyebrow">Turn-based fleet combat</div>
     <p class="lede">Close the distance, strip their shields and break their line before they break yours.</p>
-    <button class="btn-quick" id="btn-quick"><span><b>Quick battle</b><small id="quick-sub"></small></span><i aria-hidden="true">›</i></button>
-    <div class="setup">
-      <div class="setup-h"><span>Custom engagement</span><em>Your rules</em></div>
+    <div class="diff-row">
       <div class="srow"><span class="slabel" id="lb-diff">Difficulty</span>
         <div class="seg" role="radiogroup" aria-labelledby="lb-diff">
           <button class="diff" data-d="easy" role="radio">Easy</button><button class="diff on" data-d="normal" role="radio">Normal</button><button class="diff" data-d="hard" role="radio">Hard</button>
         </div></div>
       <p class="sdesc" id="diff-desc"></p>
-      <div class="srow"><span class="slabel" id="lb-you">Your fleet</span><button class="picker" id="pk-you" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-you pk-you"></button></div>
-      <div class="srow"><span class="slabel" id="lb-enemy">Enemy fleet</span><button class="picker" id="pk-enemy" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-enemy pk-enemy"></button></div>
-      <div class="srow"><span class="slabel" id="lb-loc">Location</span><button class="picker" id="pk-loc" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-loc pk-loc"></button></div>
-      <p class="sdesc fleet-desc" id="pick-desc"></p>
-      <button class="btn-ghost btn-begin" id="btn-start">Begin engagement</button>
     </div>
+    <button class="btn-quick" id="btn-quick"><span><b>Quick battle</b><small id="quick-sub"></small></span><i aria-hidden="true">›</i></button>
+    <button class="btn-custom" id="btn-custom"><span><b>Custom battle</b><small>Choose the fleets and the location</small></span><i aria-hidden="true">›</i></button>
     <div class="cta menu-nav">
       <button class="btn-ghost" id="btn-how">How to play</button>
       <button class="btn-ghost" id="btn-ships">Ships</button>
@@ -86,6 +81,20 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-ghost btn-settings">Settings</button>
     </div>
     <div class="foot">Drag to orbit, scroll or pinch to zoom, two fingers to pan. <span class="ver" id="ver-menu"></span></div>
+  </div>
+</div>
+
+<!-- v72 (Jon): the custom setup moved off the intro into its own panel, so the intro stays short and simple -->
+<div id="setup" class="screen" role="dialog" aria-label="Custom battle">
+  <div class="sheet">
+    <h2>Custom battle</h2>
+    <div class="setup">
+      <div class="srow"><span class="slabel" id="lb-you">Your fleet</span><button class="picker" id="pk-you" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-you pk-you"></button></div>
+      <div class="srow"><span class="slabel" id="lb-enemy">Enemy fleet</span><button class="picker" id="pk-enemy" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-enemy pk-enemy"></button></div>
+      <div class="srow"><span class="slabel" id="lb-loc">Location</span><button class="picker" id="pk-loc" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb-loc pk-loc"></button></div>
+      <p class="sdesc fleet-desc" id="pick-desc"></p>
+    </div>
+    <div class="cta"><button class="btn-primary" id="btn-start">Begin engagement</button><button class="btn-ghost" id="btn-setup-back">Back</button></div>
   </div>
   <div id="pk-list" class="pk-list" role="listbox" tabindex="-1" hidden></div>
 </div>

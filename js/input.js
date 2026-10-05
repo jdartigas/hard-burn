@@ -179,7 +179,7 @@ const keys=new Set();
 addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   const open=document.querySelector('.screen.on');
-  if(open && open.id!=='menu'){ if(e.key==='Escape'||(e.key.toLowerCase()==='h'&&open.id==='help')){ if(open.id==='help'||open.id==='pause') closeScreen(); } return; }
+  if(open && open.id!=='menu'){ if(e.key==='Escape'||(e.key.toLowerCase()==='h'&&open.id==='help')){ if(open.id==='help'||open.id==='pause'||open.id==='setup') closeScreen(); } return; }
   if(state.phase==='menu'){ if(e.key==='Enter') startGame(chosenFleets()); return; }
   const k=e.key.toLowerCase();
   if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){ keys.add(k); e.preventDefault(); return; }

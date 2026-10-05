@@ -453,6 +453,24 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
    title on the intro. Sized by height on shorter screens so the intro still never scrolls on iPad landscape. ---- */
 #title{font-size:0;line-height:0;filter:none;background:none;margin:0 0 6px}
 #title img{display:block;width:min(100%,600px);height:auto;margin-left:-3%}
-@media (max-height:900px) and (min-width:761px){ #title img{width:auto;height:clamp(130px,25vh,230px);max-width:100%} }
-@media (max-height:820px) and (min-width:761px){ #menu p.lede{display:none} }   /* the logo says it; the screen must not scroll */
+@media (max-height:900px) and (min-width:761px){ #title img{width:auto;height:clamp(140px,33vh,290px);max-width:100%} }
+@media (max-height:640px) and (min-width:761px){ #menu p.lede{display:none} }   /* only on very short screens since v72 */
 @media (max-width:760px){ #title img{width:100%;margin-left:0} }
+
+/* ---- v72 (Jon): a simpler intro: logo, difficulty, Quick battle, Custom battle, and the small row of extras. The
+   fleet and location pickers moved to the Custom battle panel (#setup). ---- */
+#menu .diff-row{margin:2px 0 14px;max-width:520px}
+#menu .diff-row .srow{grid-template-columns:96px 1fr}
+#menu .diff-row .sdesc{margin-left:106px}
+.btn-custom{width:100%;min-height:72px;margin:0 0 4px;padding:0 26px;border:1px solid rgba(111,208,255,.45);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;
+  background:rgba(8,26,42,.8);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.btn-custom:hover,.btn-custom:focus-visible{border-color:var(--accent);box-shadow:0 0 18px rgba(111,208,255,.25)}
+.btn-custom span{display:flex;flex-direction:column;gap:4px}
+.btn-custom b{font-family:var(--display);font-weight:400;font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-hi)}
+.btn-custom small{font-size:15px;font-weight:600;color:var(--dim)}
+.btn-custom i{font-style:normal;font-family:var(--display);font-size:22px;color:var(--accent)}
+#setup{align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+#setup .sheet{max-width:620px}
+#setup .setup{background:none;border:0;padding:0;margin-top:6px}
+@media (max-height:900px) and (min-width:761px){ .btn-custom{min-height:58px} .btn-custom b{font-size:14px} .btn-custom small{font-size:14px} #menu .diff-row{margin-bottom:10px} }
+@media (max-width:760px){ .btn-custom{min-height:64px;padding:0 18px} .btn-custom b{font-size:14px} #menu .diff-row .srow{grid-template-columns:1fr} #menu .diff-row .sdesc{margin-left:0} }

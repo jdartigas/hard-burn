@@ -19,6 +19,10 @@ $('#btn-start').onclick=()=>startGame(chosenFleets());
 function quickFleets(){ const q=QUICK.fleets[Math.floor(Math.random()*QUICK.fleets.length)];
   return {player:q.fleet, enemy:q.fleet, enemyName:q.name, youId:'quick', enemyId:'quick-'+q.id, budget:'quick', quick:true, location:LOCATIONS[Math.floor(Math.random()*LOCATIONS.length)].id}; }
 $('#btn-quick').onclick=()=>startGame(quickFleets());
+// v72: Custom battle opens the setup panel (fleets, location, Begin); the builder returns there too
+$('#btn-custom').onclick=()=>{ Sound.init(); Sound.ui(); renderPicks(); showScreen('setup'); };
+$('#btn-setup-back').onclick=()=>{ Sound.ui(); closePicker(); closeScreen(); };
+$('#builder [data-close]').onclick=()=>{ Sound.ui(); showScreen('setup'); };
 $('#btn-ships').onclick=()=>{ Sound.init(); Sound.ui(); SV.open(ORDER[ORDER.length-1], 'menu'); };
 // ---- records panel ----
 function renderRecords(){
@@ -145,7 +149,7 @@ $('#bl-done').onclick=()=>{ if(!validCustom(draft)) return; Sound.ui();
   pickYou='custom'; store.set('fleetYou','custom');
   // presets are Standard-budget fleets: against another budget, or a Random preset, default to an opponent built to yours
   if(pickEnemy==='random' || custom.budget!=='standard'){ pickEnemy='aibuild'; store.set('fleetEnemy','aibuild'); }
-  closeScreen(); renderPicks(); };
+  showScreen('setup'); renderPicks(); };
 renderPicks();
 $('#btn-how').onclick=()=>{ Sound.init(); Sound.ui(); showScreen('help'); };
 $('#btn-help').onclick=()=>{ Sound.ui(); showScreen('help'); };
