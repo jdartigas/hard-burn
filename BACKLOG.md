@@ -404,6 +404,8 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
      the big-shield hulls that swarms keep under fire every turn. Open: tune Raiders/Swarm down, Dreadnought/Support up.
      **v77:** capitals (max hull 200+) keep 75% regen under fire. Round robin: Classic 46, Gunline 47, Swarm 57,
      Carrier 50, Wolfpack 51, Dreadnought 49, Raiders 63, Support 36; 19.5 turns. Next: Raiders (fast attack cost).
+     **v78:** fast attack cost 55 dropped Raiders to 42 (any cost over 50 loses a whole Corvette at 660), so cost
+     stayed 50 and fast attack evasion went 34 to 30: Raiders 63 to 59 (v52: 57). Support (36) is still the weakest.
 3. **Clarity:** threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
