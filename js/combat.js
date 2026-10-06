@@ -226,7 +226,7 @@ async function runAITurn(side){
 
 /* ---------------- turn flow ---------------- */
 function beginSideTurn(side){
-  for(const s of alive(side)){ tickSystems(s); s.shield=Math.min(s.shieldMax, s.shield+regenOf(s)*(s.underFire? UNDER_FIRE.regen : 1)); s.underFire=false; s.fx={}; s.mp=moveAllowance(s); s.moved=false; s.engines.forEach(e=>e.boost=0);
+  for(const s of alive(side)){ tickSystems(s); s.shield=Math.min(s.shieldMax, s.shield+regenOf(s)*(s.underFire? (s.hullMax>=UNDER_FIRE.capitalHull? UNDER_FIRE.capital : UNDER_FIRE.regen) : 1)); s.underFire=false; s.fx={}; s.mp=moveAllowance(s); s.moved=false; s.engines.forEach(e=>e.boost=0);
     s.weapons.forEach(w=>w.wait=Math.max(0,w.wait-1)); s.ability.wait=Math.max(0,s.ability.wait-1); }
   // a blackout this side cast runs out now that its enemy has had its turn
   for(const e of state.ships) if(e.blackout===side) e.blackout=null;

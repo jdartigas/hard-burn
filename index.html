@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '76';
+const GAME_VERSION = '77';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -147,7 +147,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <ul>
       <li>Click one of your ships to select it. Highlighted hexes show where it can move; click one to burn there.</li>
       <li>Hover an enemy to see your odds. Click it to fire every ready weapon that can reach, or pick a single weapon first.</li>
-      <li>Shields absorb damage first and recharge each turn, but only half as much after a turn under fire. Armor then blunts every hit to the hull.</li>
+      <li>Shields absorb damage first and recharge each turn, but only half as much after a turn under fire (three quarters for cruisers, carriers and dreadnoughts). Armor then blunts every hit to the hull.</li>
       <li>A ship that blows up damages every ship in the hexes next to it, yours included. Don't finish off an enemy your own ship is parked beside, and keep clear of your wrecks-to-be.</li>
     </ul>
     <h3>Weapons</h3>

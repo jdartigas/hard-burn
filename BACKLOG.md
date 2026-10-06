@@ -402,6 +402,8 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
      Splash is not the cause (splash off: Dreadnought 37, Raiders 63, Support 39). Crit resistance for big hulls
      (x sqrt(150/hull)) changed nothing measurable and was dropped. Suspect v74's half regen under fire, which hits
      the big-shield hulls that swarms keep under fire every turn. Open: tune Raiders/Swarm down, Dreadnought/Support up.
+     **v77:** capitals (max hull 200+) keep 75% regen under fire. Round robin: Classic 46, Gunline 47, Swarm 57,
+     Carrier 50, Wolfpack 51, Dreadnought 49, Raiders 63, Support 36; 19.5 turns. Next: Raiders (fast attack cost).
 3. **Clarity:** threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.

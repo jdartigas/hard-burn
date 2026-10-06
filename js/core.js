@@ -129,7 +129,7 @@ const BATTLE_TURNS = 30;
 // - PDC guns: every ship can turn its point defense on an enemy at knife range (WEAPONS.pdcGun, added to each ship
 //   outside its class loadout). Rounds per volley scale with the ship's point defense rating. A ship that fires them
 //   has no point defense against missiles until its next turn. Never part of "All weapons".
-const UNDER_FIRE = { regen:0.5 };
+const UNDER_FIRE = { regen:0.5, capital:0.75, capitalHull:200 };   // v77: capitals (max hull 200+) keep 75%
 // v76 (Jon): a dying ship's blast hits every ship within `radius` hexes, friend or foe, for `share` of the dying ship's
 // max hull, through shields and armor like any hit (`pierce` of the armor ignored). A blast can chain into another.
 const SPLASH = { share:0.12, radius:1, pierce:0.3 };
