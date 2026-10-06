@@ -130,6 +130,9 @@ const BATTLE_TURNS = 30;
 //   outside its class loadout). Rounds per volley scale with the ship's point defense rating. A ship that fires them
 //   has no point defense against missiles until its next turn. Never part of "All weapons".
 const UNDER_FIRE = { regen:0.5 };
+// v76 (Jon): a dying ship's blast hits every ship within `radius` hexes, friend or foe, for `share` of the dying ship's
+// max hull, through shields and armor like any hit (`pierce` of the armor ignored). A blast can chain into another.
+const SPLASH = { share:0.12, radius:1, pierce:0.3 };
 const PDC_GUNS = { perRating:18, min:3 };
 // v60 (Jon): Quick battle, four ships a side. Both sides field the same lineup, picked at random: at this size equal
 // points are far from equal fights (measured at about 220 points, a Destroyer group won 67-100% of its matchups), so a

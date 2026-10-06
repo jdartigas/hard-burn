@@ -54,11 +54,27 @@ const pendingDeaths=[];
 function destroyShip(s, by){
   log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k');
   const wc=cellAt(s.q,s.r); if(wc && wc.t==='open') wc.t='debris';   // the wreck leaves a debris field: cover, double movement
-  const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s);
+  const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s); blastNeighbours(s, by);
   if(state.selected===s) select(null);
   checkEnd();
 }
 // the ship's main weapons in firing order; PDC guns (v74) are never part of a full volley and are fired on purpose
+// v76: the blast of a dying ship. Damage lands now (so the rules stay in step); its effects show when the hull goes up.
+function blastNeighbours(s, by){
+  const dmg=s.hullMax*SPLASH.share, w={sh:1, hu:1, pierce:SPLASH.pierce}, delay=(3+Math.round(s.len))*0.2+0.15;
+  for(const o of state.ships){ if(o===s || !o.alive || o.isRock || hdist(o,s)>SPLASH.radius) continue;
+    const r=applyDamage(o, w, dmg); o.st.taken+=r.s+r.h; if(r.s+r.h>0.5) o.underFire=true;
+    log(`${o.name} caught in ${s.name}'s blast: ${Math.round(r.s+r.h)} damage`, o.side==='player'?'e':'p');
+    after(delay, ()=>{ if(r.h>=0.5) floatText(o, Math.round(r.h), 'hu'); else if(r.s>0) floatText(o, Math.round(r.s), 'sh'); impactFx(o, r, s.group.position, 1.4, 'torpedo'); });
+    if(o.hull<=0.5){ o.hull=0; o.alive=false;
+      if(by && by.side!==o.side){ by.st.kills++; state.stats[by.side].kills++; }
+      destroyShip(o, by && by.side!==o.side ? by : null); } }   // a ship lost to its own side's blast is credited to no one
+  refreshTags(); updateHUD();
+}
+// what a blast would do if this ship died now: + for enemies of `side` caught in it, - for its own ships (AI scoring)
+function blastSwing(t, side){ let v=0; const dmg=t.hullMax*SPLASH.share;
+  for(const o of alive(t.side).concat(alive(other(t.side)))){ if(o===t || hdist(o,t)>SPLASH.radius) continue; const d=Math.min(o.hull+o.shield, dmg);
+    v += o.side===side ? -d : d*0.6*targetValue(o); } return v; }
 function firingOrder(s){ const pri={pulse:0,beam:1,rail:2,missile:3,fighter:3}; return s.weapons.map((w,i)=>i).filter(i=>!isPdcGun(s.weapons[i])).sort((a,b)=>pri[s.weapons[a].def.kind]-pri[s.weapons[b].def.kind]); }
 async function fireAll(att, tgt){
   let any=false;
@@ -115,7 +131,7 @@ function targetValue(t){ return {ewar:1.4, dreadnought:1.3, carrier:1.25, tender
 function scoreAttack(att, w, tgt, from, D){
   const e=expected(att,w,tgt,from); if(!e.p) return 0;
   let v=(e.hull + (e.dmg-e.hull)*0.5)*targetValue(tgt);
-  if(e.kill) v+=45*targetValue(tgt);
+  if(e.kill) v+=45*targetValue(tgt) + blastSwing(tgt, att.side);   // v76: the kill's blast, on either side
   v*= 1 + D.focus*(1-tgt.hull/tgt.hullMax)*0.8;
   return v;
 }
@@ -139,6 +155,8 @@ function evalCell(s, cell, D){
   if(turnLimit()-state.turn<=2){ const lead=fleetValue(s.side)-fleetValue(other(s.side)); if(lead>0) guard=2.5; else if(lead<0){ press=1.3; guard=0.3; } }
   let score=off*D.aggr*press - threatAt(s,cell)*D.caution*late*guard*(s.hull/s.hullMax<0.4?1.5:1);
   const c=cellAt(cell.q,cell.r); if(c.t==='debris') score+=4;
+  // v76: don't stop next to a ship that may blow up soon, yours or theirs
+  for(const o of state.ships){ if(o===s || !o.alive || hdist(o,cell)>SPLASH.radius) continue; const risk=Math.pow(clamp(1-o.hull/o.hullMax,0,1),2); score -= risk*o.hullMax*SPLASH.share*0.6*D.caution; }
   // stand-off preference for fragile artillery, closing pressure for everyone else
   const near=foes.reduce((m,f)=>Math.min(m,hdist(f,cell)),99);
   if(s.cls==='carrier' || s.cls==='cruiser' || s.cls==='dreadnought' || s.cls==='tender') score -= Math.max(0,5-near)*6*late;
