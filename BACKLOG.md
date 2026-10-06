@@ -397,6 +397,11 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
      on missile ships (lose a salvo, small chance of an internal explosion), optionally bridge/command (ability recharge).
    - **Explosion splash damage:** dying ships hurt adjacent hexes, friend and foe, about 12% of their maximum hull,
      through shields and armor; the AI must avoid it.
+   - **Balance pass (v76 round robin, 40 battles per pairing):** Classic 48, Gunline 48, Swarm 62, Carrier 47,
+     Wolfpack 54, Dreadnought 41, Raiders 66, Support 34; 18.8 turns (v52: 48/51/50/48/51/56/57/39, 20.2 turns).
+     Splash is not the cause (splash off: Dreadnought 37, Raiders 63, Support 39). Crit resistance for big hulls
+     (x sqrt(150/hull)) changed nothing measurable and was dropped. Suspect v74's half regen under fire, which hits
+     the big-shield hulls that swarms keep under fire every turn. Open: tune Raiders/Swarm down, Dreadnought/Support up.
 3. **Clarity:** threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
