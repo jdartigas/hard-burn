@@ -172,6 +172,11 @@ function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
 function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
   const fx=[]; if(s.fx.pdcFired) fx.push('PDCs spent'); if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }
 function weaponStatus(w){ if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
+// v79: point-defense state for the ship panel and hover card: own PDCs ready or spent, and the share of
+// missile-rack missiles its cover (its own or a Frigate's screen) stops
+function pdLine(s){ if(!s.alive) return ''; const c=pdCover(s), p=Math.round(interceptChance(s, WEAPONS.missL)*100);
+  const own= s.fx.pdcFired? 'Own PDCs spent until its next turn' : 'PDCs ready';
+  return `<div class="pdl${s.fx.pdcFired?' spent':''}">${own} · stops ${p}% of missiles${c.by!==s?` (${c.by.name}'s screen)`:''}</div>`; }
 function updateHUD(){
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${turnLimit()}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
@@ -205,7 +210,7 @@ function updateHUD(){
     $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`; $('#sp-class').title=s.C.passive||'';
     $('#sp-stats').innerHTML=`<div class="sr"><span>Hull</span><b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
       <div class="sr" title="Regenerates ${s.regen} a turn"><span>Shields</span><b>${Math.round(s.shield)} / ${s.shieldMax}</b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
-      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>${damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`;
+      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>${damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`+pdLine(s);
     const wc=$('#sp-weapons'); wc.innerHTML='';
     s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':'')+(w.sys&&w.sys.state!=='ok'?' sys-'+w.sys.state:''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
       b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">${isFinite(d.range)? 'Range '+d.range : 'Range '+d.reach+'+'}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}${w.sys&&w.sys.state==='damaged'?' · damaged':''}</span>`;
@@ -271,10 +276,12 @@ function updateHover(){
     } else if(h.isRock) html+=`<div class="hint">Select a ship, then click to shoot it apart</div>`;
     else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.map(w=>w.def.name).join(', ')}</span></div>`;
     if(!h.isRock && damagedSystems(h).length) html+=`<div class="hint dmgl">${damageSummary(h)}</div>`;
+    if(!h.isRock) html+=pdLine(h);
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
     if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) html+= abilityTargets(s).includes(h)?`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`:`<div class="hint">Out of range</div>`;
+    html+=pdLine(h);
     showTooltip(html);
   }
 }
