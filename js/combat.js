@@ -22,7 +22,7 @@ async function fireWeapon(att, wi, tgt){
   // same in any order, and the shot that kills is fixed here rather than by which effect arrives first.
   const sim={shield:tgt.shield, hull:tgt.hull, armor:tgt.armor, fx:tgt.fx}; let killShot=-1;
   const simSys={};   // criticals are decided here too, in shot order, so a seed always plays out the same (damage.js)
-  const res=outcomes.map((o,i)=>{ if(o!=='hit' || killShot>=0) return {s:0,h:0}; const r=applyDamage(sim,d,dmgRoll[i]); if(sim.hull<=0.5) killShot=i; else r.crit=rollCrit(tgt,r.h,simSys,sim.hull); return r; });
+  const res=outcomes.map((o,i)=>{ if(o!=='hit' || killShot>=0) return {s:0,h:0}; const r=applyDamage(sim,d,dmgRoll[i]); if(sim.hull<=0.5) killShot=i; else { r.crit=rollCrit(tgt,r.h,simSys,sim.hull); if(r.crit && r.crit.blast) sim.hull-=r.crit.blast; } return r; });
   const st=state.stats[att.side]; st.shots+=d.shots;
   let S=0,H=0,hits=0,ints=0,misses=0, missShown=false;
   const onEvent=(i,o)=>{

@@ -61,10 +61,13 @@ function accAdj(att, w, from=att){
   if(att.blackout) a-=JAM.blackout;
   if(alive(other(att.side)).some(e=>e.C.jam && hdist(e,from)<=JAM.range)) a-= w.guided? JAM.guided : JAM.direct;
   if(alive(att.side).some(e=>e.C.jam && hdist(e,from)<=JAM.uplink)) a+=JAM.boost;
+  const sn=att.sys && att.sys.sensors && att.sys.sensors.state;   // v75: damaged sensors
+  if(sn==='damaged') a-=CRIT.sensorsDamaged; else if(sn==='offline') a-=CRIT.sensorsOffline;
   return a;
 }
 function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range) return 0;
   if(att.blackout && w.guided) return 0;   // no missile locks under a sensor blackout
+  if(w.reach && d>w.reach && att.sys && att.sys.sensors && att.sys.sensors.state==='offline') return 0;   // v75: no long-range railgun track without sensors
   return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt), accAdj(att,w,from)); }
 // who a targeted ability can be used on, right now
 function abilityTargets(s){ const d=s.ability.def; if(!d.targeted) return [];
