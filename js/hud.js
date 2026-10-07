@@ -109,6 +109,19 @@ function select(s, quiet=false){
   recomputeHighlights(); updateHUD();
   if(state.selected && (state.selected!==prev || !quiet)) focusShip(state.selected);   // after updateHUD, so the safe area allows for the ship panel
 }
+// v83 (round 3, #8): the threat overlay. T or the panel's Threat button tints every hex by how much enemy fire could
+// reach the selected ship there next turn: threatAt, the AI's own estimate, which sums every enemy weapon in reach, so it
+// runs past any one ship's hull and shields on most of a full board. Colour is relative to the most dangerous hex (amber
+// light, red heavy; hexes you can reach keep their blue, pulled toward it); the hover card gives the absolute figure.
+state.threat=!!store.get('threat', false); state.threatMap=null;
+const THREAT_LO=new THREE.Color(0x5a3a0c), THREAT_HI=new THREE.Color(0x8a1a10);
+function toggleThreat(){ state.threat=!state.threat; store.set('threat', state.threat); Sound.ui(); recomputeHighlights(); updateHUD(); updateHover(); }
+function threatTiles(map, s){ const out=new Map(), pool=s.hull+s.shield; let top=1;
+  for(const c of board.list){ if(c.t==='rock') continue; const dmg=threatAt(s,c); out.set(c.idx,{dmg, share:dmg/pool}); top=Math.max(top,dmg); }
+  for(const c of board.list){ const m=out.get(c.idx); if(!m) continue; const t=m.dmg/top; if(m.dmg<1 || t<0.04) continue;
+    const tc=THREAT_LO.clone().lerp(THREAT_HI,t).multiplyScalar(0.45+0.55*t), col=map.get(c.idx);
+    map.set(c.idx, col? col.clone().lerp(tc, 0.7*t) : tc); }
+  return out; }
 function recomputeHighlights(){
   const map=new Map(); const s=state.selected;
   state.reach=null;
@@ -119,6 +132,7 @@ function recomputeHighlights(){
       if(s.mp>0){ state.reach=reachable(s); for(const [,c] of state.reach){ if(c.cost===0||c.blocked) continue; const cell=cellAt(c.q,c.r); const k=c.cost/s.mp; map.set(cell.idx,new THREE.Color(0x13506e).multiplyScalar(1.15-k*0.45)); } }
     }
   }
+  state.threatMap = state.threat && s && state.phase==='player' && !state.busy && state.mode!=='target' ? threatTiles(map, s) : null;
   setTiles(map); updatePathPreview();
 }
 function updatePathPreview(){
@@ -255,6 +269,8 @@ function updateHUD(){
     const bb=document.createElement('button'); bb.id='abil'; bb.className='wbtn'+(state.mode==='target'?' on':''); bb.disabled=!abilityReady(s)||state.busy||state.phase!=='player'; bb.title=a.def.desc;
     bb.innerHTML=`<span class="k">Q</span><span class="wn">${a.def.name}</span><span class="wd">${state.mode==='target'?`Click ${a.def.target==='enemy'?'an enemy':'an ally'} to ${a.def.verb}`:'Ability'}</span><span class="ws">${state.mode==='target'?'Q to cancel': a.wait?`Recharging, ${a.wait} turn${a.wait>1?'s':''}`:'Ready'}</span>`;
     bb.onclick=playerAbility; bot.appendChild(bb);
+    const tb=document.createElement('button'); tb.id='threatbtn'; tb.className='wbtn'+(state.threat?' on':''); tb.title='Tint each hex by the enemy fire that could reach this ship there next turn';
+    tb.innerHTML=`<span class="k">T</span><span class="wn">Threat</span><span class="wd">Enemy reach</span><span class="ws">${state.threat?'Shown':'Hidden'}</span>`; tb.onclick=toggleThreat; bot.appendChild(tb);
   }
   const et=$('#endturn'); et.disabled= state.phase!=='player'||state.busy;
   const spent = state.phase==='player' && alive('player').every(s=>s.mp===0 && !s.weapons.some(w=>weaponReady(w) && alive('enemy').some(t=>hitChance(s,w.def,t)>0)));
@@ -292,7 +308,10 @@ function updateHover(){
       else { const w=s.weapons[state.weaponSel], p=hitChance(s,w.def,t); t.tagHit.textContent=(p?clamp(p+slotAcc(w),5,95):0)+'%'; }
       t.tagHit.classList.add('show'); }
   }
-  if(!h || state.phase==='menu'){ hideTooltip(); return; }
+  if(!h || state.phase==='menu'){ const c=state.hoverCell, m=state.threatMap && c && state.threatMap.get(c.idx);
+    if(m && state.phase!=='menu'){ const sel=state.selected; showTooltip(`<h4>Threat here</h4>`+(m.dmg<1? `<div class="hint">No enemy weapon can reach this hex next turn</div>`
+      : `<div class="tr"><span>If every enemy in reach fires on ${esc(sel.name)}</span><b>~${Math.round(m.dmg)}</b></div><div class="hint">${m.share>=1?'More than':'About '+Math.round(m.share*100)+'% of'} its hull and shields</div>`)); }
+    else hideTooltip(); return; }
   if(h.side==='enemy' || h.isRock){
     tgtRing.visible=true; tgtRing.position.copy(hexToWorld(h.q,h.r,0.04));
     let html= h.isRock ? `<h4>Asteroid</h4><div class="tr"><span>Blocks movement and line of sight</span></div><div class="tr"><span>Integrity</span><b>${Math.ceil(h.hull)} / ${h.hullMax}</b></div>`

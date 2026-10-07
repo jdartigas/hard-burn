@@ -194,6 +194,7 @@ addEventListener('keydown', e=>{
   if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){ keys.add(k); e.preventDefault(); return; }
   if(k==='m'){ toggleMusic(); return; }
   if(k==='g'){ cycleQuality(); return; }
+  if(k==='t' && state.phase!=='menu'){ toggleThreat(); return; }
   if(k==='n'){ toggleSound(); return; }
   if(k==='h'){ showScreen('help'); return; }
   if(k==='p'){ openPause(); return; }
