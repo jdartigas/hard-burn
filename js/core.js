@@ -74,7 +74,7 @@ const CLASSES = {
   fastattack:{label:'Fast attack ship', role:'Ambush striker',      m:100, cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:30, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
   dreadnought:{label:'Dreadnought',  role:'Capital of the line',    m:390, cost:480, hull:400, armor:12,shield:120,regen:22, mp:2, ev:2,  pdc:0.60, weapons:['spinal','railL','railL','beamH','beamH','pulse'], ability:'brace', len:4.6, y:1.1},
   // v34: support classes. `passive` is shown in the ship panel and builder; the effects live in the rules.
-  ewar:     {label:'Electronic warfare ship', role:'Jamming and targeting', m:215, cost:90, hull:60, armor:2, shield:30, regen:10, mp:5, ev:22, pdc:0.30, weapons:['beamL'], ability:'blackout', len:2.4, y:0.8, jam:true,
+  ewar:     {label:'Electronic warfare ship', role:'Jamming and targeting', m:215, cost:80, hull:60, armor:2, shield:30, regen:10, mp:5, ev:22, pdc:0.30, weapons:['beamL'], ability:'blackout', len:2.4, y:0.8, jam:true,
              passive:'Jams enemies within 4 hexes (-10 accuracy, -15 with missiles) and gives allies within 3 hexes +8 accuracy'},
   tender:   {label:'Repair tender', role:'Repair and resupply',    m:250, cost:70, hull:150, armor:3, shield:50, regen:12, mp:3, ev:8,  pdc:0.35, weapons:['pulse'], ability:'resupply', len:3.0, y:0.9, fieldRepair:10, fieldRange:2,
              passive:'Field repairs: allies within 2 hexes regain 10 hull each turn'},

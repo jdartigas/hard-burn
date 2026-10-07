@@ -406,6 +406,11 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
      Carrier 50, Wolfpack 51, Dreadnought 49, Raiders 63, Support 36; 19.5 turns. Next: Raiders (fast attack cost).
      **v78:** fast attack cost 55 dropped Raiders to 42 (any cost over 50 loses a whole Corvette at 660), so cost
      stayed 50 and fast attack evasion went 34 to 30: Raiders 63 to 59 (v52: 57). Support (36) is still the weakest.
+     **v87:** EW ship cost 90 to 80, so the Support plan buys a seventh hull (a Patrol craft) at 660. Support row first,
+     40 battles a pairing, same seeds: v86 35 (Raiders 13); EW 70 47; tender 50 47 (the same fleet, the same results);
+     no Heavy cruiser 42 but lopsided. Full round robin at EW 80: Classic 49, Gunline 48, Swarm 57, Carrier 49,
+     Wolfpack 49, Dreadnought 46, Raiders 54, Support 47; 19.6 turns. Spread 46-57 (v78: 36-59). Still to check:
+     the Skirmish and Large budgets, where the Support plan builds a different fleet.
 3. ~~**Clarity**~~ **Done in v79-v84** (PDC state v79, system chips v80, blast warning v81, failure reasons v82, threat overlay v83, label overlap v84): threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
