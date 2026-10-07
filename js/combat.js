@@ -46,13 +46,13 @@ async function fireWeapon(att, wi, tgt){
   const byScr= screen? ` by ${screen.name}'s screen` : '';
   if(hits===0) msg += ints? `${ints} intercepted${byScr}` : 'missed';
   else { msg += `${Math.round(S+H)} damage`; if(S>0.5 && H>0.5) msg+=` (${Math.round(S)} to shields)`; else if(H<0.5) msg+=' to shields'; if(ints) msg+=`, ${ints} intercepted${byScr}`; if(d.shots>1) msg+=`, ${hits}/${d.shots} hit`; }
-  log(msg, cls);
+  log(msg, cls, hits? 'hit' : ints? 'int' : 'miss');
   updateHUD();
   return true;
 }
 const pendingDeaths=[];
 function destroyShip(s, by){
-  log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k');
+  log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k', 'kill');
   const wc=cellAt(s.q,s.r); if(wc && wc.t==='open') wc.t='debris';   // the wreck leaves a debris field: cover, double movement
   const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s); blastNeighbours(s, by);
   if(state.selected===s) select(null);
@@ -64,7 +64,7 @@ function blastNeighbours(s, by){
   const dmg=s.hullMax*SPLASH.share, w={sh:1, hu:1, pierce:SPLASH.pierce}, delay=(3+Math.round(s.len))*0.2+0.15;
   for(const o of state.ships){ if(o===s || !o.alive || o.isRock || hdist(o,s)>SPLASH.radius) continue;
     const r=applyDamage(o, w, dmg); o.st.taken+=r.s+r.h; if(r.s+r.h>0.5) o.underFire=true;
-    log(`${o.name} caught in ${s.name}'s blast: ${Math.round(r.s+r.h)} damage`, o.side==='player'?'e':'p');
+    log(`${o.name} caught in ${s.name}'s blast: ${Math.round(r.s+r.h)} damage`, o.side==='player'?'e':'p', 'blast');
     after(delay, ()=>{ if(r.h>=0.5) floatText(o, Math.round(r.h), 'hu'); else if(r.s>0) floatText(o, Math.round(r.s), 'sh'); impactFx(o, r, s.group.position, 1.4, 'torpedo'); });
     if(o.hull<=0.5){ o.hull=0; o.alive=false;
       if(by && by.side!==o.side){ by.st.kills++; state.stats[by.side].kills++; }
@@ -108,7 +108,7 @@ async function useAbility(s, target=null){
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.5,1,.5),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.5,1,.5),size:0.3,life:0.9}); floatText(target,`+${Math.round(add)} hull`,'heal'); }
   a.wait=a.def.reload;
-  log(`${s.name}: ${a.def.name.toLowerCase()}${target&&target!==s?` on ${target.name}`:''}`, s.side==='player'?'p':'e');
+  log(`${s.name}: ${a.def.name.toLowerCase()}${target&&target!==s?` on ${target.name}`:''}`, s.side==='player'?'p':'e', 'abil');
   refreshTags(); updateHUD(); await wait(0.4); return true;
 }
 async function moveShip(s, path){

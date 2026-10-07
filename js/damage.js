@@ -73,7 +73,7 @@ function applyCrit(tgt, c){
   const name=sysName(tgt, c.key);
   if(c.key==='magazine') magazineHit(tgt, c.state, c.blast||0);
   floatText(tgt, `${name} ${c.state}`, c.state==='offline'?'crit off':'crit', 0.8); if(tgt.side==='player') Sound.alarm();
-  log(`${tgt.name}: ${name.toLowerCase()} ${c.state==='offline'?'knocked offline':'damaged'}.`, tgt.side==='player'?'e':'p');
+  log(`${tgt.name}: ${name.toLowerCase()} ${c.state==='offline'?'knocked offline':'damaged'}.`, tgt.side==='player'?'e':'p', 'crit');
 }
 // v75: a magazine hit loses a salvo from the fullest launcher; knocked offline, it cooks off as well
 function magazineHit(s, sev, blast){

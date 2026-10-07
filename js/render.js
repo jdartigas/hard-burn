@@ -227,6 +227,9 @@ const Particles = (() => {
 /* ---------------- timing helpers ---------------- */
 const tweens=[], timers=[], fxList=[];
 let timeScale=1;
+// v86 (round 5, #9): Settings > Enemy turns. Fast plays the AI's turn at ENEMY_FAST times speed; the player's own
+// actions are never sped up. Remembered as hardburn.speed.
+const ENEMY_FAST=2; let speedSetting=store.get('speed','normal');
 function tween(dur, fn, ease=easeInOut){ return new Promise(res=>{ if(dur<=0){ fn(1); res(); return; } tweens.push({t:0,dur,fn,ease,res}); }); }
 function wait(sec){ return new Promise(res=>timers.push({t:sec, fn:res})); }
 function after(sec, fn){ timers.push({t:sec, fn}); }

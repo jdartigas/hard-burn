@@ -196,6 +196,8 @@ let settingsFrom='menu';
 function syncVol(){ for(const [id,v] of [['music',Sound.musicLevel],['fx',Sound.fxLevel]]){ $('#vol-'+id).value=Math.round(v*100); $('#vol-'+id+'-v').textContent=Math.round(v*100)+'%';
   $('#vol-'+id).style.setProperty('--fill', Math.round(v*100)+'%'); }
   const b=Math.round(brightness*100); $('#bright').value=b; $('#bright-v').textContent=b+'%'; $('#bright').style.setProperty('--fill', ((b-50)/150*100)+'%'); }
+function showSpeed(){ document.querySelectorAll('.spd').forEach(b=>{ const on=b.dataset.s===speedSetting; b.classList.toggle('on',on); b.setAttribute('aria-checked',on); }); }
+document.querySelectorAll('.spd').forEach(b=>b.onclick=()=>{ Sound.ui(); speedSetting=b.dataset.s; store.set('speed',speedSetting); showSpeed(); }); showSpeed();
 document.querySelectorAll('.btn-settings').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); settingsFrom= $('#pause').classList.contains('on')? 'pause' : 'menu'; syncVol(); showScreen('settings'); });
 $('#vol-music').oninput=e=>{ Sound.init(); Sound.setMusicLevel(e.target.value/100); syncVol(); };
 $('#vol-fx').oninput=e=>{ Sound.init(); Sound.setFxLevel(e.target.value/100); syncVol(); };

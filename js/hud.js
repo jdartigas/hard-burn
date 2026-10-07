@@ -194,7 +194,11 @@ function nextShip(){
 }
 
 /* ---------------- HUD ---------------- */
-function log(msg, cls=''){ const d=document.createElement('div'); d.className=cls; d.textContent=msg; const b=$('#logbody'); b.prepend(d); while(b.children.length>50) b.lastChild.remove(); }
+// v86 (round 5, #11): each log line starts with a marker for its kind of event; the colour still says whose it is
+const LOG_MARK = { hit:'\u25B8', miss:'\u25CB', int:'\u25C7', kill:'\u2715', crit:'\u26A0', abil:'\u25C6', blast:'\u2738', rock:'\u25AA', sys:'\u00B7' };
+function log(msg, cls='', kind=cls==='sys'?'sys':''){ const d=document.createElement('div'); d.className=cls;
+  if(LOG_MARK[kind]){ const m=document.createElement('span'); m.className='mk'; m.setAttribute('aria-hidden','true'); m.textContent=LOG_MARK[kind]; d.append(m); }
+  d.append(msg); const b=$('#logbody'); b.prepend(d); while(b.children.length>50) b.lastChild.remove(); }
 function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
 function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
   const fx=[]; if(s.fx.pdcFired) fx.push('PDCs spent'); if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }

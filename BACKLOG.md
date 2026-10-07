@@ -410,7 +410,7 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
 4. ~~**Onboarding:**~~ **Done in v85:** the first-battle tutorial (#1), written against the finished rules.
-5. **Polish:** Normal / Fast animation setting (#9; Normal stays the default), combat log type markers (#11).
+5. ~~**Polish:**~~ **Done in v86:** Normal / Fast animation setting (#9; Normal stays the default; Fast applies to the enemy's turns only), combat log type markers (#11).
 
 Skipped (Jon): #4 action-state labels, #7 move-bonus formatting.
 

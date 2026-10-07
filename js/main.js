@@ -199,7 +199,7 @@ function updateMoment(raw){
 function frame(){
   requestAnimationFrame(frame);
   const fT0=DEBUG? performance.now() : 0; if(DEBUG) renderer.info.reset();
-  const rawDt=clock.getDelta(); updateMoment(Math.min(rawDt,0.1)); const dt=Math.min(rawDt,0.05)*timeScale; elapsed+=dt;
+  const rawDt=clock.getDelta(); updateMoment(Math.min(rawDt,0.1)); const dt=Math.min(rawDt,0.05)*timeScale*(speedSetting==='fast' && state.phase==='enemy'? ENEMY_FAST : 1); elapsed+=dt;
   // one-time frame-rate check early in a battle: step graphics down if the machine is struggling (never overrides a manual choice)
   if(!perfCheck.done && state.phase==='player' && !document.hidden && !window.__norender && rawDt<0.5){ perfCheck.t+=rawDt; perfCheck.n++;
     if(perfCheck.t>6){ perfCheck.done=true; const ms=perfCheck.t/perfCheck.n*1000;
