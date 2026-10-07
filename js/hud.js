@@ -177,6 +177,18 @@ function weaponStatus(w){ if(weaponOffline(w)) return `Offline, ${w.sys.t} turn$
 function pdLine(s){ if(!s.alive) return ''; const c=pdCover(s), p=Math.round(interceptChance(s, WEAPONS.missL)*100);
   const own= s.fx.pdcFired? 'Own PDCs spent until its next turn' : 'PDCs ready';
   return `<div class="pdl${s.fx.pdcFired?' spent':''}">${own} · stops ${p}% of missiles${c.by!==s?` (${c.by.name}'s screen)`:''}</div>`; }
+// v80: system status chips for the ship panel and hover cards: weapons (the worst of its guns), engines, shields,
+// point defense, sensors and, on missile ships, the magazine. Dim when working, amber damaged, red offline with turns left
+const SYS_CHIP = { weapons:'WPN', engines:'ENG', shields:'SHD', pdc:'PD', sensors:'SNS', magazine:'MAG' };
+function sysChips(s){ if(!s.alive || !s.sys) return '';
+  const say=st=> st.state==='offline'? `offline, ${st.t} turn${st.t>1?'s':''}` : st.state;
+  const chip=(k,st,tip)=>`<span class="sc ${st.state}" title="${esc(tip)}">${SYS_CHIP[k]}${st.state==='offline'?' '+st.t:''}</span>`;
+  const main=s.weapons.filter(w=>!isPdcGun(w)), hurt=main.filter(w=>w.sys.state!=='ok');
+  const worst=hurt.reduce((a,w)=>SEVERITY[w.sys.state]>SEVERITY[a.state]?w.sys:a, {state:'ok',t:0});
+  let html=chip('weapons', worst, hurt.length? hurt.map(w=>`${w.def.name} ${say(w.sys)}`).join(', ') : 'Weapons ok');
+  for(const k of SYS_KEYS){ if((k==='pdc' && !(s.pdc>0)) || (k==='magazine' && !hasMagazine(s))) continue;
+    html+=chip(k, s.sys[k], `${SYS_LABEL[k]} ${say(s.sys[k])}`); }
+  return `<div class="sysc">${html}</div>`; }
 function updateHUD(){
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${turnLimit()}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
@@ -210,7 +222,7 @@ function updateHUD(){
     $('#sp-name').textContent=s.name; $('#sp-class').textContent=`${s.C.label}, ${s.C.role.toLowerCase()}`; $('#sp-class').title=s.C.passive||'';
     $('#sp-stats').innerHTML=`<div class="sr"><span>Hull</span><b>${Math.ceil(s.hull)} / ${s.hullMax}</b><div class="mbar hu ${s.hull/s.hullMax<.35?'low':''}"><i style="width:${pct(s.hull,s.hullMax)}"></i></div></div>
       <div class="sr" title="Regenerates ${s.regen} a turn"><span>Shields</span><b>${Math.round(s.shield)} / ${s.shieldMax}</b><div class="mbar sh"><i style="width:${pct(s.shield,s.shieldMax)}"></i></div></div>
-      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>${damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`+pdLine(s);
+      <div class="sx">Move <b>${s.mp}/${s.mpMax}</b> · Armor <b>${s.armor}${s.fx.brace?'×2':''}</b> · Evasion <b>${s.ev}${s.fx.ecm?'+20':''}</b></div>${damagedSystems(s).length?`<div class="dmgl">${damageSummary(s)}</div>`:''}`+sysChips(s)+pdLine(s);
     const wc=$('#sp-weapons'); wc.innerHTML='';
     s.weapons.forEach((w,i)=>{ const d=w.def; const b=document.createElement('button'); b.className='wbtn'+(state.weaponSel===i?' on':'')+(w.sys&&w.sys.state!=='ok'?' sys-'+w.sys.state:''); b.disabled=!weaponReady(w)||state.busy||state.phase!=='player';
       b.innerHTML=`<span class="k">${i+1}</span><span class="wn">${d.name}</span><span class="wd">${isFinite(d.range)? 'Range '+d.range : 'Range '+d.reach+'+'}, ${d.shots>1?d.shots+'×':''}${d.dmg} dmg</span><span class="ws">${weaponStatus(w)}${w.sys&&w.sys.state==='damaged'?' · damaged':''}</span>`;
@@ -276,12 +288,12 @@ function updateHover(){
     } else if(h.isRock) html+=`<div class="hint">Select a ship, then click to shoot it apart</div>`;
     else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.map(w=>w.def.name).join(', ')}</span></div>`;
     if(!h.isRock && damagedSystems(h).length) html+=`<div class="hint dmgl">${damageSummary(h)}</div>`;
-    if(!h.isRock) html+=pdLine(h);
+    if(!h.isRock) html+=sysChips(h)+pdLine(h);
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
     if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) html+= abilityTargets(s).includes(h)?`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`:`<div class="hint">Out of range</div>`;
-    html+=pdLine(h);
+    html+=sysChips(h)+pdLine(h);
     showTooltip(html);
   }
 }

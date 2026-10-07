@@ -406,7 +406,7 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
      Carrier 50, Wolfpack 51, Dreadnought 49, Raiders 63, Support 36; 19.5 turns. Next: Raiders (fast attack cost).
      **v78:** fast attack cost 55 dropped Raiders to 42 (any cost over 50 loses a whole Corvette at 660), so cost
      stayed 50 and fast attack evasion went 34 to 30: Raiders 63 to 59 (v52: 57). Support (36) is still the weakest.
-3. **Clarity** (PDC state done in v79): threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
+3. **Clarity** (PDC state done in v79, system chips in v80): threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
 4. **Onboarding:** the first-battle tutorial (#1), written against the finished rules.
