@@ -283,8 +283,15 @@ function updateHUD(){
 function weaponBlurb(d){ return {pulse:'Rapid bolts. Strong against shields, weak against armor.', beam:'Highly accurate, falls off fast with range.', rail:'Long range, pierces armor, weak against shields. Needs line of sight.', missile:'Guided, ignores asteroids. Point defense can intercept.', fighter:'Fighters with long reach, hard to intercept. Rearms every other turn.', pdc:'Point defense turned on a ship at knife range: many small rounds, strong on hull, weak on shields. No missile defense until your next turn.'}[d.kind]; }
 
 /* ---------------- tooltip & hover ---------------- */
-const tip=$('#tooltip'); let mouse={x:0,y:0};
-function hideTooltip(){ tip.style.display='none'; }
+const tip=$('#tooltip'), detail=$('#detail'); let mouse={x:0,y:0};
+function hideTooltip(){ tip.style.display='none'; hideDetail(); }
+// v88: a hovered ship's or asteroid's full card docks above the combat log (under the fleet strip on phones), so it never
+// covers the board; only a one-line card follows the pointer, and only while aiming. The docked card sits clear of the log.
+function showDetail(html){ if(detail._html!==html){ detail._html=html; detail.innerHTML=html; }
+  if(detail.style.display!=='block') detail.style.display='block';
+  const lg=$('#log').getBoundingClientRect(); if(lg.height>2) detail.style.bottom=Math.round(innerHeight-lg.top+8)+'px'; }
+function hideDetail(){ if(detail.style.display!=='none') detail.style.display='none'; }
+function showMini(text){ tip.classList.add('mini'); showTooltip(text); }
 // v73 (Jon): the card follows the cursor but stays inside the area the docked panels leave free (safeRect, input.js),
 // so hovering a ship near the bottom no longer covers the weapon buttons or End turn
 /* v73: the busy chip. While your own move, volley or ability plays out the game takes no new orders; the chip says
@@ -298,7 +305,7 @@ function updateBusy(dt){
   if(show && !nudgeT && el.textContent!=='Resolving…'){ el.textContent='Resolving…'; el.classList.remove('why'); }
 }
 function nudgeBusy(text='Resolving…', why=false){ const el=$('#busy'); el.textContent=text; el.classList.toggle('why', why); nudgeT= why? 2.6 : 1.1; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
-function showTooltip(html){ tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14;
+function showTooltip(html){ if(!html.startsWith('<div class="mini')) tip.classList.remove('mini'); tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14;
   const S= typeof safeRect==='function' ? safeRect() : {l:8, t:8, r:innerWidth-8, b:innerHeight-8};
   if(x+w>S.r) x=mouse.x-w-14; if(y+h>S.b) y=mouse.y-h-14;
   if(S.r-S.l>=w) x=clamp(x, S.l, S.r-w); if(S.b-S.t>=h) y=clamp(y, S.t, S.b-h);
@@ -312,15 +319,16 @@ function updateHover(){
       else { const w=s.weapons[state.weaponSel], p=hitChance(s,w.def,t); t.tagHit.textContent=(p?clamp(p+slotAcc(w),5,95):0)+'%'; }
       t.tagHit.classList.add('show'); }
   }
-  if(!h || state.phase==='menu'){ const c=state.hoverCell, m=state.threatMap && c && state.threatMap.get(c.idx);
-    if(m && state.phase!=='menu'){ const sel=state.selected; showTooltip(`<h4>Threat here</h4>`+(m.dmg<1? `<div class="hint">No enemy weapon can reach this hex next turn</div>`
-      : `<div class="tr"><span>If every enemy in reach fires on ${esc(sel.name)}</span><b>~${Math.round(m.dmg)}</b></div><div class="hint">${m.share>=1?'More than':'About '+Math.round(m.share*100)+'% of'} its hull and shields</div>`)); }
-    else hideTooltip(); return; }
+  const mini=t=>showMini(`<div class="mini">${t}</div>`);
+  if(!h || state.phase==='menu'){ hideDetail(); const c=state.hoverCell, m=state.threatMap && c && state.threatMap.get(c.idx);
+    if(m && state.phase!=='menu') mini(m.dmg<1? 'No enemy weapon reaches this hex' : `Threat here ~${Math.round(m.dmg)}, ${m.share>=1?'more than':'about '+Math.round(m.share*100)+'% of'} ${esc(state.selected.name)}'s hull and shields`);
+    else tip.style.display='none'; return; }
+  let line='';   // the pointer card: what a click here would do
   if(h.side==='enemy' || h.isRock){
     tgtRing.visible=true; tgtRing.position.copy(hexToWorld(h.q,h.r,0.04));
     let html= h.isRock ? `<h4>Asteroid</h4><div class="tr"><span>Blocks movement and line of sight</span></div><div class="tr"><span>Integrity</span><b>${Math.ceil(h.hull)} / ${h.hullMax}</b></div>`
       : `<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Hull <b>${Math.ceil(h.hull)}</b> Shields <b>${Math.round(h.shield)}</b></span></div>`;
-    if(s && state.mode==='target' && s.ability.def.target==='enemy' && !h.isRock) html+= abilityTargets(s).includes(h)? (h.blackout?`<div class="hint">Already blacked out</div>`:`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`) : `<div class="hint">Out of range</div>`;
+    if(s && state.mode==='target' && s.ability.def.target==='enemy' && !h.isRock) line= abilityTargets(s).includes(h)? (h.blackout?'Already blacked out':`Click to ${s.ability.def.verb} ${h.name}`) : `Out of range for ${s.ability.def.name}`;
     let killNow=false;
     if(s && state.phase==='player' && !state.mode){
       html+=`<div style="height:5px"></div>`; let tot=0, hk=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
@@ -330,18 +338,20 @@ function updateHover(){
         html+=`<div class="tr ${ready&&p?'':'off'}"><span>${d.name}</span><b>${note}</b></div>`; }
       killNow= !h.isRock && hk>=h.hull*0.92;
       const cover=cellAt(h.q,h.r).t==='debris';
-      if(tot>0) html+=`<div class="sum">Expected damage ~${Math.round(tot)}${h.isRock&&tot>=h.hull?', likely shatters it':''}</div><div class="hint">Click to fire${cover?'. Target has debris cover':''}${h.fx.ecm?'. Target is under ECM':''}</div>`;
-      else html+=`<div class="hint">Nothing can reach this target from here</div>`;
+      if(tot>0){ html+=`<div class="sum">Expected damage ~${Math.round(tot)}${h.isRock&&tot>=h.hull?', likely shatters it':''}</div>${cover||h.fx.ecm?`<div class="hint">${cover?'Target has debris cover. ':''}${h.fx.ecm?'Target is under ECM.':''}</div>`:''}`;
+        const one= state.weaponSel==='all'? '' : s.weapons[state.weaponSel].def.name+' · ';
+        line=`${one}~${Math.round(tot)} damage${killNow?' · likely kill':h.isRock&&tot>=h.hull?' · likely shatters':''}`; }
+      else { html+=`<div class="hint">Nothing can reach this target from here</div>`; line='Out of reach from here'; }
     } else if(h.isRock) html+=`<div class="hint">Select a ship, then click to shoot it apart</div>`;
-    else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.map(w=>w.def.name).join(', ')}</span></div>`;
+    else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.filter(w=>!isPdcGun(w)).map(w=>w.def.name).join(', ')}</span></div>`;
     if(!h.isRock && damagedSystems(h).length) html+=`<div class="hint dmgl">${damageSummary(h)}</div>`;
     if(!h.isRock) html+=sysChips(h)+pdLine(h)+blastLine(h, killNow);
-    showTooltip(html);
+    showDetail(html);
   } else {
-    let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
-    if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) html+= abilityTargets(s).includes(h)?`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`:`<div class="hint">Out of range</div>`;
-    html+=sysChips(h)+pdLine(h)+blastLine(h, false);
-    showTooltip(html);
+    if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) line= abilityTargets(s).includes(h)? `Click to ${s.ability.def.verb} ${h.name}` : `Out of range for ${s.ability.def.name}`;
+    if(h===s) hideDetail();   // the command bar already shows the selected ship
+    else showDetail(`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`+sysChips(h)+pdLine(h)+blastLine(h, false));
   }
+  if(line) mini(esc(line)); else tip.style.display='none';
 }
 
