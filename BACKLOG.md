@@ -4,9 +4,13 @@ Work Laniakea's Edge (Hard Burn until v44, then briefly Orion's Spur) still owes
 context to pick up cold. `CLAUDE.md` describes what the game *is*; this file
 describes what it doesn't do yet.
 
+**Milestones (Jon, after v89).** The large tracks are classed by size:
+- **Class A:** Mobile release (iOS and Android); Campaign, the Trade Wars-style shared trading universe.
+- **Class C:** Scenarios (escort, hold the line, last stand).
+
 ---
 
-## MAJOR MILESTONE — Mobile release (iOS and Android) (Jon, after v88)
+## CLASS A MILESTONE — Mobile release (iOS and Android) (Jon, after v88)
 
 Ship Laniakea's Edge to the App Store and Google Play. **Decided approach: wrap the existing web game, don't rewrite it.**
 The game stays one codebase for the web and both stores.
@@ -63,6 +67,41 @@ The game stays one codebase for the web and both stores.
 6. TestFlight and Google Play internal testing with a few players, then release.
 
 The real cost is step 1 and device testing; the wrapper itself is the easy part.
+
+---
+
+## CLASS C MILESTONE — Scenarios (Jon, after v89)
+
+Battles with objectives beyond "destroy everything" (was F3 below). Planned, not started.
+
+**Structure.** A new `js/scenarios.js` holds `SCENARIOS` as data: name, brief, fleets, location, turn limit, marked hexes,
+and two checks, a win/loss check during play and the result at the turn limit. The combat code gets small hooks rather
+than special cases: `checkEnd` and `endOnTurnLimit` ask the scenario first, and the AI's `targetValue` and `evalCell`
+take a scenario bonus (hunt the escort, contest the zone). The hooks apply to whichever side the AI plays, so `HB.sim`
+can run scenarios AI against AI for tuning. Difficulty works as it does now.
+
+**Three scenarios:**
+1. **Convoy:** your Repair tender (the VIP) must reach marked exit hexes on the east edge within 14 turns. Lose if it
+   dies; destroying the enemy also wins. The enemy AI weights the tender heavily and moves to cut its path.
+2. **Hold the line:** a marked zone of seven hexes in the centre. At the end of each round, a side with ships in the zone
+   and none of the enemy's scores a point. First to 5 wins, or destroy the enemy. The AI values zone hexes.
+3. **Last stand:** four ships against a fleet about 1.6 times their budget. Win if any ship is still alive after 10 turns.
+   The enemy plays aggressively.
+
+**Interface.** A Scenarios button beside Custom battle on the intro (two half-width cards, so the phone intro still
+fits one screen), opening a panel of three cards with their briefs; a brief screen with the objective before the battle;
+an objective line in the top bar ("Convoy: Mercy, 4 hexes to the exit · turn 6/14", "Hold: you 3, enemy 2"); marked
+hexes on the existing highlight tiles (no new draw calls); and an end screen that says why you won or lost.
+
+**Balance.** Tune each so the player side wins about 40-50% AI against AI at Normal (a human should beat that). To save
+usage, Jon runs one console command per scenario and pastes the result back.
+
+**Build order:** framework plus Last stand first (fewest new parts), then Hold the line, then Convoy, each shipped as
+its own version.
+
+**Open decisions (Claude's defaults in brackets):**
+- Records: per scenario and difficulty (wins, losses, fastest win), kept out of the main score bests? [yes]
+- Fleets: fixed, hand-picked per scenario rather than built from a budget? [fixed]
 
 ---
 
@@ -507,7 +546,7 @@ drawn at 22% opacity (board.js).
 **Fun**
 - **F1. Improved sound effects** (see the sound section above). *Chosen.*
 - **F2. Big moments:** brief slow motion and camera push when a capital ship dies; victory and defeat stings. *Chosen.*
-- **F3.** Scenarios beyond "destroy everything": escort a tender, hold a point, survive an ambush for N turns.
+- **F3.** Scenarios beyond "destroy everything": escort a tender, hold a point, survive an ambush for N turns. **Now the Class C milestone at the top of this file.**
 - **F4. Quick battle mode:** smaller fleets for a ten-minute game, started from the intro screen. *Chosen.*
 - **F5. Battle summary** at the end: damage per ship, MVP, missiles intercepted. *Chosen.*
 
@@ -887,7 +926,7 @@ play by link → live online, if it's still wanted.
 
 ---
 
-## Campaign: a shared trading universe
+## CLASS A MILESTONE — Campaign: a shared trading universe
 
 A second game mode built around the existing battle engine, in the spirit of
 Trade Wars. The current game stays on the menu as **quick-launch head-to-head
