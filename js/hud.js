@@ -131,10 +131,23 @@ function updatePathPreview(){
   pathLine.visible=true;
 }
 function weaponsForAttack(s, tgt){ if(state.weaponSel==='all') return firingOrder(s).filter(i=>weaponReady(s.weapons[i])&&hitChance(s,s.weapons[i].def,tgt)>0); const i=state.weaponSel; return weaponReady(s.weapons[i])&&hitChance(s,s.weapons[i].def,tgt)>0?[i]:[]; }
+// v82 (round 3, #6): every refused order says why. whyNot names what stops one weapon from hitting tgt ('' if nothing),
+// and refuse() plays the deny sound, shows the reason in the status chip and logs it.
+function whyNot(s, w, tgt){ const d=w.def, dist=hdist(s,tgt);
+  if(!weaponReady(w)) return weaponStatus(w).toLowerCase();
+  if(dist>d.range) return `out of range (${dist} hexes, reach ${d.range})`;
+  if(s.blackout && d.guided) return 'no missile lock under sensor blackout';
+  if(d.reach && dist>d.reach && s.sys && s.sys.sensors.state==='offline') return `sensors offline, can't track past ${d.reach} hexes`;
+  if(!d.guided && !hasLOS(s,tgt)) return 'no line of sight';
+  return hitChance(s,d,tgt)>0 ? '' : "can't hit it"; }
+function refuse(text){ Sound.deny(); nudgeBusy(text, true); log(text, 'sys'); }
 async function playerAttack(tgt){
   const s=state.selected; if(!s) return;
   const list=weaponsForAttack(s,tgt);
-  if(!list.length){ Sound.deny(); log(`${tgt.name} is out of reach for ${state.weaponSel==='all'?'any ready weapon':s.weapons[state.weaponSel].def.name.toLowerCase()} on ${s.name}`,'sys'); return; }
+  if(!list.length){ const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel], ready=idx.filter(i=>weaponReady(s.weapons[i]));
+    if(!ready.length){ refuse(`${s.name} has no weapon ready`); return; }
+    const why=ready.map(i=>whyNot(s,s.weapons[i],tgt)), same=why.every(x=>x===why[0]);
+    refuse(`Can't fire on ${tgt.name}: `+(same? why[0] : ready.map((i,k)=>`${s.weapons[i].def.name} ${why[k]}`).join(' · '))); return; }
   state.busy=true; hideTooltip(); recomputeHighlights();
   if(frameShot(s,tgt)) await wait(0.35);   // both ends of the shot on screen before it fires
   if(state.weaponSel==='all') await fireAll(s,tgt); else await fireWeapon(s,state.weaponSel,tgt);
@@ -150,14 +163,14 @@ async function playerMove(k){
 }
 async function playerAbility(){
   const s=state.selected; if(!s || state.busy || state.phase!=='player') return;
-  if(!abilityReady(s)){ Sound.deny(); return; }
-  if(s.ability.def.targeted){ const d=s.ability.def; if(state.mode==='target'){ state.mode=null; } else { if(!abilityTargets(s).length){ Sound.deny(); log(`No ${d.target==='enemy'?'enemy':'ally'} within ${d.range} hexes to ${d.verb}`,'sys'); return; } state.mode='target'; Sound.ui(); } recomputeHighlights(); updateHUD(); return; }
+  if(!abilityReady(s)){ refuse(`${s.ability.def.name} recharging, ${s.ability.wait} turn${s.ability.wait>1?'s':''}`); return; }
+  if(s.ability.def.targeted){ const d=s.ability.def; if(state.mode==='target'){ state.mode=null; } else { if(!abilityTargets(s).length){ refuse(`No ${d.target==='enemy'?'enemy':'ally'} within ${d.range} hexes to ${d.verb}`); return; } state.mode='target'; Sound.ui(); } recomputeHighlights(); updateHUD(); return; }
   state.busy=true; await useAbility(s); state.busy=false; recomputeHighlights(); updateHUD();
 }
 function setWeapon(i){
   const s=state.selected; if(!s || state.busy) return;
   if(i!=='all' && (i>=s.weapons.length)) return;
-  if(i!=='all' && !weaponReady(s.weapons[i])){ Sound.deny(); return; }
+  if(i!=='all' && !weaponReady(s.weapons[i])){ refuse(`${s.weapons[i].def.name}: ${weaponStatus(s.weapons[i]).toLowerCase()}`); return; }
   state.weaponSel = state.weaponSel===i ? 'all' : i; state.mode=null; Sound.ui(); recomputeHighlights(); updateHUD(); updateHover();
 }
 function nextShip(){
@@ -171,7 +184,7 @@ function log(msg, cls=''){ const d=document.createElement('div'); d.className=cl
 function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
 function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
   const fx=[]; if(s.fx.pdcFired) fx.push('PDCs spent'); if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }
-function weaponStatus(w){ if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
+function weaponStatus(w){ if(w.mag && w.mag.state==='offline') return `Magazine offline, ${w.mag.t} turn${w.mag.t>1?'s':''}`; if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 // v79: point-defense state for the ship panel and hover card: own PDCs ready or spent, and the share of
 // missile-rack missiles its cover (its own or a Frigate's screen) stops
 function pdLine(s){ if(!s.alive) return ''; const c=pdCover(s), p=Math.round(interceptChance(s, WEAPONS.missL)*100);
@@ -262,9 +275,9 @@ function updateBusy(dt){
   busySince= resolving? (busySince<0? 0 : busySince+dt) : -1; nudgeT=Math.max(0, nudgeT-dt);
   const show=(resolving && busySince>0.35) || nudgeT>0;
   if(show!==busyShown){ busyShown=show; el.classList.toggle('on', show); }
-  if(show && !nudgeT && el.textContent!=='Resolving…') el.textContent='Resolving…';
+  if(show && !nudgeT && el.textContent!=='Resolving…'){ el.textContent='Resolving…'; el.classList.remove('why'); }
 }
-function nudgeBusy(text='Resolving…'){ const el=$('#busy'); el.textContent=text; nudgeT=1.1; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+function nudgeBusy(text='Resolving…', why=false){ const el=$('#busy'); el.textContent=text; el.classList.toggle('why', why); nudgeT= why? 2.6 : 1.1; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 function showTooltip(html){ tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14;
   const S= typeof safeRect==='function' ? safeRect() : {l:8, t:8, r:innerWidth-8, b:innerHeight-8};
   if(x+w>S.r) x=mouse.x-w-14; if(y+h>S.b) y=mouse.y-h-14;
@@ -289,7 +302,7 @@ function updateHover(){
     if(s && state.phase==='player' && !state.mode){
       html+=`<div style="height:5px"></div>`; let tot=0, hk=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
       for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p? clamp(e.p+slotAcc(w),5,95) : 0;
-        let note= !ready?weaponStatus(w).toLowerCase(): !p ? (hdist(s,h)>d.range?'out of range':'no line of sight') : `${p}% · ~${Math.round(e.dmg)}`;
+        let note= !ready||!p ? whyNot(s,w,h) : `${p}% · ~${Math.round(e.dmg)}`;
         if(ready&&p){ tot+=e.dmg; hk+=e.hull; }
         html+=`<div class="tr ${ready&&p?'':'off'}"><span>${d.name}</span><b>${note}</b></div>`; }
       killNow= !h.isRock && hk>=h.hull*0.92;

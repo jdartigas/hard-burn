@@ -485,6 +485,7 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 #busy{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:6;pointer-events:none;padding:6px 14px 6px 30px;border:1px solid var(--line);border-radius:999px;
   background:rgba(4,14,24,.9);color:var(--accent-hi);font-family:var(--display);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:opacity .2s}
 #busy::before{content:"";position:absolute;left:12px;top:50%;width:9px;height:9px;margin-top:-6px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:busyspin .8s linear infinite}
+#busy.why{padding:6px 14px;max-width:calc(100vw - 32px);width:max-content;text-align:center;font-family:inherit;font-size:13.5px;letter-spacing:0;text-transform:none;color:#ffcf8a;border-color:rgba(255,178,77,.55)} #busy.why::before{display:none}
 #busy.on{opacity:1} #busy.pulse{animation:busypulse .45s ease-out}
 @keyframes busyspin{to{transform:rotate(360deg)}}
 @keyframes busypulse{0%{box-shadow:0 0 0 0 rgba(111,208,255,.55)}100%{box-shadow:0 0 0 12px rgba(111,208,255,0)}}

@@ -170,13 +170,18 @@ function onClick(x,y){
   const s=state.selected;
   if(state.mode==='target' && s){
     if(ship && abilityTargets(s).includes(ship)){ state.mode=null; state.busy=true; frameShot(s,ship); useAbility(s,ship).then(()=>{ state.busy=false; recomputeHighlights(); updateHUD(); }); }
-    else { state.mode=null; recomputeHighlights(); updateHUD(); }
+    else { if(ship && ship!==s){ const d=s.ability.def; refuse(`${ship.name} is ${(d.target==='enemy')===(ship.side==='enemy')? `out of range for ${d.name} (${hdist(s,ship)} hexes, reach ${d.range})` : `not a valid target for ${d.name}`}`); }
+      state.mode=null; recomputeHighlights(); updateHUD(); }
     return;
   }
   if(ship && ship.side==='player'){ if(ship!==s) select(ship); return; }
-  if(ship && ship.side==='enemy'){ if(s) playerAttack(ship); return; }
-  if(!ship && cell.rock && cell.rock.alive){ if(s) playerAttack(cell.rock); return; }
+  if(ship && ship.side==='enemy'){ if(s) playerAttack(ship); else refuse('Select one of your ships first'); return; }
+  if(!ship && cell.rock && cell.rock.alive){ if(s) playerAttack(cell.rock); else refuse('Select one of your ships first'); return; }
   if(s && state.reach){ const k=key(cell.q,cell.r); const c=state.reach.get(k); if(c && c.cost>0 && !c.blocked){ playerMove(k); return; } }
+  if(s){ const c=state.reach && state.reach.get(key(cell.q,cell.r)); if(c && c.cost===0) return;   // v82: say why a move was refused
+    const eng=s.sys && s.sys.engines.state!=='ok' ? `, engines ${s.sys.engines.state}` : '';
+    if(s.mp<=0) refuse(`${s.name} has no movement left this turn${eng}`);
+    else refuse(`Too far: ${s.name} has ${s.mp} movement left${cell.t==='debris'?', and debris costs 2':''}${eng}`); }
 }
 function onCancel(){ if(state.mode){ state.mode=null; } else if(state.weaponSel!=='all'){ state.weaponSel='all'; } else select(null); recomputeHighlights(); updateHUD(); updateHover(); }
 const keys=new Set();
