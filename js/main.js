@@ -242,16 +242,26 @@ function frame(){
   if(state.hoverTarget && state.hoverTarget.alive && state.phase==='enemy'){ tgtRing.visible=true; tgtRing.position.set(state.hoverTarget.group.position.x,0.04,state.hoverTarget.group.position.z); }
   tgtRing.material.opacity=0.6+Math.sin(elapsed*6)*0.3;
   tiles.material.opacity=clamp(cam.radius/40,0.08,0.32);
-  // labels
-  const showTags = state.phase!=='menu';
+  // labels. v84 (round 3, #10): tags that would overlap stack upward. The selected or hovered ship's tag and then the
+  // lowest on screen (nearest the camera) keep their true place; each tag eases to its offset so a reshuffle never jumps.
+  const showTags = state.phase!=='menu', live=[];
+  // fade out between radius 20 and 12 rather than cutting off at 16, which blinked every tag while zooming
+  const zf=clamp((cam.radius-12)/8,0,1);
   for(const s of state.ships){ if(!s.alive || !showTags){ setTag(s,0); continue; }
     const p=s.group.position.clone(); p.y+=1.0+s.len*0.1; const sp=toScreen(p);
     if(!sp){ setTag(s,0); continue; }
     const focus=(state.rosterHover===s || state.hoverShip===s || s===sel);
-    // fade out between radius 20 and 12 rather than cutting off at 16, which blinked every tag while zooming
-    const zf=clamp((cam.radius-12)/8,0,1);
-    setTag(s, +Math.max(state.hoverShip===s?0.9:0, zf*(focus?1:0.85)).toFixed(2),
-      `translate3d(${sp.x.toFixed(1)}px,${sp.y.toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===s?1.12:1})`); }
+    const op=+Math.max(state.hoverShip===s?0.9:0, zf*(focus?1:0.85)).toFixed(2);
+    if(!op){ setTag(s,0); s.tag._dy=0; continue; }
+    const t=tagSize(s); live.push({s, x:sp.x, y:sp.y, w:t._w, h:t._h, op, pri:focus?1:0}); }
+  live.sort((a,b)=>b.pri-a.pri || b.y-a.y);
+  const placed=[];
+  for(const L of live){ let bottom=L.y;
+    for(let it=0; it<live.length; it++){ const hit=placed.find(P=>Math.abs(P.x-L.x)<(P.w+L.w)/2+2 && bottom>P.top-2 && bottom-L.h<P.bottom+2);
+      if(!hit) break; bottom=hit.top-2; }
+    L.top=bottom-L.h; L.bottom=bottom; placed.push(L);
+    const t=L.s.tag, want=bottom-L.y; let dy=t._dy===undefined? want : t._dy+(want-t._dy)*Math.min(1,rawDt*12); if(Math.abs(want-dy)<0.3) dy=want; t._dy=dy;
+    setTag(L.s, L.op, `translate3d(${L.x.toFixed(1)}px,${(L.y+dy).toFixed(1)}px,0) translate(-50%,-100%) scale(${state.rosterHover===L.s?1.12:1})`); }
   SV.update(dt);   // ship pictures and the viewer aim the scene pass before the frame renders
   if(!window.__norender) composer.render();
   if(DEBUG){ dbgFrames.push([rawDt*1000, performance.now()-fT0, renderer.info.render.calls, renderer.info.render.triangles]); debugTick(); }

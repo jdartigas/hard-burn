@@ -29,6 +29,9 @@ function updateCamera(dt){
 function panBy(dx,dz){ const f=new THREE.Vector3(Math.sin(cam.theta),0,Math.cos(cam.theta)), rt=new THREE.Vector3(f.z,0,-f.x); cam.goal.addScaledVector(rt,dx).addScaledVector(f,dz); cam.goal.x=clamp(cam.goal.x,-40,40); cam.goal.z=clamp(cam.goal.z,-26,26); cam.touched=true; }
 // Write a tag's style only when it changes: even an unchanged write can dirty style.
 function setTag(s, op, tf){ const t=s.tag; if(t._op!==op){ t._op=op; t.style.opacity=op; } if(tf!==undefined && t._tf!==tf){ t._tf=tf; t.style.transform=tf; } }
+// v84: a tag's size, measured only when its content changes (status line, hit chip), never every frame (§6 lesson 9)
+function tagSize(s){ const t=s.tag, sig=s.tagFx.textContent+'|'+(s.tagHit.classList.contains('show')? s.tagHit.textContent : '');
+  if(t._sig!==sig){ t._sig=sig; t._w=Math.max(t.offsetWidth, t.scrollWidth); t._h=t.offsetHeight; } return t; }
 function toScreen(p){ V.copy(p).project(camera); if(V.z>1) return null; return {x:(V.x*0.5+0.5)*innerWidth, y:(-V.y*0.5+0.5)*innerHeight}; }
 
 /* ---------------- camera framing (v56, Jon) ----------------
