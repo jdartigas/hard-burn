@@ -6,6 +6,8 @@ describes what it doesn't do yet.
 
 **Milestones (Jon, after v89).** The large tracks are classed by size:
 - **Class A:** Mobile release (iOS and Android); Campaign, the Trade Wars-style shared trading universe.
+- **Class B:** Real nearby star systems as battle locations (the 21 systems within about 50 light years; see
+  "Locations beyond the solar system" under Battle locations).
 - **Class C:** Scenarios (escort, hold the line, last stand).
 
 ---
@@ -740,7 +742,7 @@ changes. A fourth picker on the intro screen, same pattern as the fleet pickers.
     which raises download size; measure it.
   - Does location change anything in play (light, sensor range, debris density)? Default: cosmetic only.
 
-### Locations beyond the solar system (Jon)
+### CLASS B MILESTONE — Locations beyond the solar system (Jon)
 
 **Decided (Jon): every system in this table is a location.** He asked first for Alpha Centauri, Wolf 359 and Sirius
 A and B, then for all of them. **Keep each as real as possible:** its known planets, companions, disks and belts,
