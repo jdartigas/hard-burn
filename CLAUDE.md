@@ -16,7 +16,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **No build step, no package.json, no bundler.** Split into files in v29:
   - `index.html`: the markup, `GAME_VERSION`, the three.js import map and a small module that loads three.js and then the game.
   - `css/hard-burn.css`: all styles.
-  - `js/*.js`: the game, **plain scripts (not modules) sharing one global scope**, loaded in this order by `index.html`: `core` (utilities, all game data, hex maths), `audio`, `render`, `board`, `environment`, `ships`, `rules`, `wrecks`, `combat`, `hud`, `input`, `menus`, `tutorial`, `main`. Each file's header says what it holds.
+  - `js/*.js`: the game, **plain scripts (not modules) sharing one global scope**, loaded in this order by `index.html`: `core` (utilities, all game data, hex maths), `audio`, `render`, `board`, `environment`, `ships`, `rules`, `wrecks`, `combat`, `hud`, `input`, `menus`, `tutorial`, `shipview`, `sfxlab`, `main`. Each file's header says what it holds.
   - **Load order matters:** code that runs at load time (not inside a function called later) can only use names from earlier files or earlier in the same file. Function calls at runtime can go anywhere. A new file must be added to the list in `index.html`.
   - Every top-level name is global, so it must not collide with a browser global (`open`, `close`, `name`, `status`, `top`...). Checked for all 287 names in v29; check new ones the same way.
   - Globals are reachable from the browser console (`state`, `CLASSES`, `createShip`...), which makes debugging much easier. `window.HB` still exposes the test hooks.
@@ -35,7 +35,7 @@ Turn-based 2.5D space fleet battle in the browser, built with Three.js/WebGL. Th
 - **Never push to `main` without Jon's OK.** It is the live site. Committing locally is fine.
 - **Bump `GAME_VERSION`** (top of `index.html`) on every change you ship. Jon uses it to confirm he isn't looking at a cached copy.
 - Keep the game working at every quality setting on Apple Silicon (M2 Max, Chrome and Safari) and on Windows with an NVIDIA 4070 Ti. Read §6 before touching rendering.
-- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `custom` (the builder's fleet), `hud` (which HUD drawers are open), `threat` (the threat overlay, v83), `tutorial` (`'done'` or `'declined'`, v85), `speed` (enemy turn speed, v86), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
+- `localStorage` keys use the prefix `hardburn.`: `sound`, `music`, `diff`, `gfx`, `fleetYou`, `fleetEnemy`, `custom` (the builder's fleet), `hud` (which HUD drawers are open), `threat` (the threat overlay, v83), `tutorial` (`'done'` or `'declined'`, v85), `speed` (enemy turn speed, v86), `sfxlab` (the sound lab's sliders and notes, v90), `scores` (records, below). Always go through the `store` helper, which wraps `localStorage` in try/catch.
 - **Scores and records live in `hardburn.scores`, and losing them would lose Jon's history.** Never rename the key. The shape is `{format, games, bests}`; each game keeps the raw facts (fleets, difficulty, seed, result, turns, fleet values, damage) plus its score and `formula` version, so the formula can change and old games be rescored. If the format changes, bump `SCORES_FORMAT` and convert old data in `loadScores`, never drop it. `loadScores` validates everything it reads, because Import brings in files from outside; render record fields through `esc()`. Simulator battles are never recorded.
 
 ## 3. Code map (sections in load order; the file is in brackets)
@@ -234,6 +234,7 @@ An automatic step-down triggers if frames average over 40 ms in the first 6 seco
 **URL diagnostics:**
 - `?debug` shows a bottom-left overlay with version, live performance over the last half second (fps, average and worst frame, time in game code, draw calls and triangles across all passes), GPU, device pixel ratio, render scale, buffer sizes, feature flags and GL errors. Ask Jon for this overlay when he reports slowness: a slow frame with low game-code time and normal draw calls points at the browser or machine, not the game.
 - `?shadows=0`, `?aa=0`, `?ao=0` and `?pr=1` each turn off a single feature to isolate driver problems.
+- `?sfx` opens the **sound lab** (v90, js/sfxlab.js): every game sound on its own, grouped (firing, hull hits, shield hits, interception, explosions, abilities, interface), plus weapon sequences with the game's timing. Each row has volume and pitch sliders and a note, remembered in `hardburn.sfxlab`; Copy notes gathers the changed rows as text for Claude. It plays through `Sound.labPlay`, which routes one sound through its own gain stage and scales sample rates and synthesized frequencies, so the game's own sounds never change. Add a row to `LAB_SOUNDS` whenever a new sound is added.
 
 ## 7. Testing
 

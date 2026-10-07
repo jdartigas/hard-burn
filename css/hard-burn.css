@@ -514,3 +514,15 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 html.touch #tut button{min-height:40px}
 /* phones: above the command bar (over the log), so the fleet strip at the top stays free to tap */
 @media (max-width:600px){ #tut{padding:8px 10px;top:auto!important;bottom:calc(var(--hud-bottom,100px) + 8px)} #tut-t{font-size:14px;margin:4px 0 6px} }
+
+/* ---- v90: the sound lab (?sfx) ---- */
+#sfxlab{align-items:center;justify-content:center;background:rgba(2,8,14,.6)} #sfxlab.on{display:flex}
+.sheet.lab{max-width:980px}
+.lab-row{display:grid;grid-template-columns:40px minmax(180px,1.4fr) 150px 160px minmax(140px,1fr);gap:10px;align-items:center;padding:5px 6px;border-radius:var(--r-sm)}
+.lab-row:nth-child(odd){background:rgba(255,255,255,.025)} .lab-row.changed{box-shadow:inset 3px 0 0 var(--accent)}
+.lab-play{width:36px;height:32px;border-radius:var(--r-sm);border:1px solid var(--line);background:rgba(111,208,255,.12);color:var(--accent-hi);font-size:13px;cursor:pointer}
+.lab-play:active{background:rgba(111,208,255,.3)}
+.lab-name b{display:block;font-weight:600;font-size:14px} .lab-name small{color:var(--faint);font-size:12px}
+.lab-sl{display:grid;grid-template-columns:auto 1fr 34px;gap:6px;align-items:center;font-size:12px;color:var(--dim)} .lab-sl output{text-align:right;color:var(--ink)}
+.lab-note{height:30px;padding:0 8px;border-radius:var(--r-sm);border:1px solid var(--line-cool);background:rgba(0,0,0,.3);color:var(--ink);font:inherit;font-size:13px;min-width:0}
+@media (max-width:760px){ .lab-row{grid-template-columns:40px 1fr 1fr;row-gap:4px} .lab-name{grid-column:2/4} .lab-sl{grid-column:auto} .lab-note{grid-column:1/4} }

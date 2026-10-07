@@ -32,6 +32,7 @@ const Sound = (() => {
   const SFX = { pulse:['pulse1','pulse2','pulse3'], rail:['rail1'], launch:['launch1','launch2'],
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
   const bufs={}; let lastPdcHit=0, lastPdcShield=0;
+  let labRate=1;   // v90: the sound lab's pitch (1 in the game)
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
   // were silently missing there
   const b64=s=>{ const bin=atob(s), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a.buffer; };
@@ -40,7 +41,7 @@ const Sound = (() => {
       new Promise((ok,no)=>ctx.decodeAudioData(b64(SFX_DATA[n]),ok,no)).then(b=>{ bufs[n]=b; }).catch(()=>{}); }
   function sample(key, {gain=1, rate=1, vary=0.06, delay=0, dur=0}={}){   // dur: fade out and stop after this long
     if(!ctx) return false; const list=SFX[key].filter(n=>bufs[n]); if(!list.length) return false;
-    const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*(1+(Math.random()*2-1)*vary);
+    const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*labRate*(1+(Math.random()*2-1)*vary);
     const g=ctx.createGain(), t=now()+delay; g.gain.setValueAtTime(gain,t); src.connect(g); g.connect(sfx); src.start(t);
     if(dur){ g.gain.setTargetAtTime(0.0001, t+dur*0.55, dur*0.15); src.stop(t+dur+0.1); } return true; }
   // v66: a synthesized explosion: a short crack, a band of rumbling noise that darkens as it decays, a falling sub tone,
@@ -57,13 +58,13 @@ const Sound = (() => {
   function noise(dur, {type='lowpass', f0=2000, f1=200, q=1, gain=0.5, attack=0.005, delay=0}={}){
     if(!ctx) return; const t=now()+delay;
     const src=ctx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
-    const flt=ctx.createBiquadFilter(); flt.type=type; flt.Q.value=q; flt.frequency.setValueAtTime(f0,t); flt.frequency.exponentialRampToValueAtTime(Math.max(20,f1), t+dur);
+    const flt=ctx.createBiquadFilter(); flt.type=type; flt.Q.value=q; flt.frequency.setValueAtTime(f0*labRate,t); flt.frequency.exponentialRampToValueAtTime(Math.max(20,f1*labRate), t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     src.connect(flt); flt.connect(g); g.connect(sfx); src.start(t, Math.random()); src.stop(t+dur+0.05);
   }
   function tone(dur, {type='sine', f0=440, f1=null, gain=0.3, attack=0.005, delay=0, dest=null}={}){
     if(!ctx) return; const t=now()+delay;
-    const o=ctx.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0,t); if(f1) o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+    const o=ctx.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0*labRate,t); if(f1) o.frequency.exponentialRampToValueAtTime(f1*labRate,t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     o.connect(g); g.connect(dest||sfx); o.start(t); o.stop(t+dur+0.05);
   }
@@ -71,7 +72,12 @@ const Sound = (() => {
     init,
     get on(){ return on; },
     get musicOn(){ return musicOn; },
-    _dbg(){ return {ctx, music, sfx, samples:Object.keys(bufs).length}; },
+    _dbg(){ return {ctx, music, sfx, samples:Object.keys(bufs).length, of:new Set(Object.values(SFX).flat()).size}; },
+    // v90: the sound lab (?sfx, js/sfxlab.js) plays one sound through its own gain stage and with every sample rate and
+    // synthesized frequency scaled by `rate`, without touching the game's levels. The beam's hum and shimmer use their own
+    // oscillators, so only its ignition and fizz follow the pitch control.
+    labPlay(fn, {gain=1, rate=1}={}){ init(); if(!ctx) return; const bus=ctx.createGain(); bus.gain.value=gain; bus.connect(sfx);
+      const keep=sfx; sfx=bus; labRate=rate; try{ fn(); } finally{ sfx=keep; labRate=1; } },
     toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?fv():0, now(), 0.05); return on; },
     get musicLevel(){ return musicLevel; }, get fxLevel(){ return fxLevel; },
     setMusicLevel(v){ musicLevel=clamp(v,0,1); store.set('musicVol',musicLevel); if(music && musicOn) music.gain.setTargetAtTime(mv(), now(), 0.08); },
