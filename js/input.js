@@ -50,6 +50,7 @@ function safeRect(fresh=false){
   const tu=box('#tut'); if(tu){ if(tu.top<H*0.4) t=Math.max(t, tu.bottom); else b=Math.min(b, tu.top); }   // v85: the tutorial card
   for(const s of ['#shippanel','#endturn','#log']){ const q=box(s); if(q && q.top>H*0.45) b=Math.min(b,q.top); }
   const ro=box('#roster'); if(ro && ro.left<W*0.3 && ro.height>H*0.3) l=ro.right;
+  else if(ro && ro.width>W*0.6 && ro.top<H*0.3) t=Math.max(t, ro.bottom);   // v89: the phone fleet strip across the top
   const en=box('#enemies'); if(en && en.right>W*0.7 && en.height>H*0.2) r=en.left;
   l+=12; t+=12; r-=12; b-=12;
   if(r-l<W*0.4){ l=W*0.1; r=W*0.9; } if(b-t<H*0.3){ t=H*0.12; b=H*0.85; }

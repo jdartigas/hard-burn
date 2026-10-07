@@ -526,7 +526,7 @@ What the screenshots show (portrait):
 - Hit chips and tags crowd the top of the visible board.
 
 Ideas, roughly cheapest first:
-- **P-1.** Count the phone fleet strip in `safeRect` (top edge), so framing keeps ships below it.
+- ~~**P-1.**~~ **Done in v89:** `safeRect` counts the phone fleet strip (top edge), so framing keeps ships below it.
 - **P-2.** Trim the phone command bar: hide the chips and PD line there (they are in the docked card on tap), and fold
   Threat into a small icon button.
 - **P-3.** Slimmer fleet strip: name and one bar per ship, no "Move" line; or collapse it behind a Fleet button.
