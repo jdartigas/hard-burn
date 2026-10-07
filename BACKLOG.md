@@ -451,6 +451,29 @@ drawn at 22% opacity (board.js).
 - **F4. Quick battle mode:** smaller fleets for a ten-minute game, started from the intro screen. *Chosen.*
 - **F5. Battle summary** at the end: damage per ship, MVP, missiles intercepted. *Chosen.*
 
+## Phone layout (Jon, after v88)
+
+Jon's verdict from playing v88 on an Android phone (about 390 x 850): **the touch wording is fine, but the phone UI is far too
+intrusive.** iPad and desktop work well. Not urgent; parked here.
+
+What the screenshots show (portrait):
+- The command bar takes about a third of the screen: name, ability and Threat buttons, hull and shield bars, the v80 system
+  chips, the v79 PD line, then a horizontally scrolling weapon row. The log and End turn take another row under it. With
+  the top bar and the fleet strip, the board gets well under half the screen.
+- The fleet strip (three cards) covers the top of the board, and **ships and their tags end up underneath it** (Needle
+  hidden behind Kestrel's card). Cause: `safeRect` ignores the phone strip (it only counts `#roster` as a left-hand
+  column), so camera framing puts ships under it. This one is a bug, the cheapest fix and worth doing first.
+- Hit chips and tags crowd the top of the visible board.
+
+Ideas, roughly cheapest first:
+- **P-1.** Count the phone fleet strip in `safeRect` (top edge), so framing keeps ships below it.
+- **P-2.** Trim the phone command bar: hide the chips and PD line there (they are in the docked card on tap), and fold
+  Threat into a small icon button.
+- **P-3.** Slimmer fleet strip: name and one bar per ship, no "Move" line; or collapse it behind a Fleet button.
+- **P-4.** Make the command bar a bottom sheet: collapsed to name plus weapon buttons, pulled up for detail.
+- **P-5.** Log as a one-line ticker overlaid on the board, or behind a button, giving End turn the full row width.
+- **P-6.** Suggest landscape for phones (as iPad landscape already works well), or a landscape-specific layout.
+
 ## Camera follow-ups (after v56)
 
 Options E and F from the v56 camera plan, deferred when A–D were built:
