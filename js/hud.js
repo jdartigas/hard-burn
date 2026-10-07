@@ -189,6 +189,15 @@ function sysChips(s){ if(!s.alive || !s.sys) return '';
   for(const k of SYS_KEYS){ if((k==='pdc' && !(s.pdc>0)) || (k==='magazine' && !hasMagazine(s))) continue;
     html+=chip(k, s.sys[k], `${SYS_LABEL[k]} ${say(s.sys[k])}`); }
   return `<div class="sysc">${html}</div>`; }
+// v81: the hover card's blast warning. A ship likely to die (the volley you have selected would kill it, or its hull is
+// under BLAST_WARN of max) shows what its explosion would do to each ship within SPLASH.radius, yours listed first
+const BLAST_WARN = 0.25;
+function blastLine(h, killNow){ if(!h.alive || !(killNow || h.hull/h.hullMax<BLAST_WARN)) return '';
+  const dmg=h.hullMax*SPLASH.share, w={sh:1, hu:1, pierce:SPLASH.pierce};
+  const hit=state.ships.filter(o=>o!==h && o.alive && !o.isRock && hdist(o,h)<=SPLASH.radius).sort((a,b)=>(a.side==='player'?0:1)-(b.side==='player'?0:1));
+  const list=hit.map(o=>{ const r=applyDamage({shield:o.shield, hull:o.hull, armor:o.armor, fx:o.fx}, w, dmg);
+    return `<span class="${o.side==='player'?'own':''}">${esc(o.name)} ~${Math.round(r.s+r.h)}${o.hull-r.h<=0.5?' (destroyed)':''}</span>`; }).join(', ');
+  return `<div class="bwarn">\u26a0 Blast if destroyed, ~${Math.round(dmg)} within ${SPLASH.radius} hex: ${list||'no ships in reach'}</div>`; }
 function updateHUD(){
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${turnLimit()}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
@@ -276,24 +285,26 @@ function updateHover(){
     let html= h.isRock ? `<h4>Asteroid</h4><div class="tr"><span>Blocks movement and line of sight</span></div><div class="tr"><span>Integrity</span><b>${Math.ceil(h.hull)} / ${h.hullMax}</b></div>`
       : `<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Hull <b>${Math.ceil(h.hull)}</b> Shields <b>${Math.round(h.shield)}</b></span></div>`;
     if(s && state.mode==='target' && s.ability.def.target==='enemy' && !h.isRock) html+= abilityTargets(s).includes(h)? (h.blackout?`<div class="hint">Already blacked out</div>`:`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`) : `<div class="hint">Out of range</div>`;
+    let killNow=false;
     if(s && state.phase==='player' && !state.mode){
-      html+=`<div style="height:5px"></div>`; let tot=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
+      html+=`<div style="height:5px"></div>`; let tot=0, hk=0; const idx= state.weaponSel==='all'? firingOrder(s) : [state.weaponSel];
       for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p? clamp(e.p+slotAcc(w),5,95) : 0;
         let note= !ready?weaponStatus(w).toLowerCase(): !p ? (hdist(s,h)>d.range?'out of range':'no line of sight') : `${p}% · ~${Math.round(e.dmg)}`;
-        if(ready&&p) tot+=e.dmg;
+        if(ready&&p){ tot+=e.dmg; hk+=e.hull; }
         html+=`<div class="tr ${ready&&p?'':'off'}"><span>${d.name}</span><b>${note}</b></div>`; }
+      killNow= !h.isRock && hk>=h.hull*0.92;
       const cover=cellAt(h.q,h.r).t==='debris';
       if(tot>0) html+=`<div class="sum">Expected damage ~${Math.round(tot)}${h.isRock&&tot>=h.hull?', likely shatters it':''}</div><div class="hint">Click to fire${cover?'. Target has debris cover':''}${h.fx.ecm?'. Target is under ECM':''}</div>`;
       else html+=`<div class="hint">Nothing can reach this target from here</div>`;
     } else if(h.isRock) html+=`<div class="hint">Select a ship, then click to shoot it apart</div>`;
     else html+=`<div class="tr"><span>Armor ${h.armor}</span><span>Evasion ${h.ev}</span></div><div class="tr"><span>Weapons</span><span>${h.weapons.map(w=>w.def.name).join(', ')}</span></div>`;
     if(!h.isRock && damagedSystems(h).length) html+=`<div class="hint dmgl">${damageSummary(h)}</div>`;
-    if(!h.isRock) html+=sysChips(h)+pdLine(h);
+    if(!h.isRock) html+=sysChips(h)+pdLine(h)+blastLine(h, killNow);
     showTooltip(html);
   } else {
     let html=`<h4>${h.name}</h4><div class="tr"><span>${h.C.label}</span><span>Move <b>${h.mp}/${h.mpMax}</b></span></div><div class="tr"><span>Hull <b>${Math.ceil(h.hull)}/${h.hullMax}</b></span><span>Shields <b>${Math.round(h.shield)}/${h.shieldMax}</b></span></div>`;
     if(state.mode==='target' && s && s.ability.def.target==='ally' && h!==s) html+= abilityTargets(s).includes(h)?`<div class="sum">Click to ${s.ability.def.verb} ${h.name}</div>`:`<div class="hint">Out of range</div>`;
-    html+=sysChips(h)+pdLine(h);
+    html+=sysChips(h)+pdLine(h)+blastLine(h, false);
     showTooltip(html);
   }
 }
