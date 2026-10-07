@@ -47,6 +47,7 @@ function safeRect(fresh=false){
   const box=sel=>{ const e=$(sel); if(!e) return null; const q=e.getBoundingClientRect();
     if(q.width<2 || q.height<2 || q.right<=0 || q.left>=W || q.bottom<=0 || q.top>=H || getComputedStyle(e).visibility==='hidden') return null; return q; };
   const tb=box('#topbar'); if(tb) t=tb.bottom;
+  const tu=box('#tut'); if(tu){ if(tu.top<H*0.4) t=Math.max(t, tu.bottom); else b=Math.min(b, tu.top); }   // v85: the tutorial card
   for(const s of ['#shippanel','#endturn','#log']){ const q=box(s); if(q && q.top>H*0.45) b=Math.min(b,q.top); }
   const ro=box('#roster'); if(ro && ro.left<W*0.3 && ro.height>H*0.3) l=ro.right;
   const en=box('#enemies'); if(en && en.right>W*0.7 && en.height>H*0.2) r=en.left;
@@ -191,7 +192,7 @@ const keys=new Set();
 addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   const open=document.querySelector('.screen.on');
-  if(open && open.id!=='menu'){ if(e.key==='Escape'||(e.key.toLowerCase()==='h'&&open.id==='help')){ if(open.id==='help'||open.id==='pause'||open.id==='setup') closeScreen(); } return; }
+  if(open && open.id!=='menu'){ if(e.key==='Escape'||(e.key.toLowerCase()==='h'&&open.id==='help')){ if(open.id==='help'||open.id==='pause'||open.id==='setup'||open.id==='tutask') closeScreen(); } return; }
   if(state.phase==='menu'){ if(e.key==='Enter') startGame(chosenFleets()); return; }
   const k=e.key.toLowerCase();
   if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){ keys.add(k); e.preventDefault(); return; }

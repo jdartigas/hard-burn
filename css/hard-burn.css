@@ -422,7 +422,7 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 #menu .menu-nav{margin-top:14px}
 #menu .menu-nav .btn-ghost{height:42px}
 @media (max-width:760px){ .btn-quick{min-height:72px;padding:0 18px} .btn-quick b{font-size:15px} .btn-quick small{font-size:14.5px} #menu .eyebrow{font-size:10px;margin-bottom:8px} }
-@media (max-width:760px){ #menu .menu-nav{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:760px){ #menu .menu-nav{grid-template-columns:repeat(2,minmax(0,1fr))} #menu #btn-tut{grid-column:1/-1} }
 /* v60: the intro now holds Quick battle and the setup card; on screens under ~900px tall it tightens so it never scrolls */
 @media (max-height:900px) and (min-width:761px){
   #menu{padding-top:14px;padding-bottom:2vh}
@@ -482,7 +482,7 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 @media (max-width:760px){ .btn-custom{min-height:64px;padding:0 18px} .btn-custom b{font-size:14px} #menu .diff-row .srow{grid-template-columns:1fr} #menu .diff-row .sdesc{margin-left:0} }
 
 /* ---- v73: the busy chip (a click during an animation, or the enemy's turn, now gets an answer) ---- */
-#busy{position:fixed;left:50%;top:64px;transform:translateX(-50%);z-index:6;pointer-events:none;padding:6px 14px 6px 30px;border:1px solid var(--line);border-radius:999px;
+#busy{position:fixed;left:50%;top:var(--busy-top,64px);transform:translateX(-50%);z-index:6;pointer-events:none;padding:6px 14px 6px 30px;border:1px solid var(--line);border-radius:999px;
   background:rgba(4,14,24,.9);color:var(--accent-hi);font-family:var(--display);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;opacity:0;transition:opacity .2s}
 #busy::before{content:"";position:absolute;left:12px;top:50%;width:9px;height:9px;margin-top:-6px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:busyspin .8s linear infinite}
 #busy.why{padding:6px 14px;max-width:calc(100vw - 32px);width:max-content;text-align:center;font-family:inherit;font-size:13.5px;letter-spacing:0;text-transform:none;color:#ffcf8a;border-color:rgba(255,178,77,.55)} #busy.why::before{display:none}
@@ -490,3 +490,17 @@ body.sv-open #hud, body.sv-open #labels{visibility:hidden}
 @keyframes busyspin{to{transform:rotate(360deg)}}
 @keyframes busypulse{0%{box-shadow:0 0 0 0 rgba(111,208,255,.55)}100%{box-shadow:0 0 0 12px rgba(111,208,255,0)}}
 @media (prefers-reduced-motion:reduce){ #busy::before{animation:none} #busy.pulse{animation:none} }
+
+/* ---- v85: the tutorial's step card, top centre under the top bar (Tut.render sets top and moves the busy chip below it) ---- */
+#tut{position:fixed;left:50%;transform:translateX(-50%);top:72px;z-index:5;width:min(520px,calc(100vw - 32px));padding:10px 14px;display:none;
+  background:rgba(4,14,24,.93);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 0 18px rgba(111,208,255,.18)}
+#tut.on{display:block}
+#tut-n{font:9.5px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+#tut-t{margin:6px 0 8px;font-size:15px;line-height:1.35;color:var(--ink)}
+#tut .tut-b{display:flex;gap:8px;justify-content:flex-end}
+#tut button{min-height:32px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:13px;cursor:pointer}
+#tut #tut-next{background:linear-gradient(180deg,#8FDCFF,#4FB7EE);border:0;color:var(--accent-ink);font-weight:600}
+#tut button[hidden]{display:none}
+html.touch #tut button{min-height:40px}
+/* phones: above the command bar (over the log), so the fleet strip at the top stays free to tap */
+@media (max-width:600px){ #tut{padding:8px 10px;top:auto!important;bottom:calc(var(--hud-bottom,100px) + 8px)} #tut-t{font-size:14px;margin:4px 0 6px} }

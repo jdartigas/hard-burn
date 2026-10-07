@@ -409,7 +409,7 @@ Jon, plus three combat ideas of his. Rule: change the rules before building what
 3. ~~**Clarity**~~ **Done in v79-v84** (PDC state v79, system chips v80, blast warning v81, failure reasons v82, threat overlay v83, label overlap v84): threat overlay (#8), failure reasons (#6), system status icons on the ship panel and hover card, an
    explosion warning on the hover card, PDC state (defending or spent), and **label overlap (#10)**, pulled forward
    because PDC brawls bring ships close.
-4. **Onboarding:** the first-battle tutorial (#1), written against the finished rules.
+4. ~~**Onboarding:**~~ **Done in v85:** the first-battle tutorial (#1), written against the finished rules.
 5. **Polish:** Normal / Fast animation setting (#9; Normal stays the default), combat log type markers (#11).
 
 Skipped (Jon): #4 action-state labels, #7 move-bonus formatting.

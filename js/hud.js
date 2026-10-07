@@ -39,7 +39,7 @@ function saveScores(d){ d.games=d.games.slice(-SCORES_KEEP); store.set('scores',
 let persistAsked=false;
 function requestPersist(){ if(persistAsked) return; persistAsked=true; try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){} }
 function recordBattle(result){
-  if(simRunning || state.simulated || state.recorded) return null; state.recorded=true;
+  if(simRunning || state.simulated || state.recorded || state.tutorial) return null; state.recorded=true;
   const mine=state.ships.filter(s=>s.side==='player'), theirs=state.ships.filter(s=>s.side==='enemy');
   const cost=l=>l.reduce((a,s)=>a+s.C.cost,0);
   const g={ date:new Date().toISOString(), version:GAME_VERSION, formula:SCORE_FORMULA, diff:state.diff, seed:board.seed, location:state.location, limit:turnLimit(),

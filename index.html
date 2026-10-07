@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '84';
+const GAME_VERSION = '85';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -53,6 +53,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     </div>
   </section>
 
+  <div id="tut" class="pe" role="status" aria-live="polite"><div id="tut-n"></div><p id="tut-t"></p><div class="tut-b"><button id="tut-skip">Skip tutorial</button><button id="tut-next">Next</button></div></div>
   <button id="endturn" class="pe">End turn<small>Space</small></button>
   <section id="log" class="panel pe"><h3>Combat log<button id="tg-log" aria-controls="logbody"></button></h3><div id="logbody"></div></section>
 </div>
@@ -76,6 +77,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <button class="btn-quick" id="btn-quick"><span><b>Quick battle</b><small id="quick-sub"></small></span><i aria-hidden="true">›</i></button>
     <button class="btn-custom" id="btn-custom"><span><b>Custom battle</b><small>Choose the fleets and the location</small></span><i aria-hidden="true">›</i></button>
     <div class="cta menu-nav">
+      <button class="btn-ghost" id="btn-tut">Tutorial</button>
       <button class="btn-ghost" id="btn-how">How to play</button>
       <button class="btn-ghost" id="btn-ships">Ships</button>
       <button class="btn-ghost" id="btn-records">Records</button>
@@ -194,6 +196,13 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
   <p class="sv-hint">Drag to rotate · scroll or pinch to zoom · Shift-drag or two fingers to pan · double-click to reset</p>
 </div>
 
+<div id="tutask" class="screen" role="dialog" aria-label="First battle">
+  <div class="sheet" style="max-width:440px">
+    <h2>First battle?</h2>
+    <p>A short guided battle shows you how to move, fire and read the enemy, about ten minutes on Easy. You can skip it at any time.</p>
+    <div class="cta"><button class="btn-primary" id="btn-tutask-play">Play the tutorial</button><button class="btn-ghost" id="btn-tutask-quick">Straight to Quick battle</button></div>
+  </div>
+</div>
 <div id="pause" class="screen" role="dialog" aria-label="Menu">
   <div class="sheet" style="max-width:420px">
     <h2>Paused</h2>
@@ -251,7 +260,7 @@ const webgl=(()=>{ try{ const c=document.createElement('canvas'); return !!(c.ge
 if(!webgl) cantStart("This browser can't show 3D graphics", "Laniakea's Edge needs WebGL. Turn on hardware acceleration (graphics acceleration) in your browser's settings and reload, or try another browser.");
 else try{
   // The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
-  for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','shipview','main']) await new Promise((ok,fail)=>{
+  for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','damage','combat','hud','input','menus','tutorial','shipview','main']) await new Promise((ok,fail)=>{
     const s=document.createElement('script'); s.src=`js/${f}.js?v=${GAME_VERSION}`; s.onload=ok;
     s.onerror=()=>fail(new Error(`Could not load js/${f}.js`)); document.body.appendChild(s); });
 } catch(e){ cantStart("The game couldn't load", `${e.message}. Check your connection and reload the page.`); }

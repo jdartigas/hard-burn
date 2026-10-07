@@ -60,8 +60,9 @@ function setupBattle(seed, fleets={}){
 let lastFleets={};
 function startGame(fleets){
   if(fleets && (fleets.player || fleets.enemy)) lastFleets=fleets;
+  Tut.setup(lastFleets);   // v85: the tutorial battle plays on Easy and is never recorded; any other battle ends it
   Sound.init(); Sound.ui();
-  setupBattle(Math.floor(Math.random()*1e9), lastFleets); warmUp();
+  setupBattle(lastFleets.seed ?? Math.floor(Math.random()*1e9), lastFleets); warmUp();
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   $('#hud').classList.add('on');
   cam.thGoal=cam.phGoal=null; cam.menu=false; cam.goal.set(-3,0,6); cam.rGoal=fitRadius(); cam.phi=0.8; cam.theta=((cam.theta%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; tween(1.6,k=>{ cam.theta=cam.theta*(1-k); },easeInOut);
@@ -70,7 +71,7 @@ function startGame(fleets){
   after(1.2, ()=>startPlayerTurn());
   canvas.focus();
 }
-function toMenu(){ Sound.setMood('menu'); setupBattle(4242); state.phase='menu'; cam.menu=true; $('#hud').classList.remove('on'); showScreen('menu'); }
+function toMenu(){ Tut.stop(); Sound.setMood('menu'); setupBattle(4242); state.phase='menu'; cam.menu=true; $('#hud').classList.remove('on'); showScreen('menu'); }
 
 /* ---------------- shader warm-up ----------------
    A material's shader is compiled the first time it draws, and on Macs (ANGLE over Metal) that stalls the
@@ -237,7 +238,7 @@ function frame(){
   // rings
   const sel=state.selected; selRing.visible=!!sel && state.phase==='player';
   if(sel){ selRing.position.copy(hexToWorld(sel.q,sel.r,0.04)).lerp(new THREE.Vector3(sel.group.position.x,0.04,sel.group.position.z),1); selRing.material.opacity=0.6+Math.sin(elapsed*4)*0.3; }
-  updateBusy(Math.min(rawDt,0.1));
+  updateBusy(Math.min(rawDt,0.1)); Tut.tick();
   if(state.acting && state.acting.alive){ actRing.position.set(state.acting.group.position.x,0.04,state.acting.group.position.z); actRing.material.opacity=0.5+Math.sin(elapsed*5)*0.3; }
   if(state.hoverTarget && state.hoverTarget.alive && state.phase==='enemy'){ tgtRing.visible=true; tgtRing.position.set(state.hoverTarget.group.position.x,0.04,state.hoverTarget.group.position.z); }
   tgtRing.material.opacity=0.6+Math.sin(elapsed*6)*0.3;
