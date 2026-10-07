@@ -6,6 +6,66 @@ describes what it doesn't do yet.
 
 ---
 
+## MAJOR MILESTONE — Mobile release (iOS and Android) (Jon, after v88)
+
+Ship Laniakea's Edge to the App Store and Google Play. **Decided approach: wrap the existing web game, don't rewrite it.**
+The game stays one codebase for the web and both stores.
+
+### Packaging options
+
+| Route | What it is | Effort | Verdict |
+|---|---|---|---|
+| PWA | Add to Home Screen from the browser: full-screen, offline, own icon | Days | Free, but not in the stores. A cheap way to try it as an app |
+| **Capacitor wrapper** | The same HTML/CSS/JS in a native iOS and Android shell (system WebView) | 2-4 weeks to a first store build | **Recommended** |
+| Native or engine port (Unity, Godot) | Rebuild in a game engine | Months | Only if WebView performance proves inadequate; loses the single codebase |
+
+### What the game needs, whichever route
+- **Phone UI:** the Phone layout section below (P-1 to P-6) becomes mandatory. Lock phones to **landscape** (iPad
+  landscape already works well) and handle notches and home-bar safe areas (`env(safe-area-inset-*)`).
+- **Offline bundling:** Three.js r169 (now the jsDelivr import map) and the Google Fonts (Michroma, Rajdhani) ship inside
+  the app. Keep the CDN path for the web build or switch both to local copies.
+- **Performance and heat:** bloom, GTAO and shadows on a phone GPU will run hot. A lower default quality on phones, a frame
+  cap (30 fps is plenty for a turn-based game), no rendering while idle, and testing on a mid-range Android, the weakest
+  target. Keep the §6 lessons in CLAUDE.md (no multisampled targets, whole pixel ratios, no NaN in shaders).
+- **Saved data:** iOS may clear WebView storage, so scores and settings move to native storage (Capacitor Preferences).
+  The `store` helper makes this a contained change; the `hardburn.` keys and the `hardburn.scores` format must survive
+  it, with a one-time migration from `localStorage`.
+- **App lifecycle:** pause audio and rendering when backgrounded; on iOS respect the silent switch and unlock audio on the
+  first tap.
+- **Touch polish:** haptics on fire and hits, larger tap targets, no stray browser gestures (pull-to-refresh,
+  double-tap zoom, long-press menus).
+
+### Stores
+- **Accounts:** Apple Developer $99 a year (needs a Mac with Xcode), Google Play $25 once.
+- **Listing:** icons at every size, screenshots per device class, description, age rating questionnaire, privacy labels.
+  "Collects no data" is true today and is the easiest label to get through.
+- **Apple review:** guideline 4.2 rejects thin website wrappers; a full game normally passes.
+- **Attribution in the app:** the HYG star data (CC BY-SA 4.0) needs a visible credit, e.g. an About screen fed from
+  `assets/CREDITS.md`. NASA images and Kenney's CC0 sounds are fine as they are.
+
+### Legal and IP, before selling
+- **The Expanse:** "inspired by" is fine; keep the name out of the store listing and keywords, and make sure no design
+  copies a trademarked ship.
+- **Jon's miniatures (Path 2):** if the STL models go in, check each Printables license allows commercial use. Many don't.
+- **The name:** check "Laniakea's Edge" is free on both stores and not trademarked.
+
+### Business decisions (Jon)
+- **Price model:** paid up front ($3-8 is typical for a premium tactics game) is simplest: no ads, accounts or server.
+  Free with in-app purchases needs something to sell (scenarios, the campaign) and adds review and privacy work.
+- **Optional extras, not needed for launch:** Game Center and Play Games achievements, iCloud saves, controller support.
+
+### Suggested order
+1. Phone UI: P-1 to P-4 below, plus landscape.
+2. PWA: manifest, icons, offline cache. Test it as an app on real phones.
+3. Bundle Three.js and the fonts locally; mobile quality preset and frame cap.
+4. Capacitor wrapper; native storage (with migration) and lifecycle handling.
+5. Store accounts, assets, About and credits screen, the IP and name checks.
+6. TestFlight and Google Play internal testing with a few players, then release.
+
+The real cost is step 1 and device testing; the wrapper itself is the easy part.
+
+---
+
 ## TOP PRIORITY — Fleet setup before battle
 
 **This is the first thing to build.** Everything else in this file comes after
