@@ -90,10 +90,10 @@ const Sound = (() => {
     if(crack) crackle(dur*0.8,{gain:gain*crack*0.5,f:1400,density:28,delay:delay+0.05}); }
   // v93: struck metal by modal synthesis: a click excites a set of inharmonic partials (the ratios of a struck plate),
   // each ringing down on its own, over a bright noise burst; base is the lowest partial in Hz
-  function metal(base, {gain=0.2, decay=0.5, delay=0, drive=0.3, verb=0.25, parts=[1,2.32,4.25,6.63,9.38,12.1], bright=1}={}){   // bright scales the click and the noise burst (v96)
+  function metal(base, {gain=0.2, decay=0.5, delay=0, drive=0.3, verb=0.25, parts=[1,2.32,4.25,6.63,9.38,12.1], bright=1, ring=1}={}){   // bright scales the click and the noise burst (v96); ring the partials (v99)
     noise(0.012,{type:'highpass',f0:4000,f1:2000,gain:gain*1.6*bright,attack:0.001,delay,drive});
     noise(0.09,{type:'bandpass',f0:3200*(0.5+bright*0.5),f1:1400*(0.5+bright*0.5),q:1.5,gain:gain*1.1*bright,attack:0.002,delay,drive});
-    parts.forEach((r,i)=>tone(decay*(1-i*0.11),{type:'sine',f0:base*r*(1+(Math.random()-0.5)*0.03),gain:gain*0.5/(1+i*0.6),attack:0.002,delay,verb}));
+    parts.forEach((r,i)=>tone(decay*(1-i*0.11),{type:'sine',f0:base*r*(1+(Math.random()-0.5)*0.03),gain:gain*0.5*ring/(1+i*0.6),attack:0.002,delay,verb}));
     tone(0.16,{type:'sine',f0:120,f1:50,gain:gain*1.2,attack:0.003,delay,drive}); }
   // v93: an electric discharge: noise through a sharp band-pass whose centre jumps at random every 25 ms, a gated buzz,
   // crackle and fizz. Used for the beam, a beam on a hull and a beam on shields
@@ -204,8 +204,13 @@ const Sound = (() => {
         blast(F?0.5:0.65,{gain:F?0.2:0.25,lo:F?85:70,bright:F?3000:2600,crack:F?0.5:0.6,delay:0.015}); return; }
       if(kind==='beam'){ discharge(0.6,{gain:0.2, tail:0.25}); crackle(0.5,{gain:0.06,f:1500,density:60}); return; }   // v93: the discharge burning into the hull
       if(kind==='pulse'){ sample('hull',{gain:0.6,rate:0.85,vary:0.12}); sample('pop',{gain:0.25,rate:1.8,vary:0.15}); noise(0.12,{type:'lowpass',f0:4000,f1:400,gain:0.35}); tone(0.14,{type:'sine',f0:140,f1:55,gain:0.3}); return; }   // a punchy blast
-      // v93 (Jon: the Metal 01 reference, pitch 1.05): a slug striking plate: a heavy, ringing metal hit with the hull recording under it
-      if(kind==='rail'){ metal(441,{gain:0.24,decay:0.7,drive:0.35,verb:0.35}); sample('hull',{gain:0.35,rate:0.8,vary:0.08}); tone(0.35,{type:'sine',f0:95,f1:35,gain:0.35}); return; }
+      // v99 (Jon: still far too much cowbell): the plate's pitched partials were the cowbell (and kept ringing through the
+      // reverb), so the slug hit has no pitched partials at all now: a hard click, a broad torn-metal crunch, a low thud
+      // and punch, the hull recording kept low, and a rattle of debris
+      if(kind==='rail'){ noise(0.012,{type:'highpass',f0:3500,f1:1800,gain:0.35,attack:0.001,drive:0.5});
+        noise(0.32,{type:'bandpass',f0:1500,f1:400,q:0.8,gain:0.32,attack:0.002,drive:0.5,verb:0.25}); noise(0.22,{type:'lowpass',f0:600,f1:120,gain:0.3,attack:0.003});
+        sample('hull',{gain:0.28,rate:0.65,vary:0.08});
+        tone(0.45,{type:'sine',f0:90,f1:32,gain:0.45,attack:0.003}); crackle(0.25,{gain:0.1,f:1500,density:70,delay:0.02}); return; }
       // v91 (Jon): the generic hull hit rips metal: the hull recording, a resonant tearing rasp, a rattle and a short ring
       if(!sample('hull',{gain:0.7,rate:0.72,vary:0.1})) noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3});
       noise(0.4,{type:'bandpass',f0:2400,f1:600,q:5,gain:0.17,attack:0.004}); crackle(0.35,{gain:0.12,f:1500,density:90});
