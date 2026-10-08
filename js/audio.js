@@ -20,7 +20,9 @@ const Sound = (() => {
     master.connect(lim); lim.connect(ctx.destination);
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4; comp.connect(master);
     sfx = ctx.createGain(); sfx.gain.value=on?fv():0; sfx.connect(comp);
-    music = ctx.createGain(); music.gain.value=0.0; music.connect(comp);
+    // v101: the score loses the deep sub that small speakers can't play (a steep 45 Hz high-pass, two stages) and its weight moves up to
+    // 60-150 Hz (the drum bus's bell at 95 Hz, the drone and booms an octave up), where the v100 reference lives
+    music = ctx.createGain(); music.gain.value=0.0; const mhp=ctx.createBiquadFilter(), mhp2=ctx.createBiquadFilter(); [mhp,mhp2].forEach(f=>{ f.type='highpass'; f.frequency.value=45; f.Q.value=0.7; }); music.connect(mhp); mhp.connect(mhp2); mhp2.connect(comp);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
     const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
     buildFx(); startMusic(); loadSfx();
@@ -165,7 +167,13 @@ const Sound = (() => {
       tone(0.4,{type:'sine',f0:110,f1:38,gain:0.45,attack:0.003,delay:c,drive:0.3}); tone(0.18,{type:'sawtooth',f0:180,f1:60,gain:0.08,attack:0.002,delay:c,drive:0.6});
       noise(0.5,{type:'lowpass',f0:1800,f1:120,gain:0.16,attack:0.01,delay:c+0.09,verb:0.8});   // the report
       crackle(0.18,{gain:0.08,f:2000,density:70,delay:c+0.01}); },
-    pulse(){ if(sample('pulse',{gain:0.5,vary:0.1})) return; tone(0.1,{type:'square',f0:980,f1:180,gain:0.09}); noise(0.08,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.12}); },
+    // v101: a pulse bolt has variety: one of four zaps (a sweep from about 1.5 kHz down to around 100 Hz, saw or square,
+    // with a fifth above it), randomly detuned, through a little drive, over the recording and a short low body, so a
+    // three-bolt volley never repeats itself
+    pulse(){ const v=Math.floor(Math.random()*4), f0=[1500,1300,1700,1150][v]*(1+(Math.random()-0.5)*0.08), f1=[110,140,95,160][v];
+      sample('pulse',{gain:0.38,vary:0.1});
+      tone(0.15,{type:v%2?'square':'sawtooth',f0,f1,gain:0.05,attack:0.002,drive:0.5}); tone(0.12,{type:'sine',f0:f0*1.5,f1:f1*2,gain:0.025,attack:0.002});
+      noise(0.05,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.08,attack:0.001}); tone(0.18,{type:'sine',f0:140,f1:55,gain:0.12,attack:0.002}); },
     // v65: an energy beam: a short ignition, a detuned resonant hum with a slow filter sweep, and a fizz of energy over it
     // v93 (Jon: the electric-discharge reference): a short ignition, then a hard plasma discharge for the length of the beam,
     // trailing off (replaces v65's detuned hum and v67's shimmer)
@@ -177,7 +185,11 @@ const Sound = (() => {
       discharge(dur,{gain:0.1+0.12*w, tail:0.4, grit:0.2+0.15*w}); tone(dur+0.3,{type:'sawtooth',f0:98,f1:92,gain:0.04+0.035*w,attack:0.06,verb:0.3}); },
     // v65: a fast missile leaving the tube: a quick rising whoosh and a whine, a little of the thruster recording for body
     missile(){ noise(0.45,{type:'bandpass',f0:900,f1:5200,q:2.5,gain:0.22,attack:0.02}); noise(0.3,{type:'highpass',f0:6000,f1:3000,gain:0.07}); tone(0.35,{type:'sawtooth',f0:420,f1:1700,gain:0.018}); sample('launch',{gain:0.22,rate:2.2,dur:0.35,vary:0.1}); },
-    fighter(){ noise(1.0,{type:'bandpass',f0:1200,f1:3200,q:4,gain:0.12,attack:0.2}); },
+    // v101: a strike wing launches as six craft, staggered and spread across the stereo field, each a rising whoosh with
+    // a thin engine whine, over a low thrum from the launch bay
+    fighter(){ for(let i=0;i<6;i++){ const d=i*0.09+Math.random()*0.03, p=(Math.random()*2-1)*0.8;
+        noise(0.5,{type:'bandpass',f0:900,f1:2600,q:3,gain:0.06,attack:0.06,delay:d,pan:p,verb:0.2}); tone(0.45,{type:'sawtooth',f0:300,f1:900,gain:0.008,attack:0.05,delay:d,pan:p}); }
+      noise(1.2,{type:'lowpass',f0:400,f1:120,gain:0.1,attack:0.1}); },
     // v68 (Jon): point defense as a gatling: the barrels spin up with a motor whine, then a fast, even stream of rounds
     // (each a sharp crack with a little low thump), slightly uneven in pitch and level, and a spin-down
     pdc(){ if(!ctx) return; const n=18, gap=0.038, spin=0.12, len=spin+n*gap;
@@ -197,11 +209,14 @@ const Sound = (() => {
       if(kind==='torpedo'){ concuss(0,{gain:0.42,lo:52,len:0.9,verb:0.6}); blast(1.4,{gain:0.3,lo:45,bright:1600,crack:1});
         noise(2.6,{type:'lowpass',f0:700,f1:50,gain:0.22,attack:0.05,delay:0.1,verb:0.6}); sample('rumble',{gain:0.35,rate:1.0,vary:0.05});
         tone(2.0,{type:'sine',f0:48,f1:18,gain:0.4,attack:0.01}); crackle(1.6,{gain:0.07,f:1800,density:25,delay:0.3}); return; }
-      // v91: missiles and strike craft land as small explosions with a report: a sharp crack on the impact, then the blast
-      if(kind==='missile' || kind==='fighter'){ const F=kind==='fighter';
-        if(!sample('pop',{gain:F?0.22:0.3,rate:F?1.15:0.95,vary:0.1})) noise(0.05,{type:'highpass',f0:3200,f1:1500,gain:0.3,attack:0.001});
-        noise(0.05,{type:'highpass',f0:3000,f1:1400,gain:F?0.2:0.28,attack:0.001}); tone(0.08,{type:'square',f0:F?340:300,f1:80,gain:0.04});
-        blast(F?0.5:0.65,{gain:F?0.2:0.25,lo:F?85:70,bright:F?3000:2600,crack:F?0.5:0.6,delay:0.015}); return; }
+      // v101: warheads land as small concussive explosions with a report (v91): the crack, a short concussion, the blast and a
+      // little debris; strike craft lighter and spread across the stereo field, since six land in quick succession
+      if(kind==='missile' || kind==='fighter'){ const F=kind==='fighter', p= F? (Math.random()*2-1)*0.7 : null;
+        if(!sample('pop',{gain:F?0.2:0.3,rate:F?1.15:0.95,vary:0.1,pan:p})) noise(0.05,{type:'highpass',f0:3200,f1:1500,gain:0.3,attack:0.001,pan:p});
+        noise(0.05,{type:'highpass',f0:3000,f1:1400,gain:F?0.18:0.28,attack:0.001,pan:p,drive:0.4});
+        concuss(0.01,{gain:F?0.13:0.2, lo:F?100:85, len:F?0.3:0.42, verb:0.35});
+        blast(F?0.45:0.6,{gain:F?0.12:0.16,lo:F?90:75,bright:F?3000:2600,crack:F?0.4:0.5,delay:0.015});
+        crackle(F?0.3:0.5,{gain:0.05,f:1700,density:30,delay:0.1}); return; }
       if(kind==='beam'){ discharge(0.6,{gain:0.2, tail:0.25}); crackle(0.5,{gain:0.06,f:1500,density:60}); return; }   // v93: the discharge burning into the hull
       if(kind==='pulse'){ sample('hull',{gain:0.6,rate:0.85,vary:0.12}); sample('pop',{gain:0.25,rate:1.8,vary:0.15}); noise(0.12,{type:'lowpass',f0:4000,f1:400,gain:0.35}); tone(0.14,{type:'sine',f0:140,f1:55,gain:0.3}); return; }   // a punchy blast
       // v99 (Jon: still far too much cowbell): the plate's pitched partials were the cowbell (and kept ringing through the
@@ -289,7 +304,7 @@ const Sound = (() => {
     // bus with only a little of the hall (the score's voices sit in the hall; the drums sit in front of them)
     drumBus=ctx.createGain(); { const sh=ctx.createWaveShaper(), cv=new Float32Array(1024), kd=DRUMS.drive; for(let i=0;i<1024;i++){ const x=i/511.5-1; cv[i]=Math.tanh(kd*x)/Math.tanh(kd); } sh.curve=cv;
       const cp=ctx.createDynamicsCompressor(); cp.threshold.value=-20; cp.knee.value=4; cp.ratio.value=5; cp.attack.value=0.004; cp.release.value=0.12;
-      const ls=ctx.createBiquadFilter(); ls.type='lowshelf'; ls.frequency.value=140; ls.gain.value=DRUMS.lowShelf; const hc=ctx.createBiquadFilter(); hc.type='lowpass'; hc.frequency.value=7000;   // v98: more low end, softer top
+      const ls=ctx.createBiquadFilter(); ls.type='peaking'; ls.frequency.value=95; ls.Q.value=0.9; ls.gain.value=DRUMS.lowShelf; const hc=ctx.createBiquadFilter(); hc.type='lowpass'; hc.frequency.value=7000;   // v98: more low end, softer top   // v101: a bell at 95 Hz, not a shelf that lifted the sub
       const mk=ctx.createGain(); mk.gain.value=DRUMS.makeup; drumBus.connect(ls); ls.connect(hc); hc.connect(sh); sh.connect(cp); cp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=DRUMS.verb; mk.connect(ws); ws.connect(revIn); }
     // v100: the synth pulse's bus: a light tanh drive and a top cut, then the dry music bus with a touch of the hall
     seqBus=ctx.createGain(); { const sh=ctx.createWaveShaper(), cv=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; cv[i]=Math.tanh(2.5*x)/Math.tanh(2.5); } sh.curve=cv;
@@ -309,14 +324,14 @@ const Sound = (() => {
         const vib=osc('sine',5.2,t,t+dur+0.6), vg=ctx.createGain(); vg.gain.setValueAtTime(0,t); vg.gain.linearRampToValueAtTime(mf(m)*0.006,t+0.35); vib.connect(vg); vg.connect(o1.frequency); vg.connect(o2.frequency);
         o1.connect(f); o2.connect(f); f.connect(g); env(g,t,0.06,0.07*vel,dur*0.75,0.45); out(g,0.5); },
       bass(t,m,dur,vel){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=260;
-        osc('sawtooth',mf(m),t,t+dur+0.2).connect(f); osc('sine',mf(m-12),t,t+dur+0.2).connect(f); f.connect(g); env(g,t,0.01,0.16*vel,dur*0.5,dur*0.5); out(g,0.1); },
+        osc('sawtooth',mf(m),t,t+dur+0.2).connect(f); osc('sine',mf(m),t,t+dur+0.2).connect(f); f.connect(g); env(g,t,0.01,0.16*vel,dur*0.5,dur*0.5); out(g,0.1); },
       // v95: cinematic voices. pad: slow-swelling strings; drone: a low pedal; braam: a low,
       // dense brass hit whose filter tears open
       pad(t,notes,dur,vel){ notes.forEach(m=>{ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=0.7;
           f.frequency.setValueAtTime(500,t); f.frequency.linearRampToValueAtTime(700+vel*1100,t+dur*0.4);
           [-11,0,11].forEach(d=>osc('sawtooth',mf(m),t,t+dur+2.5,d).connect(f)); f.connect(g); env(g,t,dur*0.35,0.022*vel,dur*0.3,2.2); out(g,0.65); }); },
       drone(t,m,dur){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=230;
-        osc('sawtooth',mf(m),t,t+dur+3).connect(f); osc('sawtooth',mf(m),t,t+dur+3,7).connect(f); osc('sine',mf(m-12),t,t+dur+3).connect(f);
+        osc('sawtooth',mf(m),t,t+dur+3).connect(f); osc('sawtooth',mf(m),t,t+dur+3,7).connect(f); osc('sine',mf(m),t,t+dur+3).connect(f);
         f.connect(g); env(g,t,2.0,0.09,Math.max(0,dur-2),3.0); out(g,0.5); },
       // v100 (Jon: the Expanse, Rocinante against the Zmeya): the tactical layer. seq: a sequenced synth-bass pulse, a saw and
       // a detuned square through a resonant low-pass that snaps open on each note, into its own light distortion;
@@ -348,7 +363,7 @@ const Sound = (() => {
           const ng=ctx.createGain(); ng.gain.setValueAtTime(v*k.nAmt,tt); ng.gain.exponentialRampToValueAtTime(0.0001,tt+k.nDur); n.connect(nf); nf.connect(ng); ng.connect(drumBus); n.start(tt,Math.random()*0.5); n.stop(tt+k.nDur+0.02);
           const c=ctx.createBufferSource(); c.buffer=noiseBuf; const cf=ctx.createBiquadFilter(); cf.type='highpass'; cf.frequency.value=3000;   // the beater
           const cg=ctx.createGain(); cg.gain.setValueAtTime(v*k.click,tt); cg.gain.exponentialRampToValueAtTime(0.0001,tt+0.012); c.connect(cf); cf.connect(cg); cg.connect(drumBus); c.start(tt,Math.random()*0.5); c.stop(tt+0.03); } },
-      boom(t){ const g=ctx.createGain(); const o=osc('sine',60,t,t+3); o.frequency.exponentialRampToValueAtTime(34,t+2.5); o.connect(g); env(g,t,0.005,0.6,0.1,2.4); out(g,0.6);
+      boom(t){ const g=ctx.createGain(); const o=osc('sine',78,t,t+3); o.frequency.exponentialRampToValueAtTime(44,t+2.5); o.connect(g); env(g,t,0.005,0.6,0.1,2.4); out(g,0.6);
         const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(80,t+1.5); const ng=ctx.createGain(); n.connect(f); f.connect(ng); env(ng,t,0.005,0.35,0.05,1.4); out(ng,0.8); n.start(t); n.stop(t+2); },
       riser(t,dur){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=2; f.frequency.setValueAtTime(300,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
         const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.12,t+dur); g.gain.linearRampToValueAtTime(0.0001,t+dur+0.05); n.connect(f); f.connect(g); out(g,0.6); n.start(t); n.stop(t+dur+0.1); },
