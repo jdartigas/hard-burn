@@ -204,7 +204,7 @@ async function explodeShip(s){
   await wait(n*0.2+0.15);
   s.body.position.set(0,0,0);
   // main detonation
-  Sound.boom(L/2.2); addShake(0.6+L*0.12); flash(p,0xffcc88,14,1.0);
+  Sound.boom(L/2.2); Sound.drumHit('odaiko', 1.1); addShake(0.6+L*0.12);   // v94: and an odaiko on the music bus flash(p,0xffcc88,14,1.0);
   Particles.burst(p,170,{speed:9*L/2.5,color:C_WHITE,size:0.9,life:0.8,drag:2.5});
   Particles.burst(p,150,{speed:5*L/2.5,color:C_FIRE,size:1.6,life:1.4,drag:2,grow:1.5});
   Particles.burst(p,120,{speed:15,color:C_SPARK,size:0.3,life:1.8,drag:0.7});

@@ -55,6 +55,7 @@ function setupBattle(seed, fleets={}){
   }
   state.fleets=lists;
   state.turn=0; state.over=false; state.result=null; state.surrendered=false; state.recorded=false; state.simulated=false; state.busy=false; state.selected=null; state.mode=null; state.stats=newStats(); refreshTags();
+  Sound.drum('stand', alive('player').length<=2 || alive('enemy').length<=2);   // v94: a small fleet starts at full intensity
 }
 // fleets: {player:[...], enemy:[...]}. Leave it out to replay the last fleets (classic on the first game).
 let lastFleets={};

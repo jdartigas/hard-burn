@@ -66,6 +66,17 @@ const LAB_SOUNDS = [
   ['Misses', [
     ['miss', 'Miss (energy ricochet)', 'a direct-fire shot glancing away', ()=>Sound.miss()],
   ]],
+  ['Music: battle drums (music bus: needs the music on; volume and pitch sliders do not apply)', [
+    ['dr-odaiko', 'Odaiko, the big drum', 'one-shot; also hits on every ship destroyed', ()=>Sound.drumHit('odaiko',1.1)],
+    ['dr-chu', 'Chu-daiko', 'one-shot; also hits on every ability', ()=>Sound.drumHit('chu',0.9)],
+    ['dr-shime', 'Shime', 'the fast high drum', ()=>Sound.drumHit('shime',1)],
+    ['dr-ka', 'Ka, the rim click', '', ()=>Sound.drumHit('ka',1)],
+    ['dr-0', 'Intensity 0: tension', 'menu and battle setup. Plays for 12 s from the next bar', ()=>Sound.drumPreview(0)],
+    ['dr-1', 'Intensity 1: stalking', 'your turn with nothing happening', ()=>Sound.drumPreview(1)],
+    ['dr-2', 'Intensity 2: battle', 'the enemy turn, and 4 s after any shot', ()=>Sound.drumPreview(2)],
+    ['dr-3', 'Intensity 3: full assault', '6 s after a kill, or a side down to two ships', ()=>Sound.drumPreview(3)],
+    ['dr-off', 'End the preview', 'back to the level the game sets', ()=>Sound.drumPreview(null)],
+  ]],
   ['Sequences, with the game\'s timing', [
     ['q-rail', 'Railgun on a hull', 'charge, shot, slug hits', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.hit('rail')); }],
     ['q-rail-sh', 'Railgun on shields', '', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.shield('rail')); }],
@@ -161,7 +172,7 @@ const SfxLab = {
       const text=lines.length>1? lines.join('\n') : 'No changes yet.';
       (navigator.clipboard? navigator.clipboard.writeText(text) : Promise.reject()).then(()=>{ $('#lab-copy').textContent='Copied'; setTimeout(()=>$('#lab-copy').textContent='Copy notes',1500); }, ()=>prompt('Copy these notes:', text)); };
     $('#lab-reset').onclick=()=>{ if(!confirm('Reset every slider and note?')) return; this.st={}; this.save(); el.remove(); this.build(); showScreen('sfxlab'); };
-    $('#lab-close').onclick=()=>{ stopRef(); closeScreen(); };
+    $('#lab-close').onclick=()=>{ stopRef(); Sound.drumPreview(null); closeScreen(); };
     el.addEventListener('pointerdown', ()=>Sound.init(), {once:true});
     // samples decode after the first click; until then the recorded sounds fall back to their synthesized versions
     setInterval(()=>{ const s=$('#lab-status'); if(!s) return; const d=Sound._dbg(); s.textContent= !Sound.on? 'Effects are muted: press N or turn them on in the top bar.' : !d.ctx? 'Click anywhere to start the audio.' : d.samples<d.of? `Loading recordings ${d.samples}/${d.of}…` : ''; }, 500);

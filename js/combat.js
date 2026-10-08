@@ -9,6 +9,7 @@ async function fireWeapon(att, wi, tgt){
   const w=att.weapons[wi], d=w.def;
   if(!att.alive || !tgt.alive || !weaponReady(w)) return false;
   let p=hitChance(att,d,tgt); if(p<=0) return false;
+  Sound.drum('fire');   // v94: weapons fire lifts the battle drums
   p=clamp(p+slotAcc(w),5,95);   // a damaged weapon aims worse
   if(state.acting===att && !cam.touched && frameShot(att,tgt)) await wait(0.3);   // AI shots: frame both ends, unless the player has taken the camera
   await faceTarget(att,tgt);
@@ -53,6 +54,7 @@ async function fireWeapon(att, wi, tgt){
 }
 const pendingDeaths=[];
 function destroyShip(s, by){
+  Sound.drum('kill'); Sound.drum('stand', alive('player').length<=2 || alive('enemy').length<=2);   // v94: the drums peak
   log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k', 'kill');
   const wc=cellAt(s.q,s.r); if(wc && wc.t==='open') wc.t='debris';   // the wreck leaves a debris field: cover, double movement
   const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s); blastNeighbours(s, by);
@@ -84,7 +86,7 @@ async function fireAll(att, tgt){
 }
 async function useAbility(s, target=null){
   const a=s.ability; if(!abilityReady(s)) return false;
-  const k=a.key;
+  const k=a.key; Sound.drumHit('chu', 0.9);   // v94: a drum hit on every ability
   if(k==='burn'){ s.mp+=3; Sound.power(); s.engines.forEach(e=>e.boost=1.5); floatText(s,'+3 movement','heal'); }
   else if(k==='ecm'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.ecm=1; Particles.burst(o.group.position,30,{speed:3,color:C_CYAN,size:0.3,life:0.8}); }
     Sound.power(); const ring=hexRing(0.5,0.7,COL.cyan,0.8); ring.position.copy(s.group.position).setY(0.1); scene.add(ring);

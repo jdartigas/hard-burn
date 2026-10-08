@@ -33,6 +33,14 @@ const Sound = (() => {
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
   const bufs={}; let lastPdcHit=0, lastPdcShield=0, lastMiss=0;
   let labRate=1;   // v90: the sound lab's pitch (1 in the game)
+  /* v94: the battle drums. The score's percussion is the taiko ensemble from js/taiko-battle-drums.js (Jon), ported into
+     the score's own scheduler so it shares its clock, tempo, reverb and the music bus (M mutes it, the music slider sets
+     it). Its intensity, 0 to 3, follows the battle: the floor comes from the mood (menu 0, your turn 1, enemy turn 2), and
+     events lift it: weapons fire to 2 for DRUMS.fireHold s, a kill to 3 for DRUMS.killHold s, and a side down to two ships
+     or fewer holds 3. It rises at the next bar and falls one level a bar. Times are the audio clock, not timeScale, so
+     the big-moment slow motion never drags the music. */
+  const DRUMS = { fireHold:4, killHold:6, gain:0.5 };
+  let drumLv=0, lastFire=-99, lastKill=-99, lastStand=false, drumPreview=null;
   /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
      two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
      report after a crack and the roll of an explosion). A voice can also send to either on its own ({drive, verb}) and
@@ -228,6 +236,12 @@ const Sound = (() => {
       const tier= size<0.9? 0 : size<1.8? 1 : 2, P=[{rate:1.45,gain:0.36,rumble:0,sub:0.16},{rate:1.2,gain:0.48,rumble:0.3,sub:0.22},{rate:1,gain:0.6,rumble:0.5,sub:0.3}][tier];
       if(sample('boomL',{gain:P.gain, rate:P.rate, vary:0.05})){ if(P.rumble) sample('rumble',{gain:P.rumble, rate:tier===1?1.2:1, vary:0}); tone(0.9+0.5*size,{type:'sine',f0:70,f1:22,gain:P.sub,attack:0.01}); if(tier===0) blast(0.6,{gain:0.12,lo:90,bright:2400,crack:0.4}); return; }
       noise(1.2+size, {type:'lowpass',f0:1400,f1:40,gain:0.7,attack:0.01}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.7}); noise(0.3,{type:'highpass',f0:3000,f1:800,gain:0.25}); },
+    // v94: what the battle tells the drums. drum('fire') on every volley, drum('kill') on a kill, drum('stand', bool) when a
+    // side is down to two ships or fewer; drumHit(kind) a one-shot on the music bus (silent with the music off)
+    drum(ev, v){ if(!ctx) return; const t=ctx.currentTime; if(ev==='fire') lastFire=t; else if(ev==='kill') lastKill=t; else if(ev==='stand') lastStand=!!v; },
+    drumHit(kind, vel=1){ if(!ctx || !musicOn || !drumOne || !DRUM_KINDS[kind]) return; drumOne(kind, vel); },
+    drumPreview(lv, secs=12){ init(); if(!ctx) return; drumPreview= lv===null? null : {lv, until:ctx.currentTime+secs}; },
+    get drumLevel(){ return drumLv; },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
     turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{dry:true,type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
     // v63 stings: a rising fanfare that resolves into a held chord; defeat falls to a low minor chord over a rumble
@@ -236,6 +250,14 @@ const Sound = (() => {
     lose(){ duck(0.2,3.5); sample('rumble',{gain:0.6,rate:0.8,vary:0}); [330,277,247,196].forEach((f,i)=>tone(1.0,{dry:true,type:'sawtooth',f0:f,gain:0.04,delay:i*0.2}));
       [196,233,294].forEach(f=>tone(3.0,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{dry:true,type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
   };
+  // v94: the drum voices (from js/taiko-battle-drums.js); wet is each one's share of the score's hall reverb
+  const DRUM_KINDS = {
+    odaiko:{ f0:95,  f1:40,  dur:1.2,  g:1.0,  nHz:280,  nQ:0.7, nAmt:0.45, nType:'bandpass', nDur:0.09, wet:0.4 },
+    chu:   { f0:175, f1:82,  dur:0.6,  g:0.8,  nHz:700,  nQ:0.8, nAmt:0.45, nType:'bandpass', nDur:0.07, wet:0.3 },
+    shime: { f0:340, f1:215, dur:0.22, g:0.5,  nHz:2600, nQ:0.9, nAmt:0.7,  nType:'bandpass', nDur:0.05, wet:0.2 },
+    ka:    { f0:900, f1:700, dur:0.05, g:0.28, nHz:1800, nQ:0.5, nAmt:1.0,  nType:'highpass', nDur:0.05, wet:0.15 },
+  };
+  let drumOne=null;   // the score's drum voice, for one-shot hits outside the patterns (set in startMusic)
   /* ---------- cinematic score: generative, scheduled with lookahead ---------- */
   function startMusic(){
     if(!ctx || musicNodes) return;
@@ -266,9 +288,12 @@ const Sound = (() => {
         o1.connect(f); o2.connect(f); f.connect(g); env(g,t,0.06,0.07*vel,dur*0.75,0.45); out(g,0.5); },
       bass(t,m,dur,vel){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=260;
         osc('sawtooth',mf(m),t,t+dur+0.2).connect(f); osc('sine',mf(m-12),t,t+dur+0.2).connect(f); f.connect(g); env(g,t,0.01,0.16*vel,dur*0.5,dur*0.5); out(g,0.1); },
-      taiko(t,vel){ const g=ctx.createGain(); const o=osc('sine',110,t,t+0.7); o.frequency.setValueAtTime(115,t); o.frequency.exponentialRampToValueAtTime(42,t+0.35); o.connect(g); env(g,t,0.003,0.5*vel,0.02,0.55); out(g,0.35);
-        const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=700; const ng=ctx.createGain(); n.connect(f); f.connect(ng); env(ng,t,0.002,0.35*vel,0.01,0.12); out(ng,0.3); n.start(t,Math.random()); n.stop(t+0.3); },
-      snare(t,vel){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1900; f.Q.value=0.7; const g=ctx.createGain(); n.connect(f); f.connect(g); env(g,t,0.002,0.2*vel,0.01,0.16); out(g,0.45); n.start(t,Math.random()); n.stop(t+0.3); },
+      // v94: the taiko ensemble (voices from js/taiko-battle-drums.js): a pitch-dropping body and a filtered skin attack
+      drum(kind,t,vel){ const k=DRUM_KINDS[kind], v=Math.min(1.2,vel)*k.g*DRUMS.gain;
+        const o=osc('sine',k.f0,t,t+k.dur+0.05); o.frequency.setValueAtTime(k.f0,t); o.frequency.exponentialRampToValueAtTime(k.f1,t+Math.min(0.12,k.dur*0.25));
+        const og=ctx.createGain(); og.gain.setValueAtTime(0.0001,t); og.gain.exponentialRampToValueAtTime(v,t+0.004); og.gain.exponentialRampToValueAtTime(0.0001,t+k.dur); o.connect(og); out(og,k.wet);
+        const n=ctx.createBufferSource(); n.buffer=noiseBuf; const nf=ctx.createBiquadFilter(); nf.type=k.nType; nf.frequency.value=k.nHz; nf.Q.value=k.nQ;
+        const ng=ctx.createGain(); ng.gain.setValueAtTime(v*k.nAmt,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+k.nDur); n.connect(nf); nf.connect(ng); out(ng,k.wet*0.7); n.start(t,Math.random()*0.5); n.stop(t+k.nDur+0.02); },
       boom(t){ const g=ctx.createGain(); const o=osc('sine',60,t,t+3); o.frequency.exponentialRampToValueAtTime(34,t+2.5); o.connect(g); env(g,t,0.005,0.6,0.1,2.4); out(g,0.6);
         const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(80,t+1.5); const ng=ctx.createGain(); n.connect(f); f.connect(ng); env(ng,t,0.005,0.35,0.05,1.4); out(ng,0.8); n.start(t); n.stop(t+2); },
       riser(t,dur){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=2; f.frequency.setValueAtTime(300,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
@@ -279,8 +304,30 @@ const Sound = (() => {
     const CH=[[50,53,57],[46,50,53],[53,57,60],[48,52,55],[50,53,57],[46,50,53],[55,58,62],[45,49,52]];
     const MEL=[ [[0,69,8],[8,74,8]], [[0,77,6],[6,76,2],[8,74,8]], [[0,72,8],[8,69,8]], [[0,67,12],[12,64,4]],
                 [[0,69,4],[4,74,4],[8,77,8]], [[0,79,8],[8,77,4],[12,74,4]], [[0,70,8],[8,74,8]], [[0,73,12],[12,76,4]] ];
-    const TAIKO_FULL={0:1,3:.55,6:.8,8:1,10:.45,11:.7,12:.9,14:.6,15:.5}, TAIKO_LIGHT={0:.8,8:.6,11:.4}, TAIKO_WAR={0:1,2:.5,3:.7,4:.9,6:.7,8:1,10:.6,11:.8,12:1,13:.5,14:.8,15:.9};
+    // v94: patterns from js/taiko-battle-drums.js, 16 steps a bar, 4-bar phrases; X accent, x hit, g ghost, . rest
+    const DRUM_P = {
+      0:{ odaiko:['X...............','................','....X...........','................'] },   // tension, a slow heartbeat
+      1:{ odaiko:['X.....x.X.......','X.....x.........','X.....x.X.......','X.....x...x.x...'],          // stalking
+          chu:   ['................','....x.......x...','................','....x.......x.x.'] },
+      2:{ odaiko:['X..x..X.X..x.X..','X..x..X.X..x..X.','X..x..X.X..x.X..','X..x..X.XxXxXxXx'],          // battle
+          chu:   ['..x...x...x.x.x.','..x...x...x.x.xx','..x...x...x.x.x.','................'],
+          shime: ['x.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xx','................'] },
+      3:{ odaiko:['X.xX..X.X.xX.X.x','X.xX..X.X.xX..Xx','X.xX..X.X.xX.X.x','XxXxXxXxXXXXXXXX'],          // full assault
+          chu:   ['.xx.xx.x.xx.xx.x','.xx.xx.x.xx.xxxx','.xx.xx.x.xx.xx.x','................'],
+          shime: ['xxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxx','ggggxxxxXXXXXXXX'],
+          ka:    ['x...x...x...x...','x...x...x...x.x.','x...x...x...x...','xxxxxxxxxxxxxxxx'] },
+    };
+    const DRUM_VEL = { X:1.0, x:0.72, g:0.32 };
+    // the level for the coming bar: the mood's floor, raised by recent fire, a recent kill, a last stand or a lab preview;
+    // up at once, down one level a bar
+    function drumBar(){ const now=ctx.currentTime;
+      let want= mood==='menu'? 0 : mood==='enemy'? 2 : 1;
+      if(now-lastFire<DRUMS.fireHold) want=Math.max(want,2);
+      if(now-lastKill<DRUMS.killHold || (lastStand && mood!=='menu')) want=3;
+      if(drumPreview && now<drumPreview.until) want=drumPreview.lv;
+      drumLv= want>drumLv? want : want<drumLv? drumLv-1 : drumLv; }
     const ACC=new Set([0,3,6,8,11,14]);
+    drumOne=(kind,vel)=>{ const t=ctx.currentTime+0.01; I.drum(kind,t,vel); };
     const BPM=90, STEP=60/BPM/4;
     let step=0, nextT=ctx.currentTime+0.25, barOffset=0;
 
@@ -305,12 +352,10 @@ const Sound = (() => {
       if(sec===3 && !endMood && (st===6||st===11)) I.brass(t, [ch[0]-12, ch[0], ch[2]-12], STEP*2.5, 0.8);
       // melody
       if(sec===2 && !endMood){ for(const [o,m,l] of MEL[sb%8]) if(o===st) I.horn(t, m-12, STEP*l, 1); }
-      // percussion
-      if(!endMood){
-        const pat = sec===0 ? (enemy?TAIKO_LIGHT:null) : sec===1 ? (enemy?TAIKO_FULL:TAIKO_LIGHT) : sec===2 ? TAIKO_FULL : TAIKO_WAR;
-        if(pat && pat[st]!==undefined) I.taiko(t, pat[st]*(mood==='menu'?0.6:1));
-        if(sec>=2 && (st===4||st===12)) I.snare(t, 0.8);
-        if(sec===1 && sb%8===7 && st>=8) I.snare(t, 0.25+(st-8)*0.08);   // roll into the full section
+      // percussion (v94): the taiko ensemble at the battle's intensity (replaces the v63 taiko and snare patterns)
+      if(!endMood){ if(st===0) drumBar(); const pat=DRUM_P[drumLv], ph=bar%4, quiet= mood==='menu'? 0.6 : 1;
+        for(const kind in pat){ const ch=pat[kind][ph][st]; if(ch==='.' || ch===undefined) continue;
+          I.drum(kind, Math.max(ctx.currentTime, t+(Math.random()-0.5)*0.012), DRUM_VEL[ch]*(0.92+Math.random()*0.16)*quiet); }
         if(sec===1 && sb%8===6 && st===0) I.riser(t, STEP*32);
       }
     }
