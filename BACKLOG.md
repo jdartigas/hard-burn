@@ -7,7 +7,7 @@ describes what it doesn't do yet.
 **Milestones (Jon, after v89).** The large tracks are classed by size:
 - **Class A:** Mobile release (iOS and Android); Campaign, the Trade Wars-style shared trading universe.
 - **Class B:** Real nearby star systems as battle locations (the 21 systems within about 50 light years; see
-  "Locations beyond the solar system" under Battle locations).
+  "Locations beyond the solar system" under Battle locations); Sound library upgrade (Sonniss), under "Sound direction".
 - **Class C:** Scenarios (escort, hold the line, last stand).
 
 ---
@@ -598,6 +598,26 @@ whether lore unlocks through play or is always there, and whether named hulls (t
 sheet) become part of the game.
 
 ## Sound direction: reference set (Jon, after v91)
+
+### CLASS B MILESTONE — Sound library upgrade (Sonniss) (Jon, after v91)
+
+Replace or layer the weakest game sounds with professional effects licensed for games, aiming at the reference table
+below. **Source: Sonniss** (the free GDC bundles, or paid libraries), whose EULA fits:
+- Games are named explicitly; editing, pitching and layering are allowed (re-designed sounds stay within the license);
+  commercial use, no attribution required, lifetime, unlimited projects, so a paid mobile release is covered too.
+- **Rules to keep:** the raw library never enters the repo (local drive plus one backup only; keep it outside the repo or
+  in a gitignored folder); ship only finished, edited takes embedded in `sfxdata.js`, and stop committing those takes as
+  standalone files in `assets/sfx/` (the Kenney CC0 ones there are fine); never put the files into an AI tool; keep proof
+  of purchase (the download email, even for a free bundle) and check each GDC bundle's own license file; Jon is the sole
+  editor (a collaborator or sound designer would need a multi-user license). Credit them in `assets/CREDITS.md` anyway.
+
+**Steps:**
+1. Jon downloads one GDC bundle from gdc.sonniss.com (20-30 GB each; his choice of year). Claude does not download it.
+2. It goes in a local folder outside the repo, or a folder inside it that is gitignored first.
+3. Claude searches the file names against the reference table below and shortlists about three candidates per game sound.
+4. Jon auditions them locally in a "Candidates" group of the sound lab, never committed, and picks.
+5. Claude cuts the final takes, embeds them, layers them with the synthesis where it helps, and credits them.
+
 
 Jon collected 26 Epidemic Sound effects in `sfx/` (untracked, local only) as the sound he wants. **They can't ship:** his
 Creator Subscription licenses them only for his own video and podcast productions, forbids apps that expose the audio
