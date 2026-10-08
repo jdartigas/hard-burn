@@ -57,8 +57,9 @@ const Sound = (() => {
      off (everything centred, for one speaker); hardburn.spatial. */
   // near is about the camera's distance at the start of a battle (about 70 from the ships), so the normal view plays at
   // nearly full level; only zooming out further (to 110 at most) darkens and quietens it
+  const STING_TRIM = 0.6;   // v104: the victory and defeat stings' level (about -4.4 dB), so they peak under the limiter
   const SPACE = { near:55, far:120, farGain:0.55, offGain:0.7, cutNear:18000, cutFar:5000 };
-  let posNode=null, positional=store.get('spatial', true);
+  let posNode=null, trimK=1, positional=store.get('spatial', true);
   function makeFx(dest, drive, verb){
     const inp=ctx.createGain(); inp.connect(dest);
     const dIn=ctx.createGain(), sh=ctx.createWaveShaper(), dOut=ctx.createGain(); sh.curve=shapeCurve; sh.oversample='2x'; dOut.gain.value=0.55;
@@ -79,8 +80,8 @@ const Sound = (() => {
     let p=pan; if(p===null && spread>0) p=(Math.random()*2-1)*spread;
     if(posNode) g.connect(posNode);   // v102: placed by Sound.at
     else if(p && ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(p,-1,1); g.connect(pn); pn.connect(fx.in); } else g.connect(fx.in);
-    if(drive){ const d=ctx.createGain(); d.gain.value=drive; g.connect(d); d.connect(fx.dist); }
-    if(verb){ const v=ctx.createGain(); v.gain.value=verb; g.connect(v); v.connect(fx.verb); } }
+    if(drive){ const d=ctx.createGain(); d.gain.value=drive*trimK; g.connect(d); d.connect(fx.dist); }
+    if(verb){ const v=ctx.createGain(); v.gain.value=verb*trimK; g.connect(v); v.connect(fx.verb); } }
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
   // were silently missing there
   const b64=s=>{ const bin=atob(s), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a.buffer; };
@@ -123,12 +124,29 @@ const Sound = (() => {
     crackle(dur,{gain:gain*0.9*grit,f:3500,density:Math.max(15,120*grit),delay}); noise(T,{type:'highpass',f0:6000,f1:4000,gain:gain*0.25*grit,attack:0.02,delay}); }
   // v103: a brass chord for the stings: per note four detuned saws through a low-pass that opens from dark to bright and
   // settles, with an optional bend (the whole chord sliding by `bend` semitones), into the chain with drive and the room
-  function brassy(notes, dur, {gain=0.04, open=1800, delay=0, bend=0, attack=0.08, verb=0.7, drive=0.4, rel=1.2}={}){ if(!ctx) return; const t=now()+delay;
-    for(const m of notes){ const f=440*Math.pow(2,(m-69)/12)*labRate, f1=f*Math.pow(2,bend/12), g=ctx.createGain(), lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=1.2;
+  function brassy(notes, dur, {gain=0.04, open=1800, delay=0, bend=0, attack=0.08, verb=0.7, drive=0.4, rel=1.2, spread=0}={}){ if(!ctx) return; const t=now()+delay;
+    notes.forEach((m,ni)=>{ const pan= spread? (notes.length>1? (ni/(notes.length-1)*2-1)*spread : 0) : null; const f=440*Math.pow(2,(m-69)/12)*labRate, f1=f*Math.pow(2,bend/12), g=ctx.createGain(), lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=1.2;
       lp.frequency.setValueAtTime(160,t); lp.frequency.exponentialRampToValueAtTime(open,t+attack+0.15); lp.frequency.exponentialRampToValueAtTime(open*0.45,t+dur);
       for(const d of [-14,-5,5,14]){ const o=ctx.createOscillator(); o.type='sawtooth'; o.detune.value=d; o.frequency.setValueAtTime(f,t); if(bend) o.frequency.exponentialRampToValueAtTime(f1,t+dur); o.connect(lp); o.start(t); o.stop(t+dur+rel+0.1); }
       g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.setValueAtTime(gain,t+dur*0.7); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+rel);
-      lp.connect(g); route(g,{drive,verb}); } }
+      lp.connect(g); route(g,{drive,verb,pan}); }); }
+  // v104: a choir "aah": detuned saws through two formant band-passes (720 and 1150 Hz) and a gentle top cut, slow swell,
+  // each note placed across the stereo field
+  function choirS(notes, dur, {gain=0.03, delay=0, attack=0.9, rel=2.5, verb=0.9}={}){ if(!ctx) return; const t=now()+delay;
+    notes.forEach((m,ni)=>{ const f=440*Math.pow(2,(m-69)/12)*labRate, g=ctx.createGain(), f1=ctx.createBiquadFilter(), f2=ctx.createBiquadFilter(), lp=ctx.createBiquadFilter();
+      f1.type='bandpass'; f1.frequency.value=720; f1.Q.value=2.5; f2.type='bandpass'; f2.frequency.value=1150; f2.Q.value=3; lp.type='lowpass'; lp.frequency.value=2600;
+      for(const d of [-12,0,11]){ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f; o.detune.value=d; o.connect(f1); o.connect(f2); o.start(t); o.stop(t+dur+rel+0.1); }
+      f1.connect(lp); f2.connect(lp); lp.connect(g); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.setValueAtTime(gain,t+dur); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+rel);
+      route(g,{verb,pan:notes.length>1? (ni/(notes.length-1)*2-1)*0.7 : 0}); }); }
+  // v104: play fn's voices through one trim stage (centred), so a whole sting can be levelled at once
+  function trimmed(gain, fn){ if(!ctx || !fx) return; const g=ctx.createGain(); g.gain.value=gain; g.connect(fx.in); const keep=posNode, kt=trimK; posNode=g; trimK=gain; try{ fn(); } finally{ posNode=keep; trimK=kt; } }   // the voices' own sends too
+  // v104: one timpani stroke: a tuned, slightly falling body, a skin noise and a soft mallet click
+  function timp(delay, {gain=0.2, f=73.4}={}){ tone(0.9,{type:'sine',f0:f*1.04,f1:f,gain,attack:0.004,delay,verb:0.5}); tone(0.5,{type:'sine',f0:f*1.5,f1:f*1.47,gain:gain*0.35,attack:0.004,delay,verb:0.4});
+    noise(0.12,{type:'bandpass',f0:420,f1:200,q:0.9,gain:gain*0.7,attack:0.002,delay}); noise(0.01,{type:'highpass',f0:2500,f1:1500,gain:gain*0.4,attack:0.001,delay}); }
+  // v104: a roll: strokes that speed up and swell over `len` seconds
+  function timpRoll(len, {delay=0, from=0.04, to=0.28, f=73.4}={}){ let t=0, i=0; while(t<len){ const k=t/len; timp(delay+t,{gain:from+(to-from)*k*k, f}); t+= 0.14-0.1*k; i++; } }
+  // v104: a solo low string line: one sustained note after another, each swelling in and gliding into the next
+  function line(notes, step, {gain=0.05, delay=0, verb=0.8}={}){ notes.forEach((m,i)=>brassy([m], step*1.05, {gain, open:900, attack:step*0.45, rel:step*0.8, delay:delay+i*step, verb, drive:0.2})); }
   // v93: one concussive boom: a sharp transient, a driven low noise burst and a sub drop
   function concuss(delay, {gain=0.3, lo=70, len=0.5, verb=0.4}={}){
     noise(0.03,{type:'highpass',f0:2500,f1:900,gain:gain*0.5,attack:0.001,delay,drive:0.5});
@@ -299,26 +317,33 @@ const Sound = (() => {
     get drumLevel(){ return drumLv; },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
     turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{dry:true,type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
-    // v103 (Jon: the v63 stings were lame): stings in the score's language. Victory: "DUN ... DUN-DUN" ensemble hits under a
-    // braam on D, a noise swell rushing in, then one huge unison hit landing on D major (the score is in D minor, so the
-    // major chord is the win) with brass, a high shimmer and a long room. Defeat: two slow distant hits, a low braam
-    // sliding down and closing, a dark chord with the flat two, the rumble, a last heavy hit and a fading heartbeat.
-    win(){ duck(0.15,5); const L=1.0;
-      [[0,0.42],[0.42,0.32],[0.62,0.36]].forEach(([d,g])=>{ concuss(d,{gain:g,lo:58,len:0.8,verb:0.6}); noise(0.12,{type:'bandpass',f0:300,f1:150,q:0.8,gain:g*0.8,attack:0.002,delay:d}); });
-      brassy([38,45,50],0.9,{gain:0.05,open:1500,attack:0.06,rel:0.5});
-      noise(L,{type:'bandpass',f0:500,f1:6000,q:1.5,gain:0.09,attack:L*0.9,verb:0.4});
-      concuss(L,{gain:0.5,lo:55,len:1.4,verb:0.8}); noise(0.15,{type:'bandpass',f0:280,f1:140,q:0.8,gain:0.4,attack:0.002,delay:L});
-      brassy([50,54,57,62],3.4,{gain:0.045,open:2600,delay:L,attack:0.12,rel:2.2,verb:0.8});
-      brassy([38,45],3.2,{gain:0.06,open:900,delay:L,attack:0.1,rel:2.0,drive:0.6});
-      [74,78,81].forEach((m,i)=>tone(3.6,{type:'sine',f0:440*Math.pow(2,(m-69)/12),gain:0.018,attack:0.6,delay:L+0.15+i*0.08,verb:0.9}));
-      tone(2.6,{type:'sine',f0:73.4,f1:70,gain:0.2,attack:0.02,delay:L}); },
-    lose(){ duck(0.15,5);
-      concuss(0,{gain:0.34,lo:48,len:1.1,verb:0.85}); concuss(0.95,{gain:0.3,lo:44,len:1.2,verb:0.85});
-      brassy([38,45,50],2.6,{gain:0.05,open:1100,bend:-5,attack:0.15,rel:1.5,drive:0.5});
-      brassy([50,51,57],3.4,{gain:0.03,open:1400,delay:0.9,attack:0.6,rel:2.5,verb:0.85});   // D, E flat, A: the dread chord
-      sample('rumble',{gain:0.5,rate:0.75,vary:0,delay:0.3});
-      concuss(2.0,{gain:0.4,lo:42,len:1.6,verb:0.9}); tone(3,{type:'sine',f0:62,f1:48,gain:0.18,attack:0.02,delay:2.0});
-      [2.9,3.75,4.75].forEach((d,i)=>concuss(d,{gain:0.16-i*0.04,lo:52,len:0.5,verb:0.7})); },
+    // v104 (Jon: more cinematic): longer arcs, orchestral layers, wide stereo. Victory (about 7 s): an accelerating timpani
+    // roll into a huge hit on D major with choir, strings and brass; a rising brass call (D-A-D) answers; the chord blooms
+    // wider and higher on a second swell; a long room. Defeat (about 7 s): distant drums slowing like a failing heartbeat,
+    // a lone low string line falling D-C-B flat-A, a minor choir rising under it, the dread chord, one last low impact and
+    // a long dark tail thinning to nothing. (v103's first rebuild: shorter, without choir, timpani or the call.)
+    win(){ duck(0.12,7); trimmed(STING_TRIM, ()=>{ const H=1.5;
+      timpRoll(H,{from:0.03,to:0.3}); noise(H,{type:'bandpass',f0:400,f1:6500,q:1.4,gain:0.08,attack:H*0.92,verb:0.5});
+      brassy([38,45],H,{gain:0.03,open:700,attack:H*0.9,rel:0.3,drive:0.5});
+      concuss(H,{gain:0.5,lo:55,len:1.5,verb:0.85}); timp(H,{gain:0.4}); noise(0.16,{type:'bandpass',f0:280,f1:140,q:0.8,gain:0.38,attack:0.002,delay:H});
+      brassy([50,54,57,62],2.4,{gain:0.04,open:2600,delay:H,attack:0.1,rel:1.4,verb:0.8,spread:0.6});
+      brassy([38,45,50],5.2,{gain:0.05,open:900,delay:H,attack:0.1,rel:2.5,drive:0.6});
+      choirS([62,66,69,74],4.6,{gain:0.026,delay:H+0.05,attack:0.7,rel:2.8});
+      brassy([62],0.42,{gain:0.05,open:2400,delay:H+1.15,attack:0.04,rel:0.25,verb:0.7}); brassy([69],0.42,{gain:0.05,open:2600,delay:H+1.6,attack:0.04,rel:0.25,verb:0.7});
+      brassy([74],2.6,{gain:0.055,open:3000,delay:H+2.05,attack:0.05,rel:2.2,verb:0.85});
+      concuss(H+2.05,{gain:0.3,lo:60,len:1.2,verb:0.9}); timp(H+2.05,{gain:0.3});
+      brassy([57,62,66,69,74],3.4,{gain:0.03,open:3200,delay:H+2.05,attack:0.4,rel:2.8,verb:0.9,spread:0.8});
+      [81,86,90].forEach((m,i)=>tone(4.2,{type:'sine',f0:440*Math.pow(2,(m-69)/12),gain:0.014,attack:0.9,delay:H+2.1+i*0.1,verb:0.95,pan:(i-1)*0.6}));
+      tone(4,{type:'sine',f0:73.4,f1:71,gain:0.18,attack:0.02,delay:H}); }); },
+    lose(){ duck(0.12,7); trimmed(STING_TRIM, ()=>{
+      [[0,0.32],[1.0,0.28],[2.15,0.24],[3.5,0.2]].forEach(([d,g])=>{ concuss(d,{gain:g,lo:46,len:1.0,verb:0.9}); timp(d,{gain:g*0.6,f:65.4}); });
+      line([62,60,58,57],1.25,{gain:0.05,delay:0.3});
+      choirS([50,53,57],4.8,{gain:0.024,delay:0.8,attack:2.2,rel:3.2});
+      brassy([38,45],3.2,{gain:0.04,open:900,bend:-5,delay:0.2,attack:0.6,rel:2,drive:0.5});
+      brassy([50,51,57],3.6,{gain:0.024,open:1300,delay:2.2,attack:1.2,rel:3,verb:0.9,spread:0.5});   // D, E flat, A: the dread chord
+      sample('rumble',{gain:0.45,rate:0.7,vary:0,delay:0.4});
+      concuss(4.6,{gain:0.42,lo:40,len:2.0,verb:0.95}); timp(4.6,{gain:0.25,f:55}); tone(3.4,{type:'sine',f0:58,f1:46,gain:0.16,attack:0.02,delay:4.6});
+      noise(3.2,{type:'lowpass',f0:500,f1:80,gain:0.06,attack:0.8,delay:4.8,verb:0.8}); }); },
   };
   // v94: the drum voices (from js/taiko-battle-drums.js); wet is each one's share of the score's hall reverb
   // v97 (Jon: hit harder, more Battlestar): each kind is played as an ensemble (players, a few ms apart and slightly detuned,
