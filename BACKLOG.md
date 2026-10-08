@@ -534,7 +534,7 @@ drawn at 22% opacity (board.js).
 - **B2. Brightness slider in Settings** (tone-mapping exposure), remembered per browser. *Chosen.*
 - **B3. Lift ships' shadow side:** stronger fill light plus a soft rim light outlining hulls against space. *Chosen.*
 - **B4.** Slightly lighter player livery: mid grey instead of charcoal.
-- **B5.** More visible board: brighter hex grid, a faint glow on the board plane under the fleets.
+- ~~**B5.**~~ **Done in v105:** more visible board: brighter hex grid, a faint glow on the board plane under the fleets.
 - **B6.** Brighter backdrops per location: nebula glow, planets or sun more present (the Shattered Reach has none).
 
 **Playability and ease of use**

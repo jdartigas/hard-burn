@@ -11,7 +11,8 @@ renderer.setSize(innerWidth, innerHeight, false);
 // v59 (Jon): the scene read too dark. Every brightness lever lives here: star brightness and size, the faint filler
 // stars and the Milky Way on the real-sky locations, the second (fill) light and ambient on every location, and a rim
 // light opposite the sun that outlines hulls against space. EXPOSURE is the base the Brightness setting scales.
-const LOOK = { starGain:2.6, starSize:1.25, faintStars:9000, mwGain:2.2, fillGain:1.6, ambientGain:1.35, rimColor:0xb6c9e2, rim:2.0 };
+const LOOK = { starGain:2.6, starSize:1.25, faintStars:9000, mwGain:2.2, fillGain:1.6, ambientGain:1.35, rimColor:0xb6c9e2, rim:2.0,
+  gridOpacity:0.34, gridLift:1.25, fleetGlow:0.17, fleetGlowSize:2.2 };   // v105 (B5): a more visible board; the glow under each fleet
 const EXPOSURE = 1.4;   // was 1.3 before v59
 let brightness = clamp(+store.get('bright', 1) || 1, 0.5, 2);   // Settings, 50% to 200%
 renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = EXPOSURE*brightness;

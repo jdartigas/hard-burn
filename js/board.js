@@ -22,12 +22,24 @@ const cellAt = (q,r) => board.cells.get(key(q,r));
       const k1=`${ax.toFixed(2)},${az.toFixed(2)}`, k2=`${bx.toFixed(2)},${bz.toFixed(2)}`; const k=k1<k2?k1+'|'+k2:k2+'|'+k1;
       if(seen.has(k)) continue; seen.add(k);
       verts.push(ax,0,az,bx,0,bz);
-      for(const [x,z] of [[ax,az],[bx,bz]]){ const d=Math.sqrt(x*x+z*z*1.6)/58; const f=clamp(1.1-d,0.08,1); cols.push(toLinear(0.38*f),toLinear(0.5*f),toLinear(0.6*f)); }
+      for(const [x,z] of [[ax,az],[bx,bz]]){ const d=Math.sqrt(x*x+z*z*1.6)/58; const f=clamp(1.1-d,0.08,1)*LOOK.gridLift; cols.push(toLinear(0.38*f),toLinear(0.5*f),toLinear(0.6*f)); }
     } }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3)); g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
-  const lines=new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:0.22, depthWrite:false}));
+  const lines=new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:LOOK.gridOpacity, depthWrite:false}));   // v105: was 0.22
   lines.position.y=0.01; board.group.add(lines);
 })();
+
+// v105 (B5): a faint glow on the board under every ship, in its side's colour (blue yours, red theirs), sized to the hull,
+// so the fleets read at a glance from any zoom. One instanced mesh of flat glow quads, so one draw call; updateFleetGlow
+// rewrites the matrices each frame without allocating.
+const fleetGlow = (()=>{ const g=new THREE.PlaneGeometry(1,1); g.rotateX(-Math.PI/2);
+  const m=new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({map:glowTex, transparent:true, opacity:LOOK.fleetGlow, blending:THREE.AdditiveBlending, depthWrite:false}), 2*MAX_FLEET);
+  m.count=0; m.frustumCulled=false; m.renderOrder=-1; m.userData.noAO=true; scene.add(m); return m; })();
+const FG_M=new THREE.Matrix4(), FG_C={player:new THREE.Color(0x6fd0ff), enemy:new THREE.Color(0xff5d4d)};
+function updateFleetGlow(){ let n=0;
+  if(state.phase!=='menu') for(const s of state.ships){ if(!s.alive || n>=2*MAX_FLEET) continue; const sc=s.len*LOOK.fleetGlowSize, p=s.group.position;
+    FG_M.makeScale(sc,1,sc).setPosition(p.x,0.02,p.z); fleetGlow.setMatrixAt(n,FG_M); fleetGlow.setColorAt(n,FG_C[s.side]); n++; }
+  fleetGlow.count=n; fleetGlow.instanceMatrix.needsUpdate=true; if(fleetGlow.instanceColor) fleetGlow.instanceColor.needsUpdate=true; }
 
 // highlight tiles
 const tileGeo = (() => { const s=new THREE.Shape(); hexCorners(HEX*0.9).forEach(([x,y],i)=> i?s.lineTo(x,y):s.moveTo(x,y)); s.closePath(); const g=new THREE.ShapeGeometry(s); g.rotateX(Math.PI/2); return g; })();
