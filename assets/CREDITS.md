@@ -16,6 +16,7 @@ are where and what they really are.
   map "lroc_color_poles_1k". https://svs.gsfc.nasa.gov/4720 . Public domain (NASA).
 - **Mars** (`assets/sol/mars.jpg`): Viking MDIM 2.1 colour mosaic, USGS Astrogeology / NASA, via Wikimedia Commons
   ("Mars Viking MDIM21 ClrMosaic 1km.jpg"), resized to 2048 x 1024. Public domain.
+- **Mars as shown in the game** (`assets/sol/mars-wikiimages.jpg`, v110): Image by <a href="https://pixabay.com/users/wikiimages-1897/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=11012">WikiImages</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=11012">Pixabay</a> (image 11012), Pixabay Content License (free to use and modify; attribution given at Jon's request). The original is a disc view; it was reprojected onto the hemisphere the game turns toward the battle (longitude -70), with the far side filled from the same image, 2048 x 1024. The source file is kept locally in `reference/` and is not in the repo. `assets/sol/mars.jpg` (the Viking mosaic, below) is no longer used.
 - **Phobos** (`assets/sol/phobos.jpg`): Viking mosaic (DLR control), Planetary Data System / Phil Stooke, via Wikimedia
   Commons ("Phobos Viking Mosaic DLRcontrol 7200.jpg"), resized to 1024 x 512. Public domain.
 - **Jupiter** (`assets/sol/jupiter.jpg`): Cassini cylindrical map, December 2000, NASA/JPL/Space Science Institute,

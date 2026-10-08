@@ -81,7 +81,7 @@ Developer notes live in [`CLAUDE.md`](CLAUDE.md), and planned work in [`BACKLOG.
 
 ## Credits
 
-Planet maps from NASA, USGS and JPL (public domain); stars from the HYG Database by David Nash (CC BY-SA 4.0); sound
+Planet maps from NASA, USGS and JPL (public domain); Mars image by [WikiImages](https://pixabay.com/users/wikiimages-1897/) from [Pixabay](https://pixabay.com/); stars from the HYG Database by David Nash (CC BY-SA 4.0); sound
 effects from Kenney's Sci-Fi Sounds and Impact Sounds packs (CC0). Full sources and licenses are in
 [`assets/CREDITS.md`](assets/CREDITS.md).
 
