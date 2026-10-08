@@ -597,6 +597,35 @@ Open questions: the setting's factions and history (Laniakea's Edge Fleet Yards 
 whether lore unlocks through play or is always there, and whether named hulls (the "Swift Remit" on the cruiser
 sheet) become part of the game.
 
+## Sound direction: reference set (Jon, after v91)
+
+Jon collected 26 Epidemic Sound effects in `sfx/` (untracked, local only) as the sound he wants. **They can't ship:** his
+Creator Subscription licenses them only for his own video and podcast productions, forbids apps that expose the audio
+"on a standalone basis", allows only cutting, looping and fading (no pitch changes or layering), and stops new versions
+once the subscription ends. So they are a **reference for the target character** only: never committed, never loaded by
+the game or the sound lab, never uploaded to any AI tool. They *can* be used in trailers, gameplay videos and devlogs on
+Jon's own channels, credited "Artist / Title / courtesy of Epidemic Sound".
+
+The target, per game sound (from the reference files' names and their measured length, brightness and low end; Claude
+can't listen, so Jon's ear decides):
+
+| Game sound | Reference | Character to aim for |
+|---|---|---|
+| Railgun shot | Sniper Rifle, Single Shots; Hand Cannon, Single Shots; Huge Blaster Shot, Cannon, Distortion | A sharp, heavy single report with real low end (about a third of its energy under 250 Hz) and a short tail: a crack, not a boom |
+| Railgun slug, PDC rounds, generic hull hit | Bullets, Impact, Hit, Metal 01 and 02; Ricochet, Metal, Tank / Harsh / Sharp | Metal being struck and torn: bright (about 3.3 kHz), almost no low end, some ringing; ricochets for glancing variations |
+| Pulse bolt | Laser, Boom x4; Laser, Boom, Small; Scifi Shot 04 | Short, punchy energy shots, several takes so a three-bolt volley never repeats |
+| Beam, and beam on a hull | Electric Discharge, Beam, Plasma, Hard; Blaster, Discharge, Energy, Beam 01 | Bright electrical discharge (about 4-4.5 kHz), crackling, sustained |
+| Heavy guns (Dreadnought, heavy beam) | Laser, Boom, Heavy; Laser, Deep Drone | The pulse and beam character with more weight and a droning body |
+| Torpedo hit, capital ship deaths | Futuristic Explosion 02, 03, 05; TNT, Heavy Blast | Big designed explosions, mostly low end (42-56% under 250 Hz), long rolling tails with secondary blasts |
+| Medium ship deaths | Futuristic Explosion 01 | The same, brighter and shorter |
+| A new "miss" or shield-deflect sound | Ricochet, Laser Projectiles Bouncing Off Surface (Bursts, Continuous); Ricochet, Classic, Fast, Crunchy | Energy bolts glancing off: bright zips with no low end |
+| Skipped | Single Shot, Laser, Long Tail; Build Tool, Shot, Blast 01 | Long soft tails that would blur in rapid fire |
+
+**How to get there:** synthesis (as in v91) where it can reach the character, and for the rest, game-licensed sources:
+the Sonniss GDC bundles (free, royalty-free for commercial games, editing allowed), CC0 files on Freesound, or a paid
+pack with an explicit game license. Claude shortlists, Jon approves before anything is downloaded, and every file is
+credited in `assets/CREDITS.md`. Or ask Epidemic Sound for a custom game license (epidemicsound.com/custom-license/).
+
 ## Improved sound effects (Jon, during v52)
 
 Today every sound is synthesized in `js/audio.js` (Web Audio oscillators and filtered noise), mixed through one
