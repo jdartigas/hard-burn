@@ -121,6 +121,14 @@ const Sound = (() => {
     // v96 fix: the gate's depth follows the buzz level (it was a fixed 0.5, so the buzz ran near full scale whatever its level)
     const gg=ctx.createGain(); gg.gain.value=gain*0.22*grit; gate.connect(gg); gg.connect(bz.gain); o.connect(bz); route(bz,{drive:0.6*grit}); [o,gate].forEach(x=>{ x.start(t); x.stop(t+T+0.05); });
     crackle(dur,{gain:gain*0.9*grit,f:3500,density:Math.max(15,120*grit),delay}); noise(T,{type:'highpass',f0:6000,f1:4000,gain:gain*0.25*grit,attack:0.02,delay}); }
+  // v103: a brass chord for the stings: per note four detuned saws through a low-pass that opens from dark to bright and
+  // settles, with an optional bend (the whole chord sliding by `bend` semitones), into the chain with drive and the room
+  function brassy(notes, dur, {gain=0.04, open=1800, delay=0, bend=0, attack=0.08, verb=0.7, drive=0.4, rel=1.2}={}){ if(!ctx) return; const t=now()+delay;
+    for(const m of notes){ const f=440*Math.pow(2,(m-69)/12)*labRate, f1=f*Math.pow(2,bend/12), g=ctx.createGain(), lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=1.2;
+      lp.frequency.setValueAtTime(160,t); lp.frequency.exponentialRampToValueAtTime(open,t+attack+0.15); lp.frequency.exponentialRampToValueAtTime(open*0.45,t+dur);
+      for(const d of [-14,-5,5,14]){ const o=ctx.createOscillator(); o.type='sawtooth'; o.detune.value=d; o.frequency.setValueAtTime(f,t); if(bend) o.frequency.exponentialRampToValueAtTime(f1,t+dur); o.connect(lp); o.start(t); o.stop(t+dur+rel+0.1); }
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.setValueAtTime(gain,t+dur*0.7); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+rel);
+      lp.connect(g); route(g,{drive,verb}); } }
   // v93: one concussive boom: a sharp transient, a driven low noise burst and a sub drop
   function concuss(delay, {gain=0.3, lo=70, len=0.5, verb=0.4}={}){
     noise(0.03,{type:'highpass',f0:2500,f1:900,gain:gain*0.5,attack:0.001,delay,drive:0.5});
@@ -291,11 +299,26 @@ const Sound = (() => {
     get drumLevel(){ return drumLv; },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
     turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{dry:true,type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
-    // v63 stings: a rising fanfare that resolves into a held chord; defeat falls to a low minor chord over a rumble
-    win(){ duck(0.2,3.5); [392,494,587,784].forEach((f,i)=>tone(0.9,{dry:true,type:'triangle',f0:f,gain:0.1,delay:i*0.14}));
-      [392,494,587,784,988].forEach(f=>{ tone(2.6,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.25,delay:0.6}); tone(2.6,{dry:true,type:'sine',f0:f*2,gain:0.02,attack:0.3,delay:0.6}); }); tone(2.8,{dry:true,type:'sine',f0:98,gain:0.12,attack:0.3,delay:0.6}); },
-    lose(){ duck(0.2,3.5); sample('rumble',{gain:0.6,rate:0.8,vary:0}); [330,277,247,196].forEach((f,i)=>tone(1.0,{dry:true,type:'sawtooth',f0:f,gain:0.04,delay:i*0.2}));
-      [196,233,294].forEach(f=>tone(3.0,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{dry:true,type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
+    // v103 (Jon: the v63 stings were lame): stings in the score's language. Victory: "DUN ... DUN-DUN" ensemble hits under a
+    // braam on D, a noise swell rushing in, then one huge unison hit landing on D major (the score is in D minor, so the
+    // major chord is the win) with brass, a high shimmer and a long room. Defeat: two slow distant hits, a low braam
+    // sliding down and closing, a dark chord with the flat two, the rumble, a last heavy hit and a fading heartbeat.
+    win(){ duck(0.15,5); const L=1.0;
+      [[0,0.42],[0.42,0.32],[0.62,0.36]].forEach(([d,g])=>{ concuss(d,{gain:g,lo:58,len:0.8,verb:0.6}); noise(0.12,{type:'bandpass',f0:300,f1:150,q:0.8,gain:g*0.8,attack:0.002,delay:d}); });
+      brassy([38,45,50],0.9,{gain:0.05,open:1500,attack:0.06,rel:0.5});
+      noise(L,{type:'bandpass',f0:500,f1:6000,q:1.5,gain:0.09,attack:L*0.9,verb:0.4});
+      concuss(L,{gain:0.5,lo:55,len:1.4,verb:0.8}); noise(0.15,{type:'bandpass',f0:280,f1:140,q:0.8,gain:0.4,attack:0.002,delay:L});
+      brassy([50,54,57,62],3.4,{gain:0.045,open:2600,delay:L,attack:0.12,rel:2.2,verb:0.8});
+      brassy([38,45],3.2,{gain:0.06,open:900,delay:L,attack:0.1,rel:2.0,drive:0.6});
+      [74,78,81].forEach((m,i)=>tone(3.6,{type:'sine',f0:440*Math.pow(2,(m-69)/12),gain:0.018,attack:0.6,delay:L+0.15+i*0.08,verb:0.9}));
+      tone(2.6,{type:'sine',f0:73.4,f1:70,gain:0.2,attack:0.02,delay:L}); },
+    lose(){ duck(0.15,5);
+      concuss(0,{gain:0.34,lo:48,len:1.1,verb:0.85}); concuss(0.95,{gain:0.3,lo:44,len:1.2,verb:0.85});
+      brassy([38,45,50],2.6,{gain:0.05,open:1100,bend:-5,attack:0.15,rel:1.5,drive:0.5});
+      brassy([50,51,57],3.4,{gain:0.03,open:1400,delay:0.9,attack:0.6,rel:2.5,verb:0.85});   // D, E flat, A: the dread chord
+      sample('rumble',{gain:0.5,rate:0.75,vary:0,delay:0.3});
+      concuss(2.0,{gain:0.4,lo:42,len:1.6,verb:0.9}); tone(3,{type:'sine',f0:62,f1:48,gain:0.18,attack:0.02,delay:2.0});
+      [2.9,3.75,4.75].forEach((d,i)=>concuss(d,{gain:0.16-i*0.04,lo:52,len:0.5,verb:0.7})); },
   };
   // v94: the drum voices (from js/taiko-battle-drums.js); wet is each one's share of the score's hall reverb
   // v97 (Jon: hit harder, more Battlestar): each kind is played as an ensemble (players, a few ms apart and slightly detuned,
