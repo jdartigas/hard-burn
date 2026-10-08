@@ -39,7 +39,7 @@ const Sound = (() => {
      events lift it: weapons fire to 2 for DRUMS.fireHold s, a kill to 3 for DRUMS.killHold s, and a side down to two ships
      or fewer holds 3. It rises at the next bar and falls one level a bar. Times are the audio clock, not timeScale, so
      the big-moment slow motion never drags the music. */
-  const DRUMS = { fireHold:4, killHold:6, gain:0.9, drive:2.2, makeup:1.15, verb:0.12, calm:0.7 };   // calm: the level-0 and level-1 drums' share   // v97: louder, through their own punchy bus
+  const DRUMS = { fireHold:4, killHold:6, gain:0.9, drive:2.2, makeup:1.0, verb:0.14, calm:0.7, lowShelf:6 };   // calm: the level-0 and level-1 drums' share   // v97: louder, through their own punchy bus
   let drumLv=0, drumRose=false, lastFire=-99, lastKill=-99, lastStand=false, drumPreview=null;
   /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
      two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
@@ -264,8 +264,8 @@ const Sound = (() => {
   // v97 (Jon: hit harder, more Battlestar): each kind is played as an ensemble (players, a few ms apart and slightly detuned,
   // so every stroke is thick), with a beater click, a body that drops in pitch, a second body partial and the skin noise
   const DRUM_KINDS = {
-    odaiko:{ f0:110, f1:38,  dur:1.4,  g:1.0,  p2:1.6, click:0.35, nHz:240,  nQ:0.7, nAmt:0.6,  nType:'bandpass', nDur:0.14, players:3 },
-    chu:   { f0:190, f1:78,  dur:0.55, g:0.85, p2:1.7, click:0.45, nHz:650,  nQ:0.8, nAmt:0.6,  nType:'bandpass', nDur:0.09, players:3 },
+    odaiko:{ f0:86,  f1:31,  dur:1.8,  g:1.0,  p2:1.6, click:0.12, nHz:180,  nQ:0.7, nAmt:0.55, nType:'bandpass', nDur:0.16, players:4, sub:0.8 },   // v98: lower, longer, a sub layer
+    chu:   { f0:150, f1:62,  dur:0.7,  g:0.85, p2:1.7, click:0.25, nHz:480,  nQ:0.8, nAmt:0.55, nType:'bandpass', nDur:0.1,  players:3, sub:0.3 },
     shime: { f0:380, f1:230, dur:0.18, g:0.5,  p2:2.1, click:0.6,  nHz:2600, nQ:0.9, nAmt:0.8,  nType:'bandpass', nDur:0.05, players:2 },
     ka:    { f0:950, f1:720, dur:0.05, g:0.3,  p2:0,   click:0.9,  nHz:1900, nQ:0.5, nAmt:1.0,  nType:'highpass', nDur:0.05, players:2 },
   };
@@ -284,7 +284,8 @@ const Sound = (() => {
     // bus with only a little of the hall (the score's voices sit in the hall; the drums sit in front of them)
     drumBus=ctx.createGain(); { const sh=ctx.createWaveShaper(), cv=new Float32Array(1024), kd=DRUMS.drive; for(let i=0;i<1024;i++){ const x=i/511.5-1; cv[i]=Math.tanh(kd*x)/Math.tanh(kd); } sh.curve=cv;
       const cp=ctx.createDynamicsCompressor(); cp.threshold.value=-20; cp.knee.value=4; cp.ratio.value=5; cp.attack.value=0.004; cp.release.value=0.12;
-      const mk=ctx.createGain(); mk.gain.value=DRUMS.makeup; drumBus.connect(sh); sh.connect(cp); cp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=DRUMS.verb; mk.connect(ws); ws.connect(revIn); }
+      const ls=ctx.createBiquadFilter(); ls.type='lowshelf'; ls.frequency.value=140; ls.gain.value=DRUMS.lowShelf; const hc=ctx.createBiquadFilter(); hc.type='lowpass'; hc.frequency.value=7000;   // v98: more low end, softer top
+      const mk=ctx.createGain(); mk.gain.value=DRUMS.makeup; drumBus.connect(ls); ls.connect(hc); hc.connect(sh); sh.connect(cp); cp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=DRUMS.verb; mk.connect(ws); ws.connect(revIn); }
     const mf=m=>440*Math.pow(2,(m-69)/12);
     const env=(g,t,a,peak,hold,rel)=>{ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.setValueAtTime(peak,t+a+hold); g.gain.exponentialRampToValueAtTime(0.0001,t+a+hold+rel); };
     const osc=(type,f,t,stop,detune=0)=>{ const o=ctx.createOscillator(); o.type=type; o.frequency.value=f; o.detune.value=detune; o.start(t); o.stop(stop); return o; };
@@ -319,6 +320,8 @@ const Sound = (() => {
         for(let pl=0; pl<k.players; pl++){ const tt=t+(pl? Math.random()*0.011 : 0), dt=1+(Math.random()-0.5)*0.05, v=v0*(pl? 0.8+Math.random()*0.2 : 1);
           const o=osc('sine',k.f0*dt,tt,tt+k.dur+0.05); o.frequency.setValueAtTime(k.f0*dt,tt); o.frequency.exponentialRampToValueAtTime(k.f1*dt,tt+Math.min(0.14,k.dur*0.22));
           const og=ctx.createGain(); og.gain.setValueAtTime(0.0001,tt); og.gain.exponentialRampToValueAtTime(v,tt+0.003); og.gain.exponentialRampToValueAtTime(0.0001,tt+k.dur); o.connect(og); og.connect(drumBus);
+          if(k.sub){ const o3=osc('sine',k.f1*1.35*dt,tt,tt+k.dur+0.1); o3.frequency.exponentialRampToValueAtTime(k.f1*0.9*dt,tt+k.dur*0.6); const g3=ctx.createGain();   // v98: the felt sub
+            g3.gain.setValueAtTime(0.0001,tt); g3.gain.exponentialRampToValueAtTime(v*k.sub,tt+0.012); g3.gain.exponentialRampToValueAtTime(0.0001,tt+k.dur*1.05); o3.connect(g3); g3.connect(drumBus); }
           if(k.p2){ const o2=osc('sine',k.f0*k.p2*dt,tt,tt+k.dur*0.5); o2.frequency.exponentialRampToValueAtTime(k.f1*k.p2*dt,tt+0.1); const g2=ctx.createGain();
             g2.gain.setValueAtTime(0.0001,tt); g2.gain.exponentialRampToValueAtTime(v*0.35,tt+0.003); g2.gain.exponentialRampToValueAtTime(0.0001,tt+k.dur*0.45); o2.connect(g2); g2.connect(drumBus); }
           const n=ctx.createBufferSource(); n.buffer=noiseBuf; const nf=ctx.createBiquadFilter(); nf.type=k.nType; nf.frequency.value=k.nHz; nf.Q.value=k.nQ;
@@ -340,21 +343,21 @@ const Sound = (() => {
     const BPM=72, STEP=60/BPM/4;
     let step=0, nextT=ctx.currentTime+0.25, barOffset=0;
     // v94: patterns from js/taiko-battle-drums.js, 16 steps a bar, 4-bar phrases; X accent, x hit, g ghost, . rest
-    // patterns: levels 0 and 1 from js/taiko-battle-drums.js, 16 steps a bar; v97 (Jon: more Battlestar): levels 2 and 3
-    // are double time, 32 steps a bar (twice the score's pulse), in 3-3-2 groupings with unison accents and a roll into
-    // the next phrase. X accent, x hit, g ghost, . rest; 4-bar phrases
+    // patterns: levels 0 and 1 from js/taiko-battle-drums.js, 16 steps a bar (a 32-step row plays at double time, v97);
+    // X accent, x hit, g ghost, . rest; 4-bar phrases
     const DRUM_P = {
       0:{ odaiko:['X...............','................','....X...........','................'] },   // tension, a slow heartbeat
       1:{ odaiko:['X.....x.X.......','X.....x.........','X.....x.X.......','X.....x...x.x...'],          // stalking
           chu:   ['................','....x.......x...','................','....x.......x.x.'] },
-      2:{ odaiko:['X..x..x.X..x..x.X..x..x.X..x.x.x','X..x..x.X..x..x.X..x..x.X.x..x.x','X..x..x.X..x..x.X..x..x.X..x.x.x','X..x..x.X..x..x.XxxXxxXxXxXxXXXX'],   // battle
-          chu:   ['...x..x....x..x....x..x....x..xx','...x..x....x..x....x..x..x..x..x','...x..x....x..x....x..x....x..xx','...x..x....x..x.................'],
-          shime: ['x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxgggggggggxxxxxxx'],
-          ka:    ['x.......x.......x.......x.......','x.......x.......x.......x.......','x.......x.......x.......x.......','x.......x.......................'] },
-      3:{ odaiko:['X.xX.xX.X.xX.xX.X.xX.xX.X.xXxXxX','X.xX.xX.X.xX.xX.X.xX.xX.XxXxXxXx','X.xX.xX.X.xX.xX.X.xX.xX.X.xXxXxX','XxXxXxXxXXXXXXXXX..X..X.XXXXXXXX'],   // full assault
-          chu:   ['.xx.xx.x.xx.xx.x.xx.xx.x.xx.xx.x','.xx.xx.x.xx.xx.x.xx.xx.x.xxxxxxx','.xx.xx.x.xx.xx.x.xx.xx.x.xx.xx.x','X..X..X.X..X..X.X..X..X.XXXXXXXX'],
-          shime: ['xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','ggggggggxxxxxxxxXXXXXXXXXXXXXXXX'],
-          ka:    ['x..x..x.x..x..x.x..x..x.x..x..x.','x..x..x.x..x..x.x..x..x.x..x..x.','x..x..x.x..x..x.x..x..x.x..x..x.','X..X..X.X..X..X.X..X..X.XXXXXXXX'] },
+      // v98 (Jon: more low end, less busy, like the New Caprica battle in Exodus): weight over speed. Big low hits with
+      // space, the chu doubling the odaiko on the unison accents, the shime and ka only in the fill at a phrase's end
+      2:{ odaiko:['X.....X...X.....','X.....X...X...x.','X.....X...X.....','X.....X...X.X.XX'],          // battle
+          chu:   ['X.....X...X.....','..........x.....','X.....X...X.....','..........X.X.XX'],
+          shime: ['................','................','................','............xxxx'] },
+      3:{ odaiko:['X..X..X.X...X.x.','X..X..X.X...X...','X..X..X.X...X.x.','X..X..X.XXxXXXXX'],          // full assault
+          chu:   ['X..X..X.....X...','X..X..X.....X.x.','X..X..X.....X...','X..X..X.XxXxXXXX'],
+          shime: ['................','................','................','........ggxxxxXX'],
+          ka:    ['................','................','................','X..X..X.........'] },
     };
     const DRUM_VEL = { X:1.0, x:0.72, g:0.32 };
     // the level for the coming bar: the mood's floor, raised by recent fire, a recent kill, a last stand or a lab preview;
