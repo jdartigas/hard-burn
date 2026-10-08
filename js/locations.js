@@ -91,7 +91,7 @@ function buildRealSky(R, root, sunSc, zodi=1){
     const faint=new THREE.Points(fg, mat); faint.frustumCulled=false; faint.userData.noAO=true; root.add(faint); }
   // the Milky Way: a glow along the galactic plane with the bulge toward Sagittarius and the dark rift through it
   const rt=new THREE.Matrix3().copy(R).transpose(), toGal=new THREE.Matrix3().multiplyMatrices(EQ_TO_GAL, rt);
-  const sky=new THREE.Mesh(new THREE.SphereGeometry(1800,48,24), new THREE.ShaderMaterial({ side:THREE.BackSide, depthWrite:false, uniforms:{uGal:{value:toGal}, uGain:{value:1}, uSun:{value:sunSc.clone()}, uEcl:{value:eclToEq(0,90).applyMatrix3(R).normalize()}, uZodi:{value:zodi}},
+  const sky=new THREE.Mesh(new THREE.SphereGeometry(1800,48,24), new THREE.ShaderMaterial({ side:THREE.BackSide, depthWrite:false, uniforms:{uGal:{value:toGal}, uGain:{value:LOOK.skyGain}, uSun:{value:sunSc.clone()}, uEcl:{value:eclToEq(0,90).applyMatrix3(R).normalize()}, uZodi:{value:zodi}},
     vertexShader:`varying vec3 vDir; void main(){ vDir=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader:`varying vec3 vDir; uniform mat3 uGal; uniform float uGain; uniform vec3 uSun; uniform vec3 uEcl; uniform float uZodi;
       float h(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
@@ -122,7 +122,7 @@ function buildSun(dir, dist, diamDeg, root){
   const disc=new THREE.Mesh(new THREE.CircleGeometry(r,48), new THREE.MeshBasicMaterial({color:new THREE.Color(1,0.97,0.92).multiplyScalar(4), depthWrite:false}));   // no brighter: a tiny, very hot source blooms into a square
   disc.position.copy(dir).multiplyScalar(dist); disc.lookAt(0,0,0); disc.userData.noAO=true; root.add(disc);
   const glare=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:0xfff1dc, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.8}));
-  glare.position.copy(disc.position); glare.scale.setScalar(Math.max(r*16, 22)); root.add(glare);   // the sun stays blinding even where its disc is tiny
+  glare.position.copy(disc.position); glare.scale.setScalar(Math.max(r*16, 22)*LOOK.glare); root.add(glare);   // the sun stays blinding even where its disc is tiny
   return disc;
 }
 
@@ -135,7 +135,7 @@ function bodyMaterial(map, clouds=null, nightGain=0.0, tint=[1,1,1]){
       void main(){ vec3 n=normalize(vN); float d=dot(n,uSun); float lit=smoothstep(-0.04,0.25,d)*max(d,0.0)*0.8+smoothstep(-0.04,0.1,d)*0.12;
         vec3 c=texture2D(uMap,vUv).rgb*uTint;
         if(uHasClouds>0.5){ float k=texture2D(uClouds,vUv).g; c=mix(c, vec3(1.0), k*0.92); }
-        gl_FragColor=vec4(c*(lit*2.6+uNight),1.0); }` });
+        gl_FragColor=vec4(c*(lit*${(2.6*LOOK.bodyGain).toFixed(2)}+uNight),1.0); }` });
 }
 const texLoader = new THREE.TextureLoader();
 const loadTex = (url, srgb=true) => { const t=texLoader.load(url); t.anisotropy=MAX_ANISO; if(srgb) t.colorSpace=THREE.SRGBColorSpace; return t; };

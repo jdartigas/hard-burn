@@ -389,7 +389,7 @@ changes. Everything lives in `js/environment.js` and draws a fixed number of ins
   nebula fills a third of the screen.
 - **v41, fix (Jon):** nobody could see the galaxy. At the usual tilt the top of the screen is only about 5° above the
   horizon and it sat at 7°, so it only showed zoomed in, as a speck. Now at 2° and about 11° across, with brighter arms.
-- **Open:** a ring for the gas giant, only if Jon wants it after seeing the rest.
+- ~~**Open:** a ring for the gas giant~~ **Done in v106.**
 
 ## Ship models made by Jon (after v58)
 
@@ -535,7 +535,7 @@ drawn at 22% opacity (board.js).
 - **B3. Lift ships' shadow side:** stronger fill light plus a soft rim light outlining hulls against space. *Chosen.*
 - **B4.** Slightly lighter player livery: mid grey instead of charcoal.
 - ~~**B5.**~~ **Done in v105:** more visible board: brighter hex grid, a faint glow on the board plane under the fleets.
-- **B6.** Brighter backdrops per location: nebula glow, planets or sun more present (the Shattered Reach has none).
+- ~~**B6.**~~ **Done in v106:** brighter backdrops per location: nebula glow, planets or sun more present.
 
 **Playability and ease of use**
 - **P1. Undo last move.** *Declined by Jon.*

@@ -12,7 +12,8 @@ renderer.setSize(innerWidth, innerHeight, false);
 // stars and the Milky Way on the real-sky locations, the second (fill) light and ambient on every location, and a rim
 // light opposite the sun that outlines hulls against space. EXPOSURE is the base the Brightness setting scales.
 const LOOK = { starGain:2.6, starSize:1.25, faintStars:9000, mwGain:2.2, fillGain:1.6, ambientGain:1.35, rimColor:0xb6c9e2, rim:2.0,
-  gridOpacity:0.34, gridLift:1.25, fleetGlow:0.17, fleetGlowSize:2.2 };   // v105 (B5): a more visible board; the glow under each fleet
+  gridOpacity:0.34, gridLift:1.25, fleetGlow:0.17, fleetGlowSize:2.2, ringGain:0.85,
+  nebulaGain:1.35, giantColor:0x8a8178, skyGain:1.3, bodyGain:1.25, glare:1.3 };   // v106 (B6): brighter backdrops in every location   // v105 (B5): a more visible board; the glow under each fleet
 const EXPOSURE = 1.4;   // was 1.3 before v59
 let brightness = clamp(+store.get('bright', 1) || 1, 0.5, 2);   // Settings, 50% to 200%
 renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = EXPOSURE*brightness;
@@ -122,7 +123,7 @@ function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); co
   // nebula backdrop
   const neb = new THREE.Mesh(new THREE.SphereGeometry(1800, 48, 24), new THREE.ShaderMaterial({
     side:THREE.BackSide, depthWrite:false,
-    uniforms:{ uSun:{value:sunDir}, uGain:{value:1}, uFill:{value:0} },
+    uniforms:{ uSun:{value:sunDir}, uGain:{value:LOOK.nebulaGain}, uFill:{value:0} },
     vertexShader:`varying vec3 vDir; void main(){ vDir=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader:`varying vec3 vDir; uniform vec3 uSun; uniform float uGain; uniform float uFill;
       float h(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
@@ -168,7 +169,7 @@ function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); co
       const r=Math.floor(120+70*b-30*c), gg=Math.floor(88+50*b-20*c), bb=Math.floor(62+30*b); g.fillStyle=`rgb(${r},${gg},${bb})`; g.fillRect(0,y,w,1); }
     for(let i=0;i<500;i++){ g.fillStyle=`rgba(${R()<.5?255:60},${R()<.5?220:40},${150},${R()*0.07})`; const y=R()*h; g.fillRect(0,y,w,R()*6); }
     g.fillStyle='rgba(170,80,50,.5)'; g.beginPath(); g.ellipse(640,300,46,22,0,0,Math.PI*2); g.fill(); });
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(140,64,32), new THREE.MeshStandardMaterial({map:ptex, color:0x6a6560, roughness:1, metalness:0}));
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(140,64,32), new THREE.MeshStandardMaterial({map:ptex, color:LOOK.giantColor, roughness:1, metalness:0}));   // v106: was 0x6a6560
   planet.position.set(620,-230,-1100); planet.rotation.z=0.35; reachSky.add(planet);
   const atm = new THREE.Mesh(new THREE.SphereGeometry(146,64,32), new THREE.ShaderMaterial({ transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.BackSide,
     uniforms:{uSun:{value:sunDir}},
@@ -176,6 +177,22 @@ function bakeEnvironment(es){ const pmrem=new THREE.PMREMGenerator(renderer); co
     fragmentShader:`varying vec3 vN; varying vec3 vW; uniform vec3 uSun; void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(max(1.0-abs(dot(vN,v)),0.0),3.0);   /* max(): interpolated normals can push |dot| past 1, and pow of a negative is NaN */ float l=clamp(dot(-vN,uSun)*0.5+0.6,0.0,1.0); gl_FragColor=vec4(pow(vec3(1.0,0.65,0.4)*f*l*0.9,vec3(2.2))*1.6,1.0); }`}));
   atm.position.copy(planet.position); reachSky.add(atm);
   planet.userData.spin = true; window.__planet = planet; planet.userData.noAO = true;
+  // v105: a ring for the gas giant. A flat annulus in the planet's tilted equator, its bands drawn in the shader from the
+  // radius (fine ringlets, a few gaps, a brighter inner belt); depth-tested against the
+  // planet, so it passes behind it and crosses in front of it. Not in the environment bake (too thin to matter there)
+  const ring = new THREE.Mesh(new THREE.RingGeometry(178, 300, 160, 1), new THREE.ShaderMaterial({ transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    uniforms:{uSun:{value:sunDir}, uIn:{value:178}, uOut:{value:300}, uGain:{value:LOOK.ringGain}},
+    vertexShader:`varying vec3 vP; varying vec3 vW; void main(){ vP=position; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader:`varying vec3 vP; varying vec3 vW; uniform vec3 uSun; uniform float uIn; uniform float uOut; uniform float uGain;
+      void main(){ float t=clamp((length(vP.xy)-uIn)/(uOut-uIn),0.0,1.0);
+        float bands=0.55+0.25*sin(t*180.0)+0.2*sin(t*67.0+1.3);                       // ringlets
+        float gaps=smoothstep(0.30,0.32,t)*(1.0-smoothstep(0.34,0.36,t))+smoothstep(0.71,0.72,t)*(1.0-smoothstep(0.735,0.75,t));
+        float belt=0.6+0.6*smoothstep(0.08,0.2,t)*(1.0-smoothstep(0.42,0.55,t));        // the bright inner belt
+        float edge=smoothstep(0.0,0.04,t)*(1.0-smoothstep(0.93,1.0,t));
+        float a=clamp(bands*belt*edge*(1.0-0.85*gaps),0.0,1.0)*0.55;
+        vec3 col=mix(vec3(0.62,0.52,0.40),vec3(0.80,0.72,0.58),bands);
+        gl_FragColor=vec4(col*col*uGain, a); }` }));   // squared: rough display-to-linear, as toLinear does elsewhere
+  ring.position.copy(planet.position); ring.rotation.set(Math.PI/2-0.32, 0, 0.35); ring.userData.noAO = true; reachSky.add(ring);
   // image-based lighting: bake the sky, sun and planet into a prefiltered environment map so metal reflects the scene
   const es=new THREE.Scene();
   const nebEnv=new THREE.Mesh(neb.geometry, neb.material.clone()); nebEnv.material.uniforms.uGain.value=5; nebEnv.material.uniforms.uFill.value=1; es.add(nebEnv);
