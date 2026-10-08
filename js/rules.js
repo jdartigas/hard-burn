@@ -169,11 +169,20 @@ function addShake(v){ if(!REDUCED) shake=Math.min(1.2, shake+v); }
 function shieldFlash(s, from){ s.shieldMesh.visible=true; const dir=V.copy(from).sub(s.group.position); dir.applyQuaternion(s.group.quaternion.clone().invert());
   dir.set(dir.x/s.shieldMesh.scale.x, dir.y/s.shieldMesh.scale.y, dir.z/s.shieldMesh.scale.z).normalize(); s.shMat.uniforms.uHit.value.copy(dir); s.shMat.uniforms.uFlash.value=1.2; }
 const C_SPARK=new THREE.Color(1,.62,.25), C_FIRE=new THREE.Color(1,.42,.12), C_WHITE=new THREE.Color(1,.95,.85), C_CYAN=new THREE.Color(.4,.8,1), C_SMOKE=new THREE.Color(.12,.1,.09);
+// v102: play a sound from a place in the world: pan from where it lands on screen (85% at most), distance from the camera,
+// and whether it is off screen; a point behind the camera pans to its side. Sound.at does the rest (audio.js)
+const sndRight=new THREE.Vector3();
+function sndAt(pos, fn){ if(!pos || !Sound.positional) return fn();
+  const sp=toScreen(pos); let pan, off;
+  if(sp){ pan=sp.x/innerWidth*2-1; off= sp.x<0 || sp.x>innerWidth || sp.y<0 || sp.y>innerHeight; }
+  else { sndRight.setFromMatrixColumn(camera.matrixWorld,0); pan=Math.sign(V.copy(pos).sub(camera.position).dot(sndRight)); off=true; }
+  // distance relative to this screen's starting view (fitRadius: about 70 on desktop, up to 200 on a portrait phone)
+  Sound.at({pan:clamp(pan,-1,1)*0.85, dist:camera.position.distanceTo(pos)*70/fitRadius(), off}, fn); }
 function impactFx(tgt, res, from, heavy=1, kind=null){   // kind: the weapon's, so the impact sounds like what hit
   const p=hitPoint(tgt);
-  if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); Sound.shield(kind); }
+  if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); sndAt(p, ()=>Sound.shield(kind)); }
   if(res.h>0.5){ Particles.burst(p,24*heavy,{speed:7,color:C_SPARK,size:0.35,life:0.7}); Particles.burst(p,8*heavy,{speed:1.5,color:C_FIRE,size:1.1*heavy,life:0.5,grow:1});
-    Particles.burst(p,6,{speed:0.8,color:C_SMOKE,size:1.2,life:1.4,drag:0.5,grow:1}); flash(p,0xff9944,4*heavy,0.35); Sound.hit(kind); addShake(0.12*heavy); }
+    Particles.burst(p,6,{speed:0.8,color:C_SMOKE,size:1.2,life:1.4,drag:0.5,grow:1}); flash(p,0xff9944,4*heavy,0.35); sndAt(p, ()=>Sound.hit(kind)); addShake(0.12*heavy); }
 }
 function floatText(s, text, cls, dy=0){
   const el=document.createElement('div'); el.className='ftxt '+cls; el.textContent=text; $('#labels').appendChild(el);
@@ -187,7 +196,7 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
   return new Promise(async res=>{
     const a=mp(0).p, hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
     if(!hit){ const dir=b.clone().sub(a).normalize(); const perp=new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(rand(1.2,2.2)*(Math.random()<.5?-1:1)); b=b.add(perp).addScaledVector(dir,60); }
-    Sound.rail();
+    sndAt(a, ()=>Sound.rail());
     // charge, as long as the sound's charge-up (RAIL_CHARGE): energy drawn into the muzzle, faster as it builds
     for(let s=0;s<5;s++){ for(let i=0;i<6+s*3;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.55); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
       await wait(RAIL_CHARGE/5); }
@@ -207,7 +216,7 @@ function fxBeam(att, tgt, outcomes, onEvent, mp, weight=0.7){
     if(!hit){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,0.2,dir.x).multiplyScalar(rand(1.3,2)*(Math.random()<.5?-1:1))).addScaledVector(dir,25); }
     const col= att.side==='player'?0xffb44a:0xff5a3a; const colC=new THREE.Color(col);
     const core=beamMesh(a,b,0.04,0xffffff,0.95), glow=beamMesh(a,b,0.16,col,0.7);
-    Sound.beam(0.9, weight); flash(a,col,3,0.9);
+    sndAt(a, ()=>Sound.beam(0.9, weight)); flash(a,col,3,0.9);
     let fired=false;
     addFx({t:0,dur:0.9,update(dt){ this.t+=dt; const k=this.t/this.dur; const w=Math.sin(Math.min(1,k*5)*Math.PI/2)*(k>0.8?(1-k)/0.2:1);
         core.scale.x=core.scale.z=w*(0.9+Math.random()*0.3); glow.scale.x=glow.scale.z=w*(0.8+Math.random()*0.5);
@@ -225,7 +234,7 @@ function fxPulse(att, tgt, outcomes, onEvent, mp){
         const a=mp(i).p; let b=hitPoint(tgt); if(o!=='hit'){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,rand(-.3,.3),dir.x).multiplyScalar(rand(1,1.8)*(Math.random()<.5?-1:1))); }
         const dir=b.clone().sub(a); const dist=dir.length(); dir.normalize(); const end= o==='hit'? b : b.clone().addScaledVector(dir,14);
         const bolt=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshBasicMaterial({color:col.clone().multiplyScalar(2)})); bolt.scale.set(1,1,5);
-        bolt.position.copy(a); bolt.lookAt(b); scene.add(bolt); Sound.pulse(); Particles.burst(a,5,{speed:3,color:col,size:0.25,life:0.2});
+        bolt.position.copy(a); bolt.lookAt(b); scene.add(bolt); sndAt(a, ()=>Sound.pulse()); Particles.burst(a,5,{speed:3,color:col,size:0.25,life:0.2});
         const total=a.distanceTo(end), speed=34;
         addFx({d:0,update(dt){ this.d+=speed*dt; const k=Math.min(1,this.d/total); bolt.position.copy(a).lerp(end,k);
             Particles.emit(bolt.position,new THREE.Vector3(),col,0.22,0.15,0);
@@ -241,7 +250,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
     let left=outcomes.length;
     const fighter= kind==='fighter';
     const trailCol= fighter? new THREE.Color(att.side==='player'?0x9fd8ff:0xffa070) : new THREE.Color(1,.75,.45);
-    if(fighter) Sound.fighter();
+    if(fighter) sndAt(att.group.position, ()=>Sound.fighter());
     outcomes.forEach((o,i)=>{
       after(i*(fighter?0.1:0.18), ()=>{
         const launch=mp(i), a=launch.p;
@@ -251,7 +260,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
         let end=b.clone(); if(o==='miss') end.add(new THREE.Vector3(-dir.z,rand(-1,1),dir.x).multiplyScalar(3*(Math.random()<.5?-1:1))).addScaledVector(dir,6);
         const geo= fighter? new THREE.ConeGeometry(0.12,0.35,3) : new THREE.ConeGeometry(big?0.09:0.06, big?0.5:0.34, 6); geo.rotateX(Math.PI/2);
         const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x9aa0a6, metalness:0.6, roughness:0.4, emissive:0x222222}));
-        scene.add(m); if(!fighter) Sound.missile();
+        scene.add(m); if(!fighter) sndAt(a, ()=>Sound.missile());
         const dur=(dist/(fighter?13:16))+0.45; const cutK = o==='int'? rand(0.7,0.85) : 1.0;
         // leave along the launcher's own axis (up out of a cell, out of a tube or bay), then bend onto the attack path
         const curve=new THREE.CubicBezierCurve3(a, a.clone().addScaledVector(launch.d, clamp(dist*0.18,0.8,3)), ctrl, end);
@@ -260,10 +269,10 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
             const p=curve.getPoint(Math.min(e,1)); const p2=curve.getPoint(Math.min(e+0.02,1)); m.position.copy(p); m.lookAt(p2);
             Particles.emit(p, new THREE.Vector3(rand(-.2,.2),rand(-.2,.2),rand(-.2,.2)), trailCol, big?0.45:0.3, fighter?0.25:0.5, 1, big?0.6:0.3);
             if(!fighter && Math.random()<0.4) Particles.emit(p, new THREE.Vector3(), C_SMOKE, 0.5, 1.2, 0.5, 0.8);
-            if(o==='int' && !pdcStarted && e>cutK-0.22){ pdcStarted=true; Sound.pdc(); }
+            if(o==='int' && !pdcStarted && e>cutK-0.22){ pdcStarted=true; sndAt(p, ()=>Sound.pdc()); }
             if(o==='int' && pdcStarted && e<cutK){ const src=pdcPoint(screen||tgt, p);   // the turret nearest the warhead: a screening escort's own, or the target's
               const v=p.clone().sub(src); const dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src,v,new THREE.Color(1,.85,.4),0.12,dd/40,0); }
-            if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); Sound.intercept(); onEvent(i,o); return false; }
+            if(o==='int' && e>=cutK){ Particles.burst(p,18,{speed:4,color:C_FIRE,size:0.35,life:0.4}); flash(p,0xffaa66,2,0.2); sndAt(p, ()=>Sound.intercept()); onEvent(i,o); return false; }
             if(e>=1){ if(o==='hit') onEvent(i,o); else onEvent(i,o); return false; }
             return true; }, dispose(){ disposeMesh(m); if(--left===0) res(); }});
       });
@@ -272,7 +281,7 @@ function fxGuided(att, tgt, outcomes, onEvent, kind, big, screen=null, mp=null){
 }
 // v74: PDC guns: a stream of tracers from the turrets nearest the target, round by round
 function fxPdc(att, tgt, outcomes, onEvent){
-  return new Promise(async res=>{ Sound.pdc(); const col=new THREE.Color(1,.85,.4);
+  return new Promise(async res=>{ sndAt(att.group.position, ()=>Sound.pdc()); const col=new THREE.Color(1,.85,.4);
     for(let i=0;i<outcomes.length;i++){ const src=pdcPoint(att, tgt.group.position), to=hitPoint(tgt);
       if(outcomes[i]!=='hit') to.add(new THREE.Vector3(rand(-1.2,1.2),rand(-.3,.6),rand(-1.2,1.2)));
       const v=to.clone().sub(src), dd=v.length(); v.normalize().multiplyScalar(40); Particles.emit(src, v, col, 0.14, dd/40, 0);

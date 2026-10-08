@@ -130,7 +130,7 @@ function rockDamaged(rt){ const k=0.62+0.38*Math.max(0,rt.hull/rt.hullMax); rt.m
 function destroyRock(rt, by){
   rt.alive=false; const c=rt.cell, p=rt.group.position.clone();
   log(`${by?by.name+' shatters':'Shattered'} an asteroid. The lane is open.`, 'k', 'rock');
-  Sound.boom(1.1); addShake(0.55); flash(p,0xffd6a8,10,0.9);
+  sndAt(p, ()=>Sound.boom(1.1)); addShake(0.55); flash(p,0xffd6a8,10,0.9);
   Particles.burst(p,140,{speed:6,color:new THREE.Color(.42,.36,.3),size:1.8,life:2.6,drag:1.1,grow:1.4});
   Particles.burst(p,90,{speed:11,color:C_SPARK,size:0.35,life:1.1,drag:1});
   Particles.burst(p,50,{speed:4,color:C_FIRE,size:1.2,life:0.7,drag:2,grow:1});

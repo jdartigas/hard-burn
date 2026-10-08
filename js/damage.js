@@ -80,7 +80,7 @@ function magazineHit(s, sev, blast){
   const lose=n=>{ for(let k=0;k<n;k++){ const w=s.weapons.filter(x=>x.ammo>0).sort((a,b)=>b.ammo-a.ammo)[0]; if(w) w.ammo--; } };
   lose(1);
   if(sev==='offline'){ lose(1); const dmg=Math.min(blast, s.hull-1); if(dmg>0){ s.hull-=dmg; s.st.taken+=dmg; floatText(s, Math.round(dmg), 'hu big', 0.5); }
-    if(!state.simulated && !window.__norender){ Particles.burst(hitPoint(s),30,{speed:6,color:new THREE.Color(1,.6,.2),size:0.5,life:0.6}); Sound.burst(); addShake(0.15); } }
+    if(!state.simulated && !window.__norender){ Particles.burst(hitPoint(s),30,{speed:6,color:new THREE.Color(1,.6,.2),size:0.5,life:0.6}); sndAt(hitPoint(s), ()=>Sound.burst()); addShake(0.15); } }
 }
 // the start of a side's turn: offline systems count down, damaged ones may be repaired by the crew
 function tickSystems(s){

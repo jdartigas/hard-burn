@@ -50,6 +50,15 @@ const Sound = (() => {
      sound lab tries other values without touching the game. */
   const FX = { drive:0.6, verb:0.3, spread:0.65 };   // v93: Jon's settings from the sound lab   // spread: each voice panned at random up to this far (0 to 1)
   let fx=null, shapeCurve=null, irBuf=null, spread=FX.spread;
+  /* v102: sound in space. Sound.at(where, fn) plays whatever fn makes from a place: where = {pan -1..1, dist (camera to the
+     point, world units), off (off screen)}, worked out by the game (sndAt in rules.js). Every voice fn starts goes through one
+     shared chain for that call: distance gain, an "air" low-pass that darkens far sounds, then the pan. The drive and reverb
+     sends are taken before it, so the room stays wide while the direct sound moves. Settings > Positional sound turns it
+     off (everything centred, for one speaker); hardburn.spatial. */
+  // near is about the camera's distance at the start of a battle (about 70 from the ships), so the normal view plays at
+  // nearly full level; only zooming out further (to 110 at most) darkens and quietens it
+  const SPACE = { near:55, far:120, farGain:0.55, offGain:0.7, cutNear:18000, cutFar:5000 };
+  let posNode=null, positional=store.get('spatial', true);
   function makeFx(dest, drive, verb){
     const inp=ctx.createGain(); inp.connect(dest);
     const dIn=ctx.createGain(), sh=ctx.createWaveShaper(), dOut=ctx.createGain(); sh.curve=shapeCurve; sh.oversample='2x'; dOut.gain.value=0.55;
@@ -68,7 +77,8 @@ const Sound = (() => {
   function route(g, {drive=0, verb=0, pan=null, dry=false}={}){
     if(dry){ g.connect(sfx); return; }   // v93: interface sounds skip the chain: no grit, no room, centred
     let p=pan; if(p===null && spread>0) p=(Math.random()*2-1)*spread;
-    if(p && ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(p,-1,1); g.connect(pn); pn.connect(fx.in); } else g.connect(fx.in);
+    if(posNode) g.connect(posNode);   // v102: placed by Sound.at
+    else if(p && ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(p,-1,1); g.connect(pn); pn.connect(fx.in); } else g.connect(fx.in);
     if(drive){ const d=ctx.createGain(); d.gain.value=drive; g.connect(d); d.connect(fx.dist); }
     if(verb){ const v=ctx.createGain(); v.gain.value=verb; g.connect(v); v.connect(fx.verb); } }
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
@@ -145,6 +155,13 @@ const Sound = (() => {
       const keep=fx; fx=makeFx(bus, drive, verb); labRate=rate; spread=width; try{ fn(); } finally{ fx=keep; labRate=1; spread=FX.spread; } },
     toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?fv():0, now(), 0.05); return on; },
     get musicLevel(){ return musicLevel; }, get fxLevel(){ return fxLevel; },
+    get positional(){ return positional; }, setPositional(v){ positional=!!v; store.set('spatial', positional); },
+    at(where, fn){ if(!ctx || !fx || !positional || !where) return fn();
+      const k=clamp((where.dist-SPACE.near)/(SPACE.far-SPACE.near),0,1), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+      g.gain.value=(1-k*(1-SPACE.farGain))*(where.off? SPACE.offGain : 1);
+      lp.type='lowpass'; lp.frequency.value=SPACE.cutNear*Math.pow(SPACE.cutFar/SPACE.cutNear,k); g.connect(lp);
+      if(ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(where.pan,-1,1); lp.connect(pn); pn.connect(fx.in); } else lp.connect(fx.in);
+      const keep=posNode; posNode=g; try{ fn(); } finally{ posNode=keep; } },
     setMusicLevel(v){ musicLevel=clamp(v,0,1); store.set('musicVol',musicLevel); if(music && musicOn) music.gain.setTargetAtTime(mv(), now(), 0.08); },
     setFxLevel(v){ fxLevel=clamp(v,0,1); store.set('fxVol',fxLevel); if(sfx && on) sfx.gain.setTargetAtTime(fv(), now(), 0.05); },
     toggleMusic(){ musicOn=!musicOn; store.set('music',musicOn); if(music) music.gain.setTargetAtTime(musicOn?mv():0, now(), musicOn?0.8:0.15); return musicOn; },

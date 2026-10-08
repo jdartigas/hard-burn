@@ -200,11 +200,11 @@ async function explodeShip(s){
   const n=3+Math.round(L);
   for(let i=0;i<n;i++){ after(i*0.2+rand(0,.08), ()=>{ if(!s.group.visible) return; const q=p.clone().addScaledVector(f, rand(-.45,.45)*L).add(new THREE.Vector3(rand(-.2,.2),rand(0,.25),rand(-.2,.2)));
       Particles.burst(q,34,{speed:6,color:C_SPARK,size:0.4,life:0.6}); Particles.burst(q,10,{speed:2,color:C_FIRE,size:0.9,life:0.5,grow:1.2});
-      flash(q,0xff8844,4,0.3); Sound.burst(); addShake(0.12); s.body.position.set(rand(-.04,.04),rand(-.04,.04),rand(-.04,.04)); }); }
+      flash(q,0xff8844,4,0.3); sndAt(q, ()=>Sound.burst()); addShake(0.12); s.body.position.set(rand(-.04,.04),rand(-.04,.04),rand(-.04,.04)); }); }
   await wait(n*0.2+0.15);
   s.body.position.set(0,0,0);
   // main detonation
-  Sound.boom(L/2.2); Sound.drumHit('odaiko', 1.1); addShake(0.6+L*0.12);   // v94: and an odaiko on the music bus flash(p,0xffcc88,14,1.0);
+  sndAt(p, ()=>Sound.boom(L/2.2)); Sound.drumHit('odaiko', 1.1); addShake(0.6+L*0.12); flash(p,0xffcc88,14,1.0);   // v94: and an odaiko on the music bus (v102: the flash had been commented out by mistake)
   Particles.burst(p,170,{speed:9*L/2.5,color:C_WHITE,size:0.9,life:0.8,drag:2.5});
   Particles.burst(p,150,{speed:5*L/2.5,color:C_FIRE,size:1.6,life:1.4,drag:2,grow:1.5});
   Particles.burst(p,120,{speed:15,color:C_SPARK,size:0.3,life:1.8,drag:0.7});

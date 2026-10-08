@@ -80,6 +80,15 @@ const LAB_SOUNDS = [
     ['dr-3', 'Score at intensity 3: full assault', 'everything, plus the horn motif. 6 s after a kill, or a side down to two ships', ()=>Sound.drumPreview(3)],
     ['dr-off', 'End the preview', 'back to the level the game sets', ()=>Sound.drumPreview(null)],
   ]],
+  ['Spatial (v102): a railgun slug on a hull, from different places', [
+    ['sp-left', 'Left of the screen', 'the normal battle view', ()=>Sound.at({pan:-0.85, dist:50, off:false}, ()=>Sound.hit('rail'))],
+    ['sp-centre', 'Centre', '', ()=>Sound.at({pan:0, dist:50, off:false}, ()=>Sound.hit('rail'))],
+    ['sp-right', 'Right of the screen', '', ()=>Sound.at({pan:0.85, dist:50, off:false}, ()=>Sound.hit('rail'))],
+    ['sp-close', 'Close', 'camera right on top of it', ()=>Sound.at({pan:0.2, dist:10, off:false}, ()=>Sound.hit('rail'))],
+    ['sp-far', 'Far', 'zoomed right out', ()=>Sound.at({pan:-0.3, dist:120, off:false}, ()=>Sound.hit('rail'))],
+    ['sp-off', 'Off screen, right', 'out of view', ()=>Sound.at({pan:0.85, dist:60, off:true}, ()=>Sound.hit('rail'))],
+    ['sp-sweep', 'Left to right', 'a pulse volley walking across the screen', ()=>{ [-0.85,-0.3,0.3,0.85].forEach((p,i)=>at(i*0.18, ()=>Sound.at({pan:p, dist:50, off:false}, ()=>Sound.hit('pulse')))); }],
+  ]],
   ['Sequences, with the game\'s timing', [
     ['q-rail', 'Railgun on a hull', 'charge, shot, slug hits', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.hit('rail')); }],
     ['q-rail-sh', 'Railgun on shields', '', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.shield('rail')); }],

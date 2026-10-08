@@ -39,7 +39,7 @@ async function fireWeapon(att, wi, tgt){
       refreshTags(); updateHUD();
     } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++; if(!tgt.isRock) (screen||tgt).st.ints++;
       if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
-    else { misses++; if(!d.guided && !tgt.isRock) Sound.miss(d.kind);   // v93: a direct-fire shot glances away (throttled in audio.js)
+    else { misses++; if(!d.guided && !tgt.isRock) sndAt(tgt.group.position, ()=>Sound.miss(d.kind));   // v93: a direct-fire shot glances away (throttled in audio.js)
       if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
   };
   await playWeaponFx(d, att, tgt, outcomes, onEvent, screen, wi);
@@ -87,26 +87,26 @@ async function fireAll(att, tgt){
 async function useAbility(s, target=null){
   const a=s.ability; if(!abilityReady(s)) return false;
   const k=a.key; Sound.drumHit('chu', 0.9);   // v94: a drum hit on every ability
-  if(k==='burn'){ s.mp+=3; Sound.power(); s.engines.forEach(e=>e.boost=1.5); floatText(s,'+3 movement','heal'); }
+  if(k==='burn'){ s.mp+=3; sndAt(s.group.position, ()=>Sound.power()); s.engines.forEach(e=>e.boost=1.5); floatText(s,'+3 movement','heal'); }
   else if(k==='ecm'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.ecm=1; Particles.burst(o.group.position,30,{speed:3,color:C_CYAN,size:0.3,life:0.8}); }
-    Sound.power(); const ring=hexRing(0.5,0.7,COL.cyan,0.8); ring.position.copy(s.group.position).setY(0.1); scene.add(ring);
+    sndAt(s.group.position, ()=>Sound.power()); const ring=hexRing(0.5,0.7,COL.cyan,0.8); ring.position.copy(s.group.position).setY(0.1); scene.add(ring);
     addFx({t:0,update(dt){ this.t+=dt; const k=this.t/1; ring.scale.setScalar(1+k*HEX*2.6*1.6); ring.material.opacity=0.8*(1-k); return k<1; }, dispose(){ disposeMesh(ring); }}); }
-  else if(k==='overcharge'){ const add=Math.min(s.shieldMax-s.shield, s.shieldMax*0.6); s.shield+=add; shieldFlash(s, s.group.position.clone().add(new THREE.Vector3(0,3,0))); s.shMat.uniforms.uFlash.value=2; Sound.shield(); Sound.power(); floatText(s,`+${Math.round(add)} shields`,'sh'); }
-  else if(k==='pdsurge'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.pdsurge=1; Particles.burst(o.group.position,26,{speed:3,color:new THREE.Color(1,.85,.4),size:0.28,life:0.7}); } Sound.pdc(); Sound.power(); floatText(s,'PD surge','heal'); }
-  else if(k==='ambush'){ s.mp+=2; s.fx.ambush=1; Sound.power(); s.engines.forEach(e=>e.boost=1.5); floatText(s,'Ambush','heal'); }
-  else if(k==='brace'){ s.fx.brace=1; Sound.power(); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
+  else if(k==='overcharge'){ const add=Math.min(s.shieldMax-s.shield, s.shieldMax*0.6); s.shield+=add; shieldFlash(s, s.group.position.clone().add(new THREE.Vector3(0,3,0))); s.shMat.uniforms.uFlash.value=2; sndAt(s.group.position, ()=>Sound.shield()); sndAt(s.group.position, ()=>Sound.power()); floatText(s,`+${Math.round(add)} shields`,'sh'); }
+  else if(k==='pdsurge'){ for(const o of alive(s.side)) if(hdist(o,s)<=2){ o.fx.pdsurge=1; Particles.burst(o.group.position,26,{speed:3,color:new THREE.Color(1,.85,.4),size:0.28,life:0.7}); } Sound.pdc(); sndAt(s.group.position, ()=>Sound.power()); floatText(s,'PD surge','heal'); }
+  else if(k==='ambush'){ s.mp+=2; s.fx.ambush=1; sndAt(s.group.position, ()=>Sound.power()); s.engines.forEach(e=>e.boost=1.5); floatText(s,'Ambush','heal'); }
+  else if(k==='brace'){ s.fx.brace=1; sndAt(s.group.position, ()=>Sound.power()); floatText(s,'Braced','heal'); Particles.burst(s.group.position,24,{speed:2,color:new THREE.Color(1,.8,.4),size:0.35,life:0.8}); }
   else if(k==='resupply'){ if(!target) return false;
     const hull=Math.min(a.def.amount, target.hullMax-target.hull), sh=Math.min(target.shieldMax/2, target.shieldMax-target.shield); let salvos=0;
     target.hull+=hull; target.shield+=sh; s.st.repaired+=hull; target.weapons.forEach(w=>{ if(w.ammo!==undefined && w.ammo<w.def.ammo){ w.ammo++; salvos++; } }); const fixed=repairAll(target);
-    const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
+    const a0=s.group.position.clone(), b0=target.group.position.clone(); sndAt(s.group.position, ()=>Sound.power());
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.55,.9,1),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
     floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:'', fixed?`${fixed} system${fixed>1?'s':''} repaired`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
   else if(k==='blackout'){ if(!target) return false; target.blackout=s.side;   // lasts until this side's next turn begins
-    const a0=s.group.position.clone(), b0=target.group.position.clone(); Sound.power();
+    const a0=s.group.position.clone(), b0=target.group.position.clone(); sndAt(s.group.position, ()=>Sound.power());
     for(let i=0;i<30;i++){ after(i*0.02,()=>{ const p=a0.clone().lerp(b0,i/30); Particles.emit(p.setY(p.y+0.3),new THREE.Vector3().randomDirection().multiplyScalar(0.6),new THREE.Color(.75,.5,1),0.22,0.5,0.4); }); }
     Particles.burst(b0,40,{speed:3,color:new THREE.Color(.75,.5,1),size:0.3,life:0.8}); floatText(target,'Blackout','int'); }
-  else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; s.st.repaired+=add; Sound.power();
+  else if(k==='repair'){ if(!target) return false; const add=Math.min(ABIL.repair.amount, target.hullMax-target.hull); target.hull+=add; s.st.repaired+=add; sndAt(s.group.position, ()=>Sound.power());
     const a0=s.group.position.clone(), b0=target.group.position.clone();
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.5,1,.5),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.5,1,.5),size:0.3,life:0.9}); floatText(target,`+${Math.round(add)} hull`,'heal'); }
@@ -122,7 +122,7 @@ async function moveShip(s, path){
   pts[0]=s.group.position.clone();
   const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal',0.4); const len=curve.getLength();
   const dur=clamp(len/7.5, 0.45, 3.2);
-  Sound.move(); s.engines.forEach(e=>e.boost=(e.boost||0)+1);
+  sndAt(s.group.position, ()=>Sound.move()); s.engines.forEach(e=>e.boost=(e.boost||0)+1);
   const y0=s.group.rotation.y; let yaw=y0;
   await tween(dur, k=>{ const p=curve.getPointAt(k); s.group.position.x=p.x; s.group.position.z=p.z;
     const t=curve.getTangentAt(Math.min(k+0.02,1)); const ty=Math.atan2(t.x,t.z); const dd=shortestAngle(yaw,ty); yaw+=dd*Math.min(1,0.18); s.group.rotation.y=yaw; s.body.rotation.z=-dd*0.8; }, easeInOut);
