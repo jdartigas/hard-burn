@@ -66,15 +66,15 @@ const LAB_SOUNDS = [
   ['Misses', [
     ['miss', 'Miss (energy ricochet)', 'a direct-fire shot glancing away', ()=>Sound.miss()],
   ]],
-  ['Music: battle drums (music bus: needs the music on; volume and pitch sliders do not apply)', [
+  ['Music: the score and its battle drums (music bus: needs the music on; volume and pitch sliders do not apply)', [
     ['dr-odaiko', 'Odaiko, the big drum', 'one-shot; also hits on every ship destroyed', ()=>Sound.drumHit('odaiko',1.1)],
     ['dr-chu', 'Chu-daiko', 'one-shot; also hits on every ability', ()=>Sound.drumHit('chu',0.9)],
     ['dr-shime', 'Shime', 'the fast high drum', ()=>Sound.drumHit('shime',1)],
     ['dr-ka', 'Ka, the rim click', '', ()=>Sound.drumHit('ka',1)],
-    ['dr-0', 'Intensity 0: tension', 'menu and battle setup. Plays for 12 s from the next bar', ()=>Sound.drumPreview(0)],
-    ['dr-1', 'Intensity 1: stalking', 'your turn with nothing happening', ()=>Sound.drumPreview(1)],
-    ['dr-2', 'Intensity 2: battle', 'the enemy turn, and 4 s after any shot', ()=>Sound.drumPreview(2)],
-    ['dr-3', 'Intensity 3: full assault', '6 s after a kill, or a side down to two ships', ()=>Sound.drumPreview(3)],
+    ['dr-0', 'Score at intensity 0: tension', 'drone, pads and choir, a slow heartbeat. Menu and setup. 12 s from the next bar', ()=>Sound.drumPreview(0)],
+    ['dr-1', 'Score at intensity 1: stalking', 'adds the bass and stalking drums. Your turn, nothing happening', ()=>Sound.drumPreview(1)],
+    ['dr-2', 'Score at intensity 2: battle', 'low string pulse, braams, risers, driving drums. Enemy turn, and 4 s after any shot', ()=>Sound.drumPreview(2)],
+    ['dr-3', 'Score at intensity 3: full assault', 'everything, plus the horn motif. 6 s after a kill, or a side down to two ships', ()=>Sound.drumPreview(3)],
     ['dr-off', 'End the preview', 'back to the level the game sets', ()=>Sound.drumPreview(null)],
   ]],
   ['Sequences, with the game\'s timing', [
