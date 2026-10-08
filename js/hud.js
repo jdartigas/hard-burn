@@ -305,6 +305,30 @@ function updateBusy(dt){
   if(show && !nudgeT && el.textContent!=='Resolving…'){ el.textContent='Resolving…'; el.classList.remove('why'); }
 }
 function nudgeBusy(text='Resolving…', why=false){ const el=$('#busy'); el.textContent=text; el.classList.toggle('why', why); nudgeT= why? 2.6 : 1.1; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
+// v107 (camera follow-up E): markers for enemies off screen that the selected ship can hit. Each sits on the edge of the
+// safe area in the enemy's direction (a point behind the camera is pushed to the edge it is nearest), points at it and
+// shows its tag's hit chance or expected damage; tapping one brings the enemy into view beside your ship. A pool of
+// buttons moved by transform, styles written only when they change (§6 lesson 9)
+const OSM=[], OSM_AT=[]; const osmPos=new THREE.Vector3();
+function updateMarkers(){ const s=state.selected, show= s && state.phase==='player' && !state.busy && !state.mode;
+  let n=0;
+  if(show){ const S=safeRect(), cx=(S.l+S.r)/2, cy=(S.t+S.b)/2, pad=22;
+    for(const e of state.ships){ if(e.side!=='enemy' || !e.alive || !e.tagHit.classList.contains('show')) continue;
+      osmPos.copy(e.group.position); V.copy(osmPos).project(camera); const behind=V.z>1;
+      let x=(V.x*0.5+0.5)*innerWidth, y=(-V.y*0.5+0.5)*innerHeight; if(behind){ x=2*cx-x; y=2*cy-y; }
+      if(!behind && x>S.l && x<S.r && y>S.t && y<S.b) continue;
+      let dx=x-cx, dy=y-cy; if(!dx && !dy) dy=1; const kx=dx? ((dx>0? S.r-pad : S.l+pad)-cx)/dx : Infinity, ky=dy? ((dy>0? S.b-pad : S.t+pad)-cy)/dy : Infinity, k=Math.min(kx,ky);
+      let px=cx+dx*k, py=cy+dy*k; const ang=Math.atan2(dy,dx), side= kx<=ky;   // side: on the left or right edge
+      // markers that would overlap slide along their edge, as the ship tags stack (v84)
+      for(let it=0; it<n; it++){ let hit=null; for(let j=0;j<n;j++){ const q=OSM_AT[j]; if(Math.abs(q.x-px)<76 && Math.abs(q.y-py)<28){ hit=q; break; } } if(!hit) break; if(side) py=hit.y+(py>=hit.y? 28 : -28); else px=hit.x+(px>=hit.x? 76 : -76); }
+      px=clamp(px,S.l+pad,S.r-pad); py=clamp(py,S.t+pad,S.b-pad); const at=OSM_AT[n]||(OSM_AT[n]={x:0,y:0}); at.x=px; at.y=py;
+      let m=OSM[n]; if(!m){ m=document.createElement('button'); m.className='osm'; m.innerHTML='<i></i><span></span>'; $('#osmarks').appendChild(m); OSM.push(m); }
+      const txt=e.tagHit.textContent; if(m._t!==txt){ m._t=txt; m.lastChild.textContent=txt; m.setAttribute('aria-label',`${e.name} off screen, ${txt}: bring into view`); }
+      const tf=`translate3d(${px.toFixed(0)}px,${py.toFixed(0)}px,0) translate(-50%,-50%)`; if(m._tf!==tf){ m._tf=tf; m.style.transform=tf; }
+      const rot=`rotate(${ang.toFixed(2)}rad)`; if(m._r!==rot){ m._r=rot; m.firstChild.style.transform=rot; }
+      if(m._e!==e){ m._e=e; m.onclick=()=>{ Sound.ui(); if(state.selected) frameShot(state.selected, e); else keepInView([e]); }; }
+      if(m.style.display!=='flex') m.style.display='flex'; n++; } }
+  for(let i=n;i<OSM.length;i++) if(OSM[i].style.display!=='none') OSM[i].style.display='none'; }
 function showTooltip(html){ if(!html.startsWith('<div class="mini')) tip.classList.remove('mini'); tip.innerHTML=html; tip.style.display='block'; const w=tip.offsetWidth, h=tip.offsetHeight; let x=mouse.x+18, y=mouse.y+14;
   const S= typeof safeRect==='function' ? safeRect() : {l:8, t:8, r:innerWidth-8, b:innerHeight-8};
   if(x+w>S.r) x=mouse.x-w-14; if(y+h>S.b) y=mouse.y-h-14;

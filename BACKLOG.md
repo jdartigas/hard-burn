@@ -543,7 +543,7 @@ drawn at 22% opacity (board.js).
 - **P3.** Enemy threat ranges toggle: show where enemy weapons can reach.
 - **P4.** First-battle tips: short prompts for select, move, fire, end turn.
 - **P5.** "Ships with orders left" reminder before ending the turn.
-- **P6.** Off-screen target markers (camera follow-up E, below).
+- ~~**P6.**~~ **Done in v107:** off-screen target markers (camera follow-up E, below).
 
 **Fun**
 - **F1. Improved sound effects** (see the sound section above). *Chosen.*
@@ -579,7 +579,7 @@ Ideas, roughly cheapest first:
 
 Options E and F from the v56 camera plan, deferred when A–D were built:
 
-- **E. Markers for off-screen targets.** While a ship is selected, enemies it can hit that are off screen get an arrow
+- ~~**E. Markers for off-screen targets.**~~ **Done in v107.** While a ship is selected, enemies it can hit that are off screen get an arrow
   at the screen edge with the hit chance; tapping it aims at that ship. v56 covered part of this (tapping an Enemy
   contact frames it beside the selected ship), but markers would help most on phones, where the enemy list is in a
   drawer. Medium-sized. Best done the next time the battle interface is touched.

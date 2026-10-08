@@ -531,3 +531,10 @@ html.touch #tut button{min-height:40px}
 .lab-master b{grid-column:1/-1;font-weight:600} .lab-master small{color:var(--faint);font-weight:400}
 .lab-play:disabled{opacity:.3;cursor:default}
 @media (max-width:760px){ .lab-master{grid-template-columns:1fr} .lab-ref{grid-column:1/4} }
+
+/* ---- v107: off-screen target markers (updateMarkers in hud.js) ---- */
+#osmarks .osm{position:fixed;left:0;top:0;z-index:4;display:none;align-items:center;gap:5px;padding:3px 9px 3px 5px;border-radius:999px;border:1px solid var(--red);
+  background:rgba(40,8,6,.86);color:#fff;font:600 12px/1 inherit;will-change:transform;cursor:pointer;white-space:nowrap}
+#osmarks .osm i{width:0;height:0;border-left:8px solid var(--red);border-top:5px solid transparent;border-bottom:5px solid transparent;will-change:transform}
+#osmarks .osm:hover{background:rgba(70,14,10,.92)}
+html.touch #osmarks .osm{padding:7px 12px 7px 8px;font-size:13px}
