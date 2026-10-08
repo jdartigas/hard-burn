@@ -169,8 +169,40 @@ function destroyRock(rt, by){
   const s=new THREE.Sprite(dustMat); s.position.set(p.x,0.8,p.z); s.scale.setScalar(5); board.group.add(s); board.rocks.push(s);
   if(state.phase==='player' && !state.busy) recomputeHighlights();
 }
+// v111 (Jon: ships and asteroids merged into one another): visual-only avoidance, no rules change. Every ship is a capsule
+// along its hull. Small floating rocks (an asteroid's rubble, a debris field's pieces) ease out of any capsule plus a
+// margin, as if pushed by drive wash, and drift home when it leaves. A big asteroid body doesn't move; the ship's model
+// (its body, not the group, so tags, rings and targeting stay on the hex) slides sideways and up to clear it, at most
+// AVOID.maxNudge. Runs each frame but allocates nothing; skipped in simulations.
+const AVOID = { margin:0.25, bigShrink:0.78, maxNudge:1.1, lift:0.35, ease:5, capR:0.13, capRMin:0.35 };
+const AV_A=new THREE.Vector3(), AV_B=new THREE.Vector3(), AV_P=new THREE.Vector3(), AV_N=new THREE.Vector3();
+function avoidRadius(m){ const g=m.geometry; if(!g.boundingSphere) g.computeBoundingSphere(); return g.boundingSphere.radius*Math.max(m.scale.x,m.scale.y,m.scale.z); }
+// closest point on ship s's hull segment to p, written to AV_P; returns the capsule radius
+// nudged: use where the model actually is (its avoidance nudge, back in world space), for the rubble pass
+function hullClosest(s, p, nudged=false){ const y=s.group.rotation.y, h=s.len*0.45, fx=Math.sin(y), fz=Math.cos(y), c=s.group.position;
+  let ox=0, oz=0; if(nudged && s.av){ const cy=Math.cos(y), sy=Math.sin(y); ox=s.av.x*cy+s.av.z*sy; oz=-s.av.x*sy+s.av.z*cy; }
+  AV_A.set(c.x+ox-fx*h, c.y, c.z+oz-fz*h); AV_B.set(c.x+ox+fx*h, c.y, c.z+oz+fz*h);
+  AV_N.subVectors(AV_B,AV_A); const t=clamp(AV_P.subVectors(p,AV_A).dot(AV_N)/AV_N.lengthSq(),0,1); AV_P.copy(AV_A).addScaledVector(AV_N,t);
+  return Math.max(AVOID.capRMin, s.len*AVOID.capR); }
+function avoidRocks(dt){ if(window.__norender || state.phase==='menu' || !board.avoidSmall) return; const k=Math.min(1,dt*AVOID.ease);
+  for(const m of board.avoidSmall){ if(!m.parent) continue; const home=m.userData.home; let px=0, py=0, pz=0;
+    for(const s of state.ships){ if(!s.alive) continue; const c=s.group.position, far=s.len*0.45+2.2+m.userData.ar;   // a quick reject before the exact test
+      if(Math.abs(home.x-c.x)>far || Math.abs(home.z-c.z)>far) continue;
+      const r=hullClosest(s, home, true), need=r+m.userData.ar+AVOID.margin;
+      AV_N.subVectors(home, AV_P); const d=AV_N.length(); if(d>=need) continue;
+      if(d<1e-4) AV_N.set(0,1,0); else AV_N.multiplyScalar(1/d); const push=need-d; px+=AV_N.x*push; py+=AV_N.y*push; pz+=AV_N.z*push; }
+    m.position.x+=(home.x+px-m.position.x)*k; m.position.y+=(Math.max(0.05,home.y+py)-m.position.y)*k; m.position.z+=(home.z+pz-m.position.z)*k; }   // never below the board
+  for(const s of state.ships){ if(!s.alive || !s.body) continue; let nx=0, nz=0, lift=0;
+    for(const m of board.avoidBig){ if(!m.parent) continue; const r=hullClosest(s, m.position), need=r+m.userData.ar*AVOID.bigShrink+AVOID.margin;
+      AV_N.subVectors(AV_P, m.position); AV_N.y=0; const d=AV_N.length(); if(d>=need) continue;
+      if(d<1e-4) AV_N.set(1,0,0); else AV_N.multiplyScalar(1/d); nx+=AV_N.x*(need-d); nz+=AV_N.z*(need-d); lift=Math.max(lift,(need-d)*AVOID.lift); }
+    const len=Math.hypot(nx,nz); if(len>AVOID.maxNudge){ nx*=AVOID.maxNudge/len; nz*=AVOID.maxNudge/len; }
+    const y=s.group.rotation.y, c=Math.cos(y), sn=Math.sin(y), lx=nx*c-nz*sn, lz=nx*sn+nz*c;   // world offset into the ship's turned frame
+    const b=s.body.position; s.av=s.av||{x:0,y:0,z:0}; s.av.x+=(lx-s.av.x)*k; s.av.y+=(lift-s.av.y)*k; s.av.z+=(lz-s.av.z)*k;
+    b.x=s.av.x; b.y=s.av.y; b.z=s.av.z; } }
 function generateTerrain(seed){
   board.rocks.forEach(o=>board.group.remove(o)); board.rocks=[];
+  board.avoidSmall=[]; board.avoidBig=[];   // v111: what avoidRocks moves, and what it steers ships around
   let R=mulberry32(seed), tries=0;
   while(true){
     board.list.forEach(c=>{ c.t='open'; c.rock=null; });
@@ -191,14 +223,14 @@ function generateTerrain(seed){
       const pk=new THREE.Mesh(new THREE.SphereGeometry(1.45,10,8),new THREE.MeshBasicMaterial()); pk.visible=false; pk.position.set(o.x,0.9,o.z); pk.userData.cell=c; board.group.add(pk); board.rocks.push(pk); rt.pick=pk;
       for(let i=0;i<n;i++){ const m=new THREE.Mesh(bigRockGeos[Math.floor(R()*6)], rockMat); const s=(n===1?1.3:0.9)+R()*0.4; rt.meshes.push(m);
         m.scale.set(s*(0.9+R()*0.3),s*(0.85+R()*0.3),s*(0.9+R()*0.3)); m.position.set(o.x+(R()-.5)*(n-1)*1.4, 0.6+R()*0.8, o.z+(R()-.5)*(n-1)*1.2);
-        m.rotation.set(R()*6,R()*6,R()*6); m.userData.spin=new THREE.Vector3((R()-.5)*0.2,(R()-.5)*0.2,(R()-.5)*0.2); m.userData.s0=m.scale.clone(); board.group.add(m); board.rocks.push(m); }
+        m.rotation.set(R()*6,R()*6,R()*6); m.userData.spin=new THREE.Vector3((R()-.5)*0.2,(R()-.5)*0.2,(R()-.5)*0.2); m.userData.s0=m.scale.clone(); board.group.add(m); board.rocks.push(m); m.userData.ar=avoidRadius(m); board.avoidBig.push(m); }
       // loose rubble drifting around the big body
       for(let i=0;i<5;i++){ const m=new THREE.Mesh(smallRockGeos[Math.floor(R()*6)], rockMat); m.scale.setScalar(0.07+R()*0.14); const a=R()*Math.PI*2, rr=1.3+R()*0.6;
-        m.position.set(o.x+Math.cos(a)*rr, 0.3+R()*1.5, o.z+Math.sin(a)*rr); m.rotation.set(R()*6,R()*6,R()*6); m.userData.spin=new THREE.Vector3((R()-.5),(R()-.5),(R()-.5)); board.group.add(m); board.rocks.push(m); } }
+        m.position.set(o.x+Math.cos(a)*rr, 0.3+R()*1.5, o.z+Math.sin(a)*rr); m.rotation.set(R()*6,R()*6,R()*6); m.userData.spin=new THREE.Vector3((R()-.5),(R()-.5),(R()-.5)); board.group.add(m); board.rocks.push(m); m.userData.home=m.position.clone(); m.userData.ar=avoidRadius(m); board.avoidSmall.push(m); } }
     else if(c.t==='debris'){
       for(let i=0;i<9;i++){ const big=i<2; const m=new THREE.Mesh((big?bigRockGeos:smallRockGeos)[Math.floor(R()*6)], rockMat); m.scale.setScalar(big?0.28+R()*0.12:0.08+R()*0.2);
         m.position.set(o.x+(R()-.5)*2.6, 0.2+R()*1.6, o.z+(R()-.5)*2.4); m.rotation.set(R()*6,R()*6,R()*6);
-        m.userData.spin=new THREE.Vector3((R()-.5),(R()-.5),(R()-.5)); board.group.add(m); board.rocks.push(m); }
+        m.userData.spin=new THREE.Vector3((R()-.5),(R()-.5),(R()-.5)); board.group.add(m); board.rocks.push(m); m.userData.home=m.position.clone(); m.userData.ar=avoidRadius(m); board.avoidSmall.push(m); }
       const s=new THREE.Sprite(dustMat); s.position.set(o.x,0.8,o.z); s.scale.setScalar(5); board.group.add(s); board.rocks.push(s);
     }
   }
