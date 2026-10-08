@@ -23,7 +23,7 @@ const Sound = (() => {
     music = ctx.createGain(); music.gain.value=0.0; music.connect(comp);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
     const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    startMusic(); loadSfx();
+    buildFx(); startMusic(); loadSfx();
   }
   const now = () => ctx.currentTime;
   /* v63 (Jon): recorded effects (Kenney, CC0, see assets/CREDITS.md) over or instead of the synthesized ones, which
@@ -33,16 +33,43 @@ const Sound = (() => {
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
   const bufs={}; let lastPdcHit=0, lastPdcShield=0;
   let labRate=1;   // v90: the sound lab's pitch (1 in the game)
+  /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
+     two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
+     report after a crack and the roll of an explosion). A voice can also send to either on its own ({drive, verb}) and
+     sit in the stereo field ({pan}). FX sets the sends for every sound: 0 keeps the game exactly as before v92; the
+     sound lab tries other values without touching the game. */
+  const FX = { drive:0, verb:0, spread:0 };   // spread: each voice panned at random up to this far (0 to 1)
+  let fx=null, shapeCurve=null, irBuf=null, spread=FX.spread;
+  function makeFx(dest, drive, verb){
+    const inp=ctx.createGain(); inp.connect(dest);
+    const dIn=ctx.createGain(), sh=ctx.createWaveShaper(), dOut=ctx.createGain(); sh.curve=shapeCurve; sh.oversample='2x'; dOut.gain.value=0.55;
+    dIn.connect(sh); sh.connect(dOut); dOut.connect(dest);
+    const vIn=ctx.createGain(), cv=ctx.createConvolver(); cv.buffer=irBuf; vIn.connect(cv); cv.connect(dest);
+    const gd=ctx.createGain(); gd.gain.value=drive; inp.connect(gd); gd.connect(dIn);
+    const gv=ctx.createGain(); gv.gain.value=verb; inp.connect(gv); gv.connect(vIn);
+    return {in:inp, dist:dIn, verb:vIn}; }
+  function buildFx(){
+    shapeCurve=new Float32Array(1024); const k=3; for(let i=0;i<1024;i++){ const x=i/511.5-1; shapeCurve[i]=Math.tanh(k*x)/Math.tanh(k); }
+    const sr=ctx.sampleRate, len=Math.floor(sr*1.6), pre=Math.floor(sr*0.012); irBuf=ctx.createBuffer(2,len,sr);
+    for(let c=0;c<2;c++){ const d=irBuf.getChannelData(c); let lp=0;
+      for(let i=pre;i<len;i++){ const k2=(i-pre)/(len-pre); lp+= (Math.random()*2-1 - lp)*(0.5-0.42*k2); d[i]=lp*Math.exp(-k2*5.5); } }   // darker as it decays
+    fx=makeFx(sfx, FX.drive, FX.verb); }
+  // where a voice's gain stage goes: the chain's input, panned when asked or when the lab spreads voices, plus its own sends
+  function route(g, {drive=0, verb=0, pan=null}={}){
+    let p=pan; if(p===null && spread>0) p=(Math.random()*2-1)*spread;
+    if(p && ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(p,-1,1); g.connect(pn); pn.connect(fx.in); } else g.connect(fx.in);
+    if(drive){ const d=ctx.createGain(); d.gain.value=drive; g.connect(d); d.connect(fx.dist); }
+    if(verb){ const v=ctx.createGain(); v.gain.value=verb; g.connect(v); v.connect(fx.verb); } }
   // from SFX_DATA (js/sfxdata.js), not fetch(): a page opened from a file can't fetch its own assets, so v63's sounds
   // were silently missing there
   const b64=s=>{ const bin=atob(s), a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a.buffer; };
   function loadSfx(){ if(typeof SFX_DATA==='undefined') return;
     for(const n of new Set(Object.values(SFX).flat())) if(SFX_DATA[n])
       new Promise((ok,no)=>ctx.decodeAudioData(b64(SFX_DATA[n]),ok,no)).then(b=>{ bufs[n]=b; }).catch(()=>{}); }
-  function sample(key, {gain=1, rate=1, vary=0.06, delay=0, dur=0}={}){   // dur: fade out and stop after this long
+  function sample(key, {gain=1, rate=1, vary=0.06, delay=0, dur=0, drive=0, verb=0, pan=null}={}){   // dur: fade out and stop after this long
     if(!ctx) return false; const list=SFX[key].filter(n=>bufs[n]); if(!list.length) return false;
     const src=ctx.createBufferSource(); src.buffer=bufs[list[Math.floor(Math.random()*list.length)]]; src.playbackRate.value=rate*labRate*(1+(Math.random()*2-1)*vary);
-    const g=ctx.createGain(), t=now()+delay; g.gain.setValueAtTime(gain,t); src.connect(g); g.connect(sfx); src.start(t);
+    const g=ctx.createGain(), t=now()+delay; g.gain.setValueAtTime(gain,t); src.connect(g); route(g,{drive,verb,pan}); src.start(t);
     if(dur){ g.gain.setTargetAtTime(0.0001, t+dur*0.55, dur*0.15); src.stop(t+dur+0.1); } return true; }
   // v66: a synthesized explosion: a short crack, a band of rumbling noise that darkens as it decays, a falling sub tone,
   // and a crackle of debris. Used for warhead and torpedo hits and the blasts inside a dying ship, so none of them
@@ -55,18 +82,18 @@ const Sound = (() => {
   // electric crackle: a spray of tiny band-passed noise bursts at random moments
   function crackle(dur, {gain=0.15, f=3500, density=50, delay=0}={}){ const n=Math.max(3,Math.round(dur*density));
     for(let i=0;i<n;i++){ const k=Math.random(); noise(0.008+Math.random()*0.025, {type:'bandpass', f0:f*(0.6+Math.random()*0.9), f1:f*0.5, q:1.2, gain:gain*(0.3+Math.random()*0.7)*(1-k*0.5), delay:delay+k*dur}); } }
-  function noise(dur, {type='lowpass', f0=2000, f1=200, q=1, gain=0.5, attack=0.005, delay=0}={}){
+  function noise(dur, {type='lowpass', f0=2000, f1=200, q=1, gain=0.5, attack=0.005, delay=0, drive=0, verb=0, pan=null}={}){
     if(!ctx) return; const t=now()+delay;
     const src=ctx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
     const flt=ctx.createBiquadFilter(); flt.type=type; flt.Q.value=q; flt.frequency.setValueAtTime(f0*labRate,t); flt.frequency.exponentialRampToValueAtTime(Math.max(20,f1*labRate), t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    src.connect(flt); flt.connect(g); g.connect(sfx); src.start(t, Math.random()); src.stop(t+dur+0.05);
+    src.connect(flt); flt.connect(g); route(g,{drive,verb,pan}); src.start(t, Math.random()); src.stop(t+dur+0.05);
   }
-  function tone(dur, {type='sine', f0=440, f1=null, gain=0.3, attack=0.005, delay=0, dest=null}={}){
+  function tone(dur, {type='sine', f0=440, f1=null, gain=0.3, attack=0.005, delay=0, dest=null, drive=0, verb=0, pan=null}={}){
     if(!ctx) return; const t=now()+delay;
     const o=ctx.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0*labRate,t); if(f1) o.frequency.exponentialRampToValueAtTime(f1*labRate,t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g); g.connect(dest||sfx); o.start(t); o.stop(t+dur+0.05);
+    o.connect(g); if(dest) g.connect(dest); else route(g,{drive,verb,pan}); o.start(t); o.stop(t+dur+0.05);
   }
   const S = {
     init,
@@ -76,8 +103,9 @@ const Sound = (() => {
     // v90: the sound lab (?sfx, js/sfxlab.js) plays one sound through its own gain stage and with every sample rate and
     // synthesized frequency scaled by `rate`, without touching the game's levels. The beam's hum and shimmer use their own
     // oscillators, so only its ignition and fizz follow the pitch control.
-    labPlay(fn, {gain=1, rate=1}={}){ init(); if(!ctx) return; const bus=ctx.createGain(); bus.gain.value=gain; bus.connect(sfx);
-      const keep=sfx; sfx=bus; labRate=rate; try{ fn(); } finally{ sfx=keep; labRate=1; } },
+    // v92: and through its own copy of the effects chain, with the lab's master drive, reverb and stereo spread
+    labPlay(fn, {gain=1, rate=1, drive=FX.drive, verb=FX.verb, width=FX.spread}={}){ init(); if(!ctx || !fx) return; const bus=ctx.createGain(); bus.gain.value=gain; bus.connect(sfx);
+      const keep=fx; fx=makeFx(bus, drive, verb); labRate=rate; spread=width; try{ fn(); } finally{ fx=keep; labRate=1; spread=FX.spread; } },
     toggle(){ on=!on; store.set('sound',on); if(sfx) sfx.gain.setTargetAtTime(on?fv():0, now(), 0.05); return on; },
     get musicLevel(){ return musicLevel; }, get fxLevel(){ return fxLevel; },
     setMusicLevel(v){ musicLevel=clamp(v,0,1); store.set('musicVol',musicLevel); if(music && musicOn) music.gain.setTargetAtTime(mv(), now(), 0.08); },
@@ -108,12 +136,12 @@ const Sound = (() => {
       const tail=0.7;   // v67: the hum trails off after the beam instead of stopping with it
       const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.13,t+0.08); g.gain.setValueAtTime(0.13,t+dur*0.75); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
       const tl=ctx.createOscillator(); tl.frequency.value=38; const tg=ctx.createGain(); tg.gain.value=0.025; tl.connect(tg); tg.connect(g.gain);
-      o1.connect(f); o2.connect(f); o3.connect(f); f.connect(g); g.connect(sfx); [o1,o2,o3,flfo,tl].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
+      o1.connect(f); o2.connect(f); o3.connect(f); f.connect(g); route(g); [o1,o2,o3,flfo,tl].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
       // v67 (Jon): a high shimmer over the hum: two detuned sines with a slow vibrato, trailing off with it
       const h1=ctx.createOscillator(), h2=ctx.createOscillator(); h1.type=h2.type='sine'; h1.frequency.value=2093; h2.frequency.value=2111;
       const vib=ctx.createOscillator(); vib.frequency.value=5; const vg=ctx.createGain(); vg.gain.value=9; vib.connect(vg); vg.connect(h1.frequency); vg.connect(h2.frequency);
       const hg=ctx.createGain(); hg.gain.setValueAtTime(0.0001,t); hg.gain.exponentialRampToValueAtTime(0.03,t+0.12); hg.gain.setValueAtTime(0.03,t+dur*0.75); hg.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
-      h1.connect(hg); h2.connect(hg); hg.connect(sfx); [h1,h2,vib].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
+      h1.connect(hg); h2.connect(hg); route(hg); [h1,h2,vib].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
       crackle(dur*0.9,{gain:0.05,f:6000,density:25}); },
     // v65: a fast missile leaving the tube: a quick rising whoosh and a whine, a little of the thruster recording for body
     missile(){ noise(0.45,{type:'bandpass',f0:900,f1:5200,q:2.5,gain:0.22,attack:0.02}); noise(0.3,{type:'highpass',f0:6000,f1:3000,gain:0.07}); tone(0.35,{type:'sawtooth',f0:420,f1:1700,gain:0.018}); sample('launch',{gain:0.22,rate:2.2,dur:0.35,vary:0.1}); },
