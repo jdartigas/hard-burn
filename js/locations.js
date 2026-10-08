@@ -128,41 +128,29 @@ function buildSun(dir, dist, diamDeg, root){
 
 // Planets and moons are lit by the sun alone: the game's ambient and fill lights, there to keep ships readable, would
 // light a night side that from orbit is black. Clouds ride on the same shader as a second map.
-// v108 (Jon: a stylised, illustrated Mars instead of the photo): an illustrated mode for real bodies, drawn from the same
-// real map so the geography stays (Valles Marineris, Olympus Mons, the caps). Colour is flattened into a few painted
-// bands (hue kept), strong edges in the map get a dark ink line, shading steps in cel-style bands with an inked
-// terminator, and a warm rim lights the sunlit edge. ILLUS holds every number; `texel` is one pixel of the map.
-const ILLUS = { levels:5, flatten:0.9, lumLo:0.1, lumHi:0.5, sat:1.45, paint:[1.1,0.74,0.55], expo:0.62, soften:2.5, inkReach:4.0, edge0:0.1, edge1:0.22, ink:0.6, inkCol:[0.16,0.07,0.04], bands:[0.42,0.12,-0.02], bandLit:[1.0,0.72,0.4,0.0], rim:0.35, rimCol:[1.0,0.7,0.45] };
-function bodyMaterial(map, clouds=null, nightGain=0.0, tint=[1,1,1], texel=null){
-  const ill=!!texel, I=ILLUS, f=v=>`(${v.toFixed(3)})`, v3=a=>`vec3(${a.map(v=>v.toFixed(3)).join(',')})`;   // parenthesised: a negative after a minus made GLSL's d--0.02
-  return new THREE.ShaderMaterial({ uniforms:{ uMap:{value:map}, uClouds:{value:clouds}, uHasClouds:{value:clouds?1:0}, uSun:{value:sunDir}, uNight:{value:nightGain}, uTint:{value:new THREE.Color(...tint)}, uTexel:{value:new THREE.Vector2(...(texel||[0,0]))} },
-    vertexShader:`varying vec2 vUv; varying vec3 vN; varying vec3 vW; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader:`uniform sampler2D uMap; uniform sampler2D uClouds; uniform float uHasClouds; uniform vec3 uSun; uniform float uNight; uniform vec3 uTint; uniform vec2 uTexel; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
-      float lum(vec3 c){ return dot(c,vec3(0.3,0.59,0.11)); }
+// v109 (Jon: the v108 illustrated Mars "sucks"; this reference instead, a rich, high-contrast Mars render): a colour
+// grade. The real map keeps every detail, but each point is recoloured along a gradient measured from Jon's reference image
+// (its darks, mids and lights, which are far more saturated than the Viking mosaic's greys), by where it falls in the
+// map's own brightness range (lo, mid, hi: the map's 5th, 50th and 95th percentiles). Bright polar ice blends back to its
+// own colour. Done in display space, as the measurements were. The reference image itself is never shipped.
+const MARS_GRADE = { lo:0.239, mid:0.392, hi:0.557, dark:[0.323,0.189,0.162], midC:[0.570,0.286,0.207], light:[0.909,0.416,0.246], keep:0.15, ice0:0.6, ice1:0.8, contrast:1.35, expo:0.72 };   // expo: the lit level for the graded body (its colours are already bright)
+function bodyMaterial(map, clouds=null, nightGain=0.0, tint=[1,1,1], grade=null){
+  const G=grade, f=v=>`(${v.toFixed(3)})`, v3=a=>`vec3(${a.map(v=>v.toFixed(3)).join(',')})`;   // numbers parenthesised: a negative after a minus breaks GLSL
+  return new THREE.ShaderMaterial({ uniforms:{ uMap:{value:map}, uClouds:{value:clouds}, uHasClouds:{value:clouds?1:0}, uSun:{value:sunDir}, uNight:{value:nightGain}, uTint:{value:new THREE.Color(...tint)} },
+    vertexShader:`varying vec2 vUv; varying vec3 vN; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`uniform sampler2D uMap; uniform sampler2D uClouds; uniform float uHasClouds; uniform vec3 uSun; uniform float uNight; uniform vec3 uTint; varying vec2 vUv; varying vec3 vN;
       void main(){ vec3 n=normalize(vN); float d=dot(n,uSun); float lit=smoothstep(-0.04,0.25,d)*max(d,0.0)*0.8+smoothstep(-0.04,0.1,d)*0.12;
         vec3 c=texture2D(uMap,vUv).rgb*uTint;
         if(uHasClouds>0.5){ float k=texture2D(uClouds,vUv).g; c=mix(c, vec3(1.0), k*0.92); }
-        ${ill? `
-        // soften the map first (nine taps, a few pixels apart), so the bands become flat painted shapes, not the photo's grain
-        vec2 bt=uTexel*${f(I.soften)}; vec3 cs=c;
-        for(int i=-1;i<=1;i++) for(int j=-1;j<=1;j++){ if(i==0 && j==0) continue; cs+=texture2D(uMap,vUv+vec2(float(i),float(j))*bt).rgb*uTint; }
-        c=cs/9.0;
-        // bands across the map's own brightness range (lumLo to lumHi), so a low-contrast world still gets several tones
-        float L=max(lum(c),0.001), nL=clamp((L-${f(I.lumLo)})/${f(I.lumHi-I.lumLo)},0.0,1.0), q=${f(I.lumLo)}+floor(nL*${f(I.levels)}+0.5)/${f(I.levels)}*${f(I.lumHi-I.lumLo)};
-        c=mix(c, c*(q/L), ${f(I.flatten)}); c=mix(vec3(lum(c)), c, ${f(I.sat)})*${v3(I.paint)};   // painted bands, richer, pushed toward rust
-        // samples a few pixels apart, so only broad edges ink, not the photo's grain
-        vec2 t=uTexel*${f(I.inkReach)}; float gx=lum(texture2D(uMap,vUv+vec2(t.x,0.0)).rgb)-lum(texture2D(uMap,vUv-vec2(t.x,0.0)).rgb);
-        float gy=lum(texture2D(uMap,vUv+vec2(0.0,t.y)).rgb)-lum(texture2D(uMap,vUv-vec2(0.0,t.y)).rgb);
-        float e=smoothstep(${f(I.edge0)},${f(I.edge1)},sqrt(gx*gx+gy*gy));
-        c=mix(c, ${v3(I.inkCol)}, e*${f(I.ink)});                                             // ink on strong edges
-        float b0=smoothstep(${f(I.bands[0])}-0.03,${f(I.bands[0])}+0.03,d), b1=smoothstep(${f(I.bands[1])}-0.03,${f(I.bands[1])}+0.03,d), b2=smoothstep(${f(I.bands[2])}-0.02,${f(I.bands[2])}+0.02,d);
-        lit=mix(mix(mix(${f(I.bandLit[3])},${f(I.bandLit[2])},b2),${f(I.bandLit[1])},b1),${f(I.bandLit[0])},b0)*${f(I.expo)};   // cel bands
-        float term=1.0-smoothstep(0.0,0.035,abs(d-${f(I.bands[2])}));
-        vec3 v=normalize(cameraPosition-vW); float r=1.0-clamp(abs(dot(n,v)),0.0,1.0); r=r*r*r;   // squared by hand: no pow of a negative
-        vec3 col=c*(lit*${(2.6*LOOK.bodyGain).toFixed(2)}+uNight) + ${v3(I.rimCol)}*r*${f(I.rim)}*smoothstep(-0.1,0.3,d);
-        col=mix(col, ${v3(I.inkCol)}*0.5, term*0.7);                                           // an inked terminator
-        gl_FragColor=vec4(col,1.0); }` : `
-        gl_FragColor=vec4(c*(lit*${(2.6*LOOK.bodyGain).toFixed(2)}+uNight),1.0); }`}` });
+        ${G? `
+        vec3 dc=pow(max(c,vec3(0.0)),vec3(1.0/2.2)); float L=dot(dc,vec3(0.3,0.59,0.11));
+        float t= L<${f(G.mid)}? 0.5*clamp((L-${f(G.lo)})/${f(G.mid-G.lo)},0.0,1.0) : 0.5+0.5*clamp((L-${f(G.mid)})/${f(G.hi-G.mid)},0.0,1.0);
+        t=clamp((t-0.5)*${f(G.contrast)}+0.5,0.0,1.0);
+        vec3 g= t<0.5? mix(${v3(G.dark)},${v3(G.midC)},t*2.0) : mix(${v3(G.midC)},${v3(G.light)},t*2.0-1.0);
+        g=mix(g, g*(dc/max(vec3(L),vec3(0.001))), ${f(G.keep)});                    // a little of the map's own hue variation
+        g=mix(g, dc, smoothstep(${f(G.ice0)},${f(G.ice1)},L));                         // the polar ice stays ice
+        c=pow(max(g,vec3(0.0)),vec3(2.2));` : ''}
+        gl_FragColor=vec4(c*(lit*${(2.6*LOOK.bodyGain*(G? G.expo : 1)).toFixed(2)}+uNight),1.0); }` });
 }
 const texLoader = new THREE.TextureLoader();
 const loadTex = (url, srgb=true) => { const t=texLoader.load(url); t.anisotropy=MAX_ANISO; if(srgb) t.colorSpace=THREE.SRGBColorSpace; return t; };
@@ -261,11 +249,11 @@ const Loc = (() => {
     const sunSc=onCircleAtEl(poleSc, marsDir, L.sunEl, 100), R=frameFrom(sunEq, poleEq, sunSc, poleSc);
     buildRealSky(R, root, sunSc, L.zodi); buildSun(sunSc, L.sunDist, L.sunDiam, root);
     const mR=M.dist*M.radiusKm/M.distKm, mPos=marsDir.clone().multiplyScalar(M.dist);
-    const mars=sphereBody(root, bodyMaterial(loadTex('assets/sol/mars.jpg'), null, 0.0, [1,1,1], [1/2048,1/1024]), mR, mPos, 128);   // v108: illustrated orient(mars, poleSc, marsDir.clone().negate(), M.faceLon);
+    const mars=sphereBody(root, bodyMaterial(loadTex('assets/sol/mars.jpg'), null, 0.0, [1,1,1], MARS_GRADE), mR, mPos, 128);   // v109: graded to Jon's reference orient(mars, poleSc, marsDir.clone().negate(), M.faceLon);
     limb(root, mPos, mR*1.012, [0.95,0.62,0.42], 0.9);
     // Phobos: its real shape (a 27 x 22 x 18 km lump), long axis toward Mars, dark as coal; Mars lights its night side a little
     const k=P.dist/P.distKm, phPos=phDir.clone().multiplyScalar(P.dist);
-    const phobos=sphereBody(root, bodyMaterial(loadTex('assets/sol/phobos.jpg'), null, 0.025, [0.52,0.49,0.46], [1/1024,1/512]), 1, phPos, 64);   // v108: illustrated
+    const phobos=sphereBody(root, bodyMaterial(loadTex('assets/sol/phobos.jpg'), null, 0.025, [0.52,0.49,0.46]), 1, phPos, 64);
     { const pg=phobos.geometry, ps=pg.attributes.position, v=new THREE.Vector3();   // lumpy, not a smooth ellipsoid
       for(let i=0;i<ps.count;i++){ v.fromBufferAttribute(ps,i); v.multiplyScalar(1+RockNoise.fbm(v.x*1.6,v.y*1.6,v.z*1.6,31,4)*0.16); ps.setXYZ(i,v.x,v.y,v.z); } pg.computeVertexNormals(); }
     phobos.scale.set(P.axesKm[0]*k, P.axesKm[2]*k, P.axesKm[1]*k); orient(phobos, poleSc, mPos.clone().sub(phPos), 0);
