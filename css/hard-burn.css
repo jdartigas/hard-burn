@@ -538,3 +538,14 @@ html.touch #tut button{min-height:40px}
 #osmarks .osm i{width:0;height:0;border-left:8px solid var(--red);border-top:5px solid transparent;border-bottom:5px solid transparent;will-change:transform}
 #osmarks .osm:hover{background:rgba(70,14,10,.92)}
 html.touch #osmarks .osm{padding:7px 12px 7px 8px;font-size:13px}
+
+/* ---- v112: the report sheet, and the phone command bar trims (P-2) ---- */
+#rep-text{width:100%;box-sizing:border-box;margin:6px 0 8px;padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--line-cool);background:rgba(0,0,0,.3);color:var(--ink);font:inherit;font-size:14px;resize:vertical}
+#rep-info{max-height:150px;overflow:auto;margin:0 0 10px;padding:8px 10px;border-radius:var(--r-sm);background:rgba(0,0,0,.35);color:var(--dim);font-size:11.5px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.linkbtn{background:none;border:0;padding:0;color:var(--dim);font:inherit;text-decoration:underline;cursor:pointer}
+@media (max-width:760px){
+  /* the system chips and the PD line live in the docked card on a tap, so the phone command bar drops them */
+  #sp-stats .sysc,#sp-stats .pdl{display:none}
+  /* Threat folds into a small icon button */
+  #threatbtn{min-width:0;padding:4px 10px} #threatbtn .wd,#threatbtn .ws,#threatbtn .k{display:none} #threatbtn .wn{font-size:13px}
+}

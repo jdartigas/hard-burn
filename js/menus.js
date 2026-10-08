@@ -209,3 +209,27 @@ $('#settings [data-close]').onclick=()=>{ Sound.ui(); if(settingsFrom==='pause')
 $('#btn-sound').onclick=toggleSound; $('#btn-sound').textContent= Sound.on?'Effects on':'Effects off';
 $('#btn-music').onclick=toggleMusic; $('#btn-music').textContent= Sound.musicOn?'Music on':'Music off';
 
+
+/* ---------------- report a problem (v112, beta) ----------------
+   Builds a plain-text report from what a bug needs to be reproduced: version, battle seed, location, difficulty and
+   fleets, turn and phase, browser, screen, pixel ratio, quality, GPU and sound settings, and the last log lines. Shown
+   in full before anything leaves the page; Copy puts it on the clipboard, Open fills in FEEDBACK's page in a new tab. */
+function reportInfo(){ const gl=renderer.getContext(), dbg=gl.getExtension('WEBGL_debug_renderer_info');
+  const gpu= dbg? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const inBattle= state.phase!=='menu' && state.ships.length;
+  const lines=[`Version: ${GAME_VERSION}`,
+    inBattle? `Battle: seed ${board.seed}, ${state.location}, ${state.diff}${state.quick?', quick':''}${state.tutorial?', tutorial':''}, turn ${state.turn}, ${state.phase}` : 'Battle: none (on the menus)',
+    inBattle? `Fleets: ${state.fleets.player.join(' ')} vs ${state.fleets.enemy.join(' ')}` : null,
+    `Browser: ${navigator.userAgent}`,
+    `Screen: ${innerWidth}x${innerHeight} at ${devicePixelRatio}x, ${document.documentElement.classList.contains('touch')?'touch':'mouse'}`,
+    `Graphics: ${QUALITY[quality].label}, GPU ${gpu}`,
+    `Sound: effects ${Sound.on?'on':'off'}, music ${Sound.musicOn?'on':'off'}, positional ${Sound.positional?'on':'off'}, enemy turns ${speedSetting}`];
+  const log=[...document.querySelectorAll('#logbody div')].slice(0,8).map(d=>'  '+d.textContent).reverse();
+  if(log.length) lines.push('Last log lines:', ...log);
+  return lines.filter(Boolean).join('\n'); }
+function reportText(){ const t=$('#rep-text').value.trim(); return (t? t : '(no description)')+'\n\n---\n'+reportInfo(); }
+document.querySelectorAll('.btn-report').forEach(b=>b.onclick=()=>{ Sound.init(); Sound.ui(); $('#rep-info').textContent=reportInfo(); showScreen('report'); $('#rep-text').focus(); });
+$('#rep-copy').onclick=()=>{ const t=reportText(), b=$('#rep-copy');
+  (navigator.clipboard? navigator.clipboard.writeText(t) : Promise.reject()).then(()=>{ b.textContent='Copied'; setTimeout(()=>b.textContent='Copy report',1500); }, ()=>prompt('Copy this report:', t)); };
+$('#rep-open').onclick=()=>{ const body=reportText().slice(0,6000), first=$('#rep-text').value.trim().split('\n')[0].slice(0,70);
+  const u=FEEDBACK.url+'?title='+encodeURIComponent(FEEDBACK.title+(first? ': '+first : ''))+'&body='+encodeURIComponent(body); window.open(u,'_blank','noopener'); };

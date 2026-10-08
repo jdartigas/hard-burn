@@ -10,7 +10,7 @@
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '111';
+const GAME_VERSION = '112';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -85,7 +85,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-ghost" id="btn-records">Records</button>
       <button class="btn-ghost btn-settings">Settings</button>
     </div>
-    <div class="foot">Drag to orbit, scroll or pinch to zoom, two fingers to pan. <span class="ver" id="ver-menu"></span></div>
+    <div class="foot">Drag to orbit, scroll or pinch to zoom, two fingers to pan. <span class="ver" id="ver-menu"></span> · <button class="linkbtn btn-report">Report a problem</button></div>
   </div>
 </div>
 
@@ -207,6 +207,15 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
     <div class="cta"><button class="btn-primary" id="btn-tutask-play">Play the tutorial</button><button class="btn-ghost" id="btn-tutask-quick">Straight to Quick battle</button></div>
   </div>
 </div>
+<div id="report" class="screen" role="dialog" aria-label="Report a problem">
+  <div class="sheet" style="max-width:520px">
+    <h2>Report a problem</h2>
+    <p>Say what happened and what you expected. The report adds the game version, the battle's seed and your browser and screen, so the problem can be reproduced. Nothing is sent until you send it yourself.</p>
+    <textarea id="rep-text" rows="4" placeholder="What happened?"></textarea>
+    <pre id="rep-info"></pre>
+    <div class="cta" style="flex-wrap:wrap"><button class="btn-primary" id="rep-open">Open the feedback page</button><button class="btn-ghost" id="rep-copy">Copy report</button><button class="btn-ghost" data-close>Close</button></div>
+  </div>
+</div>
 <div id="pause" class="screen" role="dialog" aria-label="Menu">
   <div class="sheet" style="max-width:420px">
     <h2>Paused</h2>
@@ -218,6 +227,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
       <button class="btn-ghost btn-settings">Settings</button>
       <button class="btn-ghost" id="btn-howp">How to play</button>
       <button class="btn-ghost" id="btn-surrender">Surrender</button>
+      <button class="btn-ghost btn-report">Report a problem</button>
     </div>
   </div>
 </div>

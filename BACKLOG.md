@@ -568,7 +568,7 @@ What the screenshots show (portrait):
 
 Ideas, roughly cheapest first:
 - ~~**P-1.**~~ **Done in v89:** `safeRect` counts the phone fleet strip (top edge), so framing keeps ships below it.
-- **P-2.** Trim the phone command bar: hide the chips and PD line there (they are in the docked card on tap), and fold
+- ~~**P-2.**~~ **Done in v112:** trim the phone command bar: hide the chips and PD line there (they are in the docked card on tap), and fold
   Threat into a small icon button.
 - **P-3.** Slimmer fleet strip: name and one bar per ship, no "Move" line; or collapse it behind a Fleet button.
 - **P-4.** Make the command bar a bottom sheet: collapsed to name plus weapon buttons, pulled up for detail.

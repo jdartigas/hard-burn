@@ -26,6 +26,9 @@ let gameRng=null;
 function seedGameRand(seed){ gameRng=mulberry32(((seed>>>0) ^ 0x9E3779B9)>>>0); }
 function gameRand(){ if(!gameRng) seedGameRand(1); return gameRng(); }
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+// v112: where testers' reports go. The Report a problem sheet opens this with the report filled in (GitHub's new-issue
+// page takes title and body in the address); point it at a form or a mail address instead by changing it here
+const FEEDBACK = { url:'https://github.com/jdartigas/hard-burn/issues/new', title:'Problem report' };
 const store = {
   get(k,d){ try{ const v = localStorage.getItem('hardburn.'+k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
   set(k,v){ try{ localStorage.setItem('hardburn.'+k, JSON.stringify(v)); }catch(e){} }
