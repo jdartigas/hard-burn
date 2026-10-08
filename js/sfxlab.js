@@ -63,8 +63,8 @@ const LAB_SOUNDS = [
     ['win', 'Victory', '', ()=>Sound.win()],
     ['lose', 'Defeat', '', ()=>Sound.lose()],
   ]],
-  ['Planned sounds (not in the game yet)', [
-    ['miss', 'Miss or shield deflect', 'a shot that glances off; reference only for now', ()=>{}],
+  ['Misses', [
+    ['miss', 'Miss (energy ricochet)', 'a direct-fire shot glancing away', ()=>Sound.miss()],
   ]],
   ['Sequences, with the game\'s timing', [
     ['q-rail', 'Railgun on a hull', 'charge, shot, slug hits', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.hit('rail')); }],
@@ -78,6 +78,8 @@ const LAB_SOUNDS = [
     ['q-int', 'Missile shot down', 'point defense opens up, then the kill', ()=>{ Sound.missile(); at(0.75, ()=>Sound.pdc()); at(1.05, ()=>Sound.intercept()); }],
     ['q-wing', 'Strike wing on a hull', 'six craft', ()=>{ Sound.fighter(); for(let i=0;i<6;i++) at(1.3+i*0.1, ()=>Sound.hit('fighter')); }],
     ['q-pdcgun', 'PDC guns on a hull', 'close-in fire at a ship', ()=>{ Sound.pdc(); for(let i=0;i<8;i++) at(0.15+i*0.09, ()=>Sound.hit('pdc')); }],
+    ['q-miss', 'Pulse volley that misses', 'three bolts glancing away', ()=>{ for(let i=0;i<3;i++){ at(i*0.13, ()=>Sound.pulse()); at(i*0.13+0.3, ()=>Sound.miss()); } }],
+    ['q-capital', 'Dreadnought dies', 'internal blasts, then the capital explosion', ()=>{ [0,0.3,0.6,0.85].forEach(d=>at(d, ()=>Sound.burst())); at(1.3, ()=>Sound.boom(2.8)); }],
     ['q-death', 'Destroyer dies', 'internal blasts, then the explosion', ()=>{ [0,0.35,0.7].forEach(d=>at(d, ()=>Sound.burst())); at(1.2, ()=>Sound.boom(1.6)); }],
   ]],
 ];
@@ -111,7 +113,7 @@ const REF_ROWS = {
   pulse:['boom4','boomS','shot4'], 'q-pulse':['boom4','boomS','shot4'],
   beam:['plasma','dischg','drone','boomH'], 'q-beam':['plasma','dischg'], 'hit-beam':['plasma','dischg'], 'sh-beam':['plasma'],
   'hit-torpedo':['fx2','fx3','fx5','tnt'], 'q-torp':['fx2','fx5','tnt'], 'boom-l':['fx3','fx2','tnt'], 'boom-m':['fx1','fx5'], 'boom-s':['fx1'], 'q-death':['fx1','fx2'],
-  'miss':['ricBurst','ricCont','ricCrunch'],
+  miss:['ricBurst','ricCont','ricCrunch'], 'q-miss':['ricBurst'], 'q-capital':['fx3','tnt'],
 };
 const refLocal = ['localhost','127.0.0.1','[::1]'].includes(location.hostname) || location.protocol==='file:';
 let refAudio=null;
@@ -123,7 +125,7 @@ const SfxLab = {
   save(){ store.set('sfxlab', this.st); },
   play(id){ const row=LAB_SOUNDS.flatMap(g=>g[1]).find(r=>r[0]===id); const v=this.get(id);
     const m=this.master(); labCur={gain:v.g, rate:v.r, drive:m.drive, verb:m.verb, width:m.width}; try{ Sound.labPlay(row[3], labCur); } finally{ labCur=null; } },
-  master(){ return this.st._fx || (this.st._fx={drive:0, verb:0, width:0}); },
+  master(){ return this.st._fx || (this.st._fx={drive:0.6, verb:0.3, width:0.65}); },   // the game's FX since v93
   ref(id, btn){ const list=REF_ROWS[id]; if(!list) return; stopRef(); const v=this.get(id); v.ri=((v.ri??-1)+1)%list.length;
     refAudio=new Audio('sfx/'+encodeURIComponent(REF_FILES[list[v.ri]])); refAudio.play().catch(()=>{});
     btn.textContent=`Ref ${v.ri+1}/${list.length}`; btn.title=REF_FILES[list[v.ri]].replace(' - Epidemic Sound','').replace(/^ES_/,''); },
@@ -131,14 +133,14 @@ const SfxLab = {
     const el=document.createElement('div'); el.id='sfxlab'; el.className='screen'; el.setAttribute('role','dialog'); el.setAttribute('aria-label','Sound lab');
     let html=`<div class="sheet lab"><h2>Sound lab</h2><p class="rec-note">Every sound the game makes, on its own or as it plays in battle. Volume and pitch here never change the game: set them by ear, write a note, then <b>Copy notes</b> and paste the text to Claude. <span id="lab-status"></span></p>
       <div class="cta" style="margin-bottom:8px"><button class="btn-primary" id="lab-copy">Copy notes</button><button class="btn-ghost" id="lab-reset">Reset all</button><button class="btn-ghost" id="lab-stop">Stop reference</button><button class="btn-ghost" id="lab-close">Close</button></div>
-      <div class="lab-master"><b>Effects chain, every sound <small>(v92; 0 is the game as it is)</small></b>
+      <div class="lab-master"><b>Effects chain, every sound <small>(the game uses drive 0.60, reverb 0.30, width 0.65 since v93)</small></b>
         <label class="lab-sl">Drive <input type="range" min="0" max="1" step="0.05" data-m="drive"><output></output></label>
         <label class="lab-sl">Reverb <input type="range" min="0" max="1" step="0.05" data-m="verb"><output></output></label>
         <label class="lab-sl">Width <input type="range" min="0" max="1" step="0.05" data-m="width"><output></output></label></div>
       ${refLocal? '<p class="rec-note">Ref buttons play your reference files from sfx/ (local only, never shipped). Each press plays the next one.</p>' : ''}`;
     for(const [group, rows] of LAB_SOUNDS){ html+=`<h3>${esc(group)}</h3>`;
       for(const [id, label, info] of rows){ html+=`<div class="lab-row" data-id="${id}">
-        <button class="lab-play" aria-label="Play ${esc(label)}"${id==='miss'?' disabled':''}>▶</button>
+        <button class="lab-play" aria-label="Play ${esc(label)}">▶</button>
         <div class="lab-name"><b>${esc(label)}</b>${info?`<small>${esc(info)}</small>`:''}</div>
         <label class="lab-sl">Vol <input type="range" min="0" max="2" step="0.05" data-k="g"><output></output></label>
         <label class="lab-sl">Pitch <input type="range" min="0.5" max="2" step="0.05" data-k="r"><output></output></label>
@@ -152,7 +154,7 @@ const SfxLab = {
     const m=this.master(); el.querySelectorAll('[data-m]').forEach(inp=>{ const k=inp.dataset.m, out=inp.nextElementSibling; inp.value=m[k]; out.textContent=(+m[k]).toFixed(2);
       inp.oninput=()=>{ m[k]=+inp.value; out.textContent=m[k].toFixed(2); this.save(); }; });
     $('#lab-stop').onclick=stopRef;
-    $('#lab-copy').onclick=()=>{ const mm=this.master(), lines=[`Sound lab notes (v${GAME_VERSION})`]; if(mm.drive||mm.verb||mm.width) lines.push(`- Effects chain on every sound: drive ${mm.drive.toFixed(2)}, reverb ${mm.verb.toFixed(2)}, width ${mm.width.toFixed(2)}`);
+    $('#lab-copy').onclick=()=>{ const mm=this.master(), lines=[`Sound lab notes (v${GAME_VERSION})`]; if(mm.drive!==0.6||mm.verb!==0.3||mm.width!==0.65) lines.push(`- Effects chain on every sound: drive ${mm.drive.toFixed(2)}, reverb ${mm.verb.toFixed(2)}, width ${mm.width.toFixed(2)}`);
       for(const [group, rows] of LAB_SOUNDS) for(const [id, label] of rows){ const v=this.st[id]; if(!v || (v.g===1 && v.r===1 && !v.n)) continue;
         if(v.ri!==undefined && REF_ROWS[id]) v.refName=REF_FILES[REF_ROWS[id][v.ri]].replace(' - Epidemic Sound','').replace(/^ES_/,'').replace(/\.(mp3|wav)$/,'');
         lines.push(`- ${group} / ${label} [${id}]: volume ${v.g.toFixed(2)}, pitch ${v.r.toFixed(2)}${v.n?` — ${v.n}`:''}${v.refName?` (last reference played: ${v.refName})`:''}`); }

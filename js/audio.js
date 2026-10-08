@@ -31,14 +31,14 @@ const Sound = (() => {
      and its pitch varied a little, so repeats don't sound mechanical. */
   const SFX = { pulse:['pulse1','pulse2','pulse3'], rail:['rail1'], launch:['launch1','launch2'],
     hull:['hull1','hull2','hull3'], pop:['pop1'], boomL:['boom4'], rumble:['rumble'] };   // beams and shields have been synthesized since v65
-  const bufs={}; let lastPdcHit=0, lastPdcShield=0;
+  const bufs={}; let lastPdcHit=0, lastPdcShield=0, lastMiss=0;
   let labRate=1;   // v90: the sound lab's pitch (1 in the game)
   /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
      two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
      report after a crack and the roll of an explosion). A voice can also send to either on its own ({drive, verb}) and
      sit in the stereo field ({pan}). FX sets the sends for every sound: 0 keeps the game exactly as before v92; the
      sound lab tries other values without touching the game. */
-  const FX = { drive:0, verb:0, spread:0 };   // spread: each voice panned at random up to this far (0 to 1)
+  const FX = { drive:0.6, verb:0.3, spread:0.65 };   // v93: Jon's settings from the sound lab   // spread: each voice panned at random up to this far (0 to 1)
   let fx=null, shapeCurve=null, irBuf=null, spread=FX.spread;
   function makeFx(dest, drive, verb){
     const inp=ctx.createGain(); inp.connect(dest);
@@ -55,7 +55,8 @@ const Sound = (() => {
       for(let i=pre;i<len;i++){ const k2=(i-pre)/(len-pre); lp+= (Math.random()*2-1 - lp)*(0.5-0.42*k2); d[i]=lp*Math.exp(-k2*5.5); } }   // darker as it decays
     fx=makeFx(sfx, FX.drive, FX.verb); }
   // where a voice's gain stage goes: the chain's input, panned when asked or when the lab spreads voices, plus its own sends
-  function route(g, {drive=0, verb=0, pan=null}={}){
+  function route(g, {drive=0, verb=0, pan=null, dry=false}={}){
+    if(dry){ g.connect(sfx); return; }   // v93: interface sounds skip the chain: no grit, no room, centred
     let p=pan; if(p===null && spread>0) p=(Math.random()*2-1)*spread;
     if(p && ctx.createStereoPanner){ const pn=ctx.createStereoPanner(); pn.pan.value=clamp(p,-1,1); g.connect(pn); pn.connect(fx.in); } else g.connect(fx.in);
     if(drive){ const d=ctx.createGain(); d.gain.value=drive; g.connect(d); d.connect(fx.dist); }
@@ -79,6 +80,30 @@ const Sound = (() => {
     noise(dur,{type:'lowpass',f0:bright,f1:150,gain,attack:0.015,delay});
     tone(dur*0.9,{type:'sine',f0:lo,f1:lo*0.45,gain:gain*1.1,attack:0.012,delay});
     if(crack) crackle(dur*0.8,{gain:gain*crack*0.5,f:1400,density:28,delay:delay+0.05}); }
+  // v93: struck metal by modal synthesis: a click excites a set of inharmonic partials (the ratios of a struck plate),
+  // each ringing down on its own, over a bright noise burst; base is the lowest partial in Hz
+  function metal(base, {gain=0.2, decay=0.5, delay=0, drive=0.3, verb=0.25, parts=[1,2.32,4.25,6.63,9.38,12.1]}={}){
+    noise(0.012,{type:'highpass',f0:4000,f1:2000,gain:gain*1.6,attack:0.001,delay,drive});
+    noise(0.09,{type:'bandpass',f0:3200,f1:1400,q:1.5,gain:gain*1.1,attack:0.002,delay,drive});
+    parts.forEach((r,i)=>tone(decay*(1-i*0.11),{type:'sine',f0:base*r*(1+(Math.random()-0.5)*0.03),gain:gain*0.5/(1+i*0.6),attack:0.002,delay,verb}));
+    tone(0.16,{type:'sine',f0:120,f1:50,gain:gain*1.2,attack:0.003,delay,drive}); }
+  // v93: an electric discharge: noise through a sharp band-pass whose centre jumps at random every 25 ms, a gated buzz,
+  // crackle and fizz. Used for the beam, a beam on a hull and a beam on shields
+  function discharge(dur, {gain=0.2, delay=0, tail=0.25}={}){ if(!ctx) return; const t=now()+delay, T=dur+tail;
+    const src=ctx.createBufferSource(); src.buffer=noiseBuf; src.loop=true;
+    const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=7;
+    for(let x=0;x<T;x+=0.025) bp.frequency.setValueAtTime((900+Math.random()*3600)*labRate, t+x);
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.02); g.gain.setValueAtTime(gain,t+dur); g.gain.exponentialRampToValueAtTime(0.0001,t+T);
+    src.connect(bp); bp.connect(g); route(g,{drive:0.5, verb:0.3}); src.start(t, Math.random()); src.stop(t+T+0.05);
+    const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=58*labRate; const gate=ctx.createOscillator(); gate.type='square'; gate.frequency.value=31;
+    const gg=ctx.createGain(); gg.gain.value=0.5; gate.connect(gg); const bz=ctx.createGain(); bz.gain.setValueAtTime(0.0001,t); bz.gain.exponentialRampToValueAtTime(gain*0.22,t+0.03); bz.gain.setValueAtTime(gain*0.22,t+dur); bz.gain.exponentialRampToValueAtTime(0.0001,t+T);
+    gg.connect(bz.gain); o.connect(bz); route(bz,{drive:0.6}); [o,gate].forEach(x=>{ x.start(t); x.stop(t+T+0.05); });
+    crackle(dur,{gain:gain*0.9,f:3500,density:120,delay}); noise(T,{type:'highpass',f0:6000,f1:4000,gain:gain*0.25,attack:0.02,delay}); }
+  // v93: one concussive boom: a sharp transient, a driven low noise burst and a sub drop
+  function concuss(delay, {gain=0.3, lo=70, len=0.5, verb=0.4}={}){
+    noise(0.03,{type:'highpass',f0:2500,f1:900,gain:gain*0.5,attack:0.001,delay,drive:0.5});
+    noise(len,{type:'lowpass',f0:1600,f1:90,gain,attack:0.004,delay,drive:0.7,verb});
+    tone(len*1.1,{type:'sine',f0:lo,f1:lo*0.4,gain:gain*1.2,attack:0.004,delay}); }
   // electric crackle: a spray of tiny band-passed noise bursts at random moments
   function crackle(dur, {gain=0.15, f=3500, density=50, delay=0}={}){ const n=Math.max(3,Math.round(dur*density));
     for(let i=0;i<n;i++){ const k=Math.random(); noise(0.008+Math.random()*0.025, {type:'bandpass', f0:f*(0.6+Math.random()*0.9), f1:f*0.5, q:1.2, gain:gain*(0.3+Math.random()*0.7)*(1-k*0.5), delay:delay+k*dur}); } }
@@ -89,11 +114,11 @@ const Sound = (() => {
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     src.connect(flt); flt.connect(g); route(g,{drive,verb,pan}); src.start(t, Math.random()); src.stop(t+dur+0.05);
   }
-  function tone(dur, {type='sine', f0=440, f1=null, gain=0.3, attack=0.005, delay=0, dest=null, drive=0, verb=0, pan=null}={}){
+  function tone(dur, {type='sine', f0=440, f1=null, gain=0.3, attack=0.005, delay=0, dest=null, drive=0, verb=0, pan=null, dry=false}={}){
     if(!ctx) return; const t=now()+delay;
     const o=ctx.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0*labRate,t); if(f1) o.frequency.exponentialRampToValueAtTime(f1*labRate,t+dur);
     const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+attack); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g); if(dest) g.connect(dest); else route(g,{drive,verb,pan}); o.start(t); o.stop(t+dur+0.05);
+    o.connect(g); if(dest) g.connect(dest); else route(g,{drive,verb,pan,dry}); o.start(t); o.stop(t+dur+0.05);
   }
   const S = {
     init,
@@ -112,9 +137,9 @@ const Sound = (() => {
     setFxLevel(v){ fxLevel=clamp(v,0,1); store.set('fxVol',fxLevel); if(sfx && on) sfx.gain.setTargetAtTime(fv(), now(), 0.05); },
     toggleMusic(){ musicOn=!musicOn; store.set('music',musicOn); if(music) music.gain.setTargetAtTime(musicOn?mv():0, now(), musicOn?0.8:0.15); return musicOn; },
     setMood(m){ if(m===mood) return; if(m==='battle' && mood==='menu') pendingJump=8; mood=m; },
-    ui(){ tone(0.06,{type:'triangle',f0:1300,f1:900,gain:0.08}); },
-    select(){ tone(0.09,{type:'triangle',f0:660,f1:990,gain:0.1}); tone(0.07,{type:'sine',f0:1320,gain:0.05,delay:0.05}); },
-    deny(){ tone(0.14,{type:'square',f0:140,f1:110,gain:0.06}); },
+    ui(){ tone(0.06,{dry:true,type:'triangle',f0:1300,f1:900,gain:0.08}); },
+    select(){ tone(0.09,{dry:true,type:'triangle',f0:660,f1:990,gain:0.1}); tone(0.07,{dry:true,type:'sine',f0:1320,gain:0.05,delay:0.05}); },
+    deny(){ tone(0.14,{dry:true,type:'square',f0:140,f1:110,gain:0.06}); },
     move(){ noise(1.1,{type:'lowpass',f0:300,f1:120,gain:0.35,attack:0.15}); tone(1.0,{type:'sawtooth',f0:55,f1:48,gain:0.06,attack:0.2}); },
     // v65 (Jon): the railgun charges (a rising whine over RAIL_CHARGE seconds, fxRail waits as long), then fires with a thump
     // v91 (Jon, sound lab): a slower charge, pitched down a tenth, with electric crackle building over it; the shot is a
@@ -122,27 +147,20 @@ const Sound = (() => {
     rail(){ duck(0.55,RAIL_CHARGE+0.5); const c=RAIL_CHARGE;
       tone(c,{type:'sine',f0:162,f1:2340,gain:0.05,attack:c*0.8}); tone(c,{type:'square',f0:81,f1:1170,gain:0.012,attack:c*0.8}); noise(c,{type:'bandpass',f0:540,f1:4500,q:4,gain:0.08,attack:c*0.85});
       crackle(c*0.55,{gain:0.05,f:4200,density:35,delay:c*0.2}); crackle(c*0.35,{gain:0.1,f:3200,density:90,delay:c*0.62});
-      sample('rail',{gain:0.6,rate:0.5,delay:c,vary:0.04});
-      noise(0.07,{type:'highpass',f0:2600,f1:1200,gain:0.42,attack:0.002,delay:c}); noise(0.22,{type:'bandpass',f0:1400,f1:260,q:1.2,gain:0.45,attack:0.003,delay:c});
-      tone(0.22,{type:'sawtooth',f0:150,f1:48,gain:0.11,attack:0.003,delay:c}); tone(0.3,{type:'sine',f0:95,f1:40,gain:0.32,attack:0.004,delay:c});
-      crackle(0.2,{gain:0.1,f:1800,density:80,delay:c+0.02}); },
+      // v93 (Jon: the sniper-rifle reference, keeping the charge): a hard click, a driven crack, a deep body, and the report
+      // ringing out through the room with a slapback
+      sample('rail',{gain:0.4,rate:0.5,delay:c,vary:0.04});
+      noise(0.006,{type:'highpass',f0:5000,f1:3000,gain:0.7,attack:0.0008,delay:c,drive:0.8});
+      noise(0.14,{type:'bandpass',f0:2200,f1:420,q:1,gain:0.55,attack:0.002,delay:c,drive:0.9,verb:0.7});
+      tone(0.4,{type:'sine',f0:110,f1:38,gain:0.45,attack:0.003,delay:c,drive:0.3}); tone(0.18,{type:'sawtooth',f0:180,f1:60,gain:0.08,attack:0.002,delay:c,drive:0.6});
+      noise(0.5,{type:'lowpass',f0:1800,f1:120,gain:0.16,attack:0.01,delay:c+0.09,verb:0.8});   // the report
+      crackle(0.18,{gain:0.08,f:2000,density:70,delay:c+0.01}); },
     pulse(){ if(sample('pulse',{gain:0.5,vary:0.1})) return; tone(0.1,{type:'square',f0:980,f1:180,gain:0.09}); noise(0.08,{type:'bandpass',f0:3000,f1:900,q:2,gain:0.12}); },
     // v65: an energy beam: a short ignition, a detuned resonant hum with a slow filter sweep, and a fizz of energy over it
-    beam(dur=0.9){ if(!ctx) return; const t=now();
-      tone(0.22,{type:'sine',f0:520,f1:160,gain:0.08});
-      const o1=ctx.createOscillator(), o2=ctx.createOscillator(), o3=ctx.createOscillator(); o1.type='sawtooth'; o2.type='sawtooth'; o3.type='sine'; o1.frequency.value=98; o2.frequency.value=98.8; o3.frequency.value=49;
-      const f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=6; f.frequency.value=900;
-      const flfo=ctx.createOscillator(); flfo.frequency.value=7; const fg=ctx.createGain(); fg.gain.value=260; flfo.connect(fg); fg.connect(f.frequency);
-      const tail=0.7;   // v67: the hum trails off after the beam instead of stopping with it
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.13,t+0.08); g.gain.setValueAtTime(0.13,t+dur*0.75); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
-      const tl=ctx.createOscillator(); tl.frequency.value=38; const tg=ctx.createGain(); tg.gain.value=0.025; tl.connect(tg); tg.connect(g.gain);
-      o1.connect(f); o2.connect(f); o3.connect(f); f.connect(g); route(g); [o1,o2,o3,flfo,tl].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
-      // v67 (Jon): a high shimmer over the hum: two detuned sines with a slow vibrato, trailing off with it
-      const h1=ctx.createOscillator(), h2=ctx.createOscillator(); h1.type=h2.type='sine'; h1.frequency.value=2093; h2.frequency.value=2111;
-      const vib=ctx.createOscillator(); vib.frequency.value=5; const vg=ctx.createGain(); vg.gain.value=9; vib.connect(vg); vg.connect(h1.frequency); vg.connect(h2.frequency);
-      const hg=ctx.createGain(); hg.gain.setValueAtTime(0.0001,t); hg.gain.exponentialRampToValueAtTime(0.03,t+0.12); hg.gain.setValueAtTime(0.03,t+dur*0.75); hg.gain.exponentialRampToValueAtTime(0.0001,t+dur+tail);
-      h1.connect(hg); h2.connect(hg); route(hg); [h1,h2,vib].forEach(o=>{ o.start(t); o.stop(t+dur+tail+0.05); });
-      crackle(dur*0.9,{gain:0.05,f:6000,density:25}); },
+    // v93 (Jon: the electric-discharge reference): a short ignition, then a hard plasma discharge for the length of the beam,
+    // trailing off (replaces v65's detuned hum and v67's shimmer)
+    beam(dur=0.9){ if(!ctx) return; tone(0.22,{type:'sine',f0:520,f1:160,gain:0.08,drive:0.4}); noise(0.05,{type:'highpass',f0:4000,f1:2000,gain:0.2,attack:0.001,drive:0.5});
+      discharge(dur,{gain:0.22, tail:0.45}); },
     // v65: a fast missile leaving the tube: a quick rising whoosh and a whine, a little of the thruster recording for body
     missile(){ noise(0.45,{type:'bandpass',f0:900,f1:5200,q:2.5,gain:0.22,attack:0.02}); noise(0.3,{type:'highpass',f0:6000,f1:3000,gain:0.07}); tone(0.35,{type:'sawtooth',f0:420,f1:1700,gain:0.018}); sample('launch',{gain:0.22,rate:2.2,dur:0.35,vary:0.1}); },
     fighter(){ noise(1.0,{type:'bandpass',f0:1200,f1:3200,q:4,gain:0.12,attack:0.2}); },
@@ -155,28 +173,35 @@ const Sound = (() => {
         tone(0.035,{type:'square',f0:190+Math.random()*40,f1:70,gain:0.028*v,attack:0.002,delay:d}); } },
     // v65 (Jon): what a hull hit sounds like depends on what hit it
     hit(kind){
-      // v91 (Jon, sound lab): PDC rounds tear into metal: the hull recording pitched well down, a resonant metallic rasp and a
-      // fast rattle of ticks. Still thinned so a burst doesn't stack up (v74)
-      if(kind==='pdc'){ if(!ctx) return; const t=now(); if(t-lastPdcHit<0.09) return; lastPdcHit=t; sample('hull',{gain:0.3,rate:0.75,vary:0.15});
-        noise(0.16,{type:'bandpass',f0:1700,f1:650,q:6,gain:0.14,attack:0.003}); crackle(0.13,{gain:0.13,f:1500,density:130}); return; }
-      // v91: a torpedo is a much bigger explosion: two blasts, the low rumble recording and a long sub drop
-      if(kind==='torpedo'){ blast(1.4,{gain:0.36,lo:45,bright:1800,crack:1}); blast(0.6,{gain:0.16,lo:80,bright:2600,crack:0.4,delay:0.14});
-        sample('rumble',{gain:0.32,rate:1.1,vary:0.05}); tone(1.5,{type:'sine',f0:55,f1:20,gain:0.4,attack:0.01}); return; }
+      // v93 (Jon: the Metal 02 reference): each PDC round a short, bright metal strike, base pitch varied per round; still
+      // thinned so a burst doesn't stack up (v74)
+      if(kind==='pdc'){ if(!ctx) return; const t=now(); if(t-lastPdcHit<0.09) return; lastPdcHit=t;
+        metal(520+Math.random()*260,{gain:0.14,decay:0.22,drive:0.4,verb:0.15,parts:[1,2.32,4.25,6.63]}); crackle(0.08,{gain:0.08,f:2500,density:120}); return; }
+      // v93 (Jon: the TNT heavy-blast reference): one huge concussion, a long low rolling tail through the room, debris crackle
+      if(kind==='torpedo'){ concuss(0,{gain:0.42,lo:52,len:0.9,verb:0.6}); blast(1.4,{gain:0.3,lo:45,bright:1600,crack:1});
+        noise(2.6,{type:'lowpass',f0:700,f1:50,gain:0.22,attack:0.05,delay:0.1,verb:0.6}); sample('rumble',{gain:0.35,rate:1.0,vary:0.05});
+        tone(2.0,{type:'sine',f0:48,f1:18,gain:0.4,attack:0.01}); crackle(1.6,{gain:0.07,f:1800,density:25,delay:0.3}); return; }
       // v91: missiles and strike craft land as small explosions with a report: a sharp crack on the impact, then the blast
       if(kind==='missile' || kind==='fighter'){ const F=kind==='fighter';
         if(!sample('pop',{gain:F?0.22:0.3,rate:F?1.15:0.95,vary:0.1})) noise(0.05,{type:'highpass',f0:3200,f1:1500,gain:0.3,attack:0.001});
         noise(0.05,{type:'highpass',f0:3000,f1:1400,gain:F?0.2:0.28,attack:0.001}); tone(0.08,{type:'square',f0:F?340:300,f1:80,gain:0.04});
         blast(F?0.5:0.65,{gain:F?0.2:0.25,lo:F?85:70,bright:F?3000:2600,crack:F?0.5:0.6,delay:0.015}); return; }
-      // v91 (Jon): a beam on a hull is electrical static: a dense crackle, a mains-like buzz and a thin hiss
-      if(kind==='beam'){ crackle(0.7,{gain:0.17,f:3000,density:130}); crackle(0.55,{gain:0.08,f:6500,density:80,delay:0.05});
-        tone(0.65,{type:'sawtooth',f0:120,f1:100,gain:0.035,attack:0.03}); tone(0.65,{type:'square',f0:240,f1:200,gain:0.01,attack:0.03});
-        noise(0.6,{type:'highpass',f0:5000,f1:3500,gain:0.05,attack:0.04}); return; }
+      if(kind==='beam'){ discharge(0.6,{gain:0.2, tail:0.25}); crackle(0.5,{gain:0.06,f:1500,density:60}); return; }   // v93: the discharge burning into the hull
       if(kind==='pulse'){ sample('hull',{gain:0.6,rate:0.85,vary:0.12}); sample('pop',{gain:0.25,rate:1.8,vary:0.15}); noise(0.12,{type:'lowpass',f0:4000,f1:400,gain:0.35}); tone(0.14,{type:'sine',f0:140,f1:55,gain:0.3}); return; }   // a punchy blast
-      if(kind==='rail'){ sample('pop',{gain:0.35,rate:0.75,vary:0.1}); noise(0.45,{type:'bandpass',f0:3200,f1:500,q:2.5,gain:0.25,attack:0.005}); tone(0.3,{type:'sawtooth',f0:260,f1:70,gain:0.06}); tone(0.35,{type:'sine',f0:95,f1:35,gain:0.4}); crackle(0.35,{gain:0.15,f:2200,density:60}); return; }   // v66: a slug ripping into metal
+      // v93 (Jon: the Metal 01 reference, pitch 1.05): a slug striking plate: a heavy, ringing metal hit with the hull recording under it
+      if(kind==='rail'){ metal(441,{gain:0.24,decay:0.7,drive:0.35,verb:0.35}); sample('hull',{gain:0.35,rate:0.8,vary:0.08}); tone(0.35,{type:'sine',f0:95,f1:35,gain:0.35}); return; }
       // v91 (Jon): the generic hull hit rips metal: the hull recording, a resonant tearing rasp, a rattle and a short ring
       if(!sample('hull',{gain:0.7,rate:0.72,vary:0.1})) noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3});
       noise(0.4,{type:'bandpass',f0:2400,f1:600,q:5,gain:0.17,attack:0.004}); crackle(0.35,{gain:0.12,f:1500,density:90});
       tone(0.5,{type:'triangle',f0:520,f1:470,gain:0.025}); tone(0.45,{type:'triangle',f0:1310,f1:1240,gain:0.015}); tone(0.2,{type:'sine',f0:90,f1:40,gain:0.2}); },
+    // v93 (Jon: the energy-ricochet reference): a direct-fire shot that misses glances away: a fast falling zip with a
+    // wobble, a thin noise streak, panned off to one side, a little room
+    miss(){ if(!ctx) return; const t=now(); if(t-lastMiss<0.08) return; lastMiss=t; const f=2600+Math.random()*1800, p=(Math.random()<0.5?-1:1)*(0.4+Math.random()*0.5);
+      const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f*labRate,t); o.frequency.exponentialRampToValueAtTime(f*0.32*labRate,t+0.22);
+      const v=ctx.createOscillator(); v.frequency.value=38; const vg=ctx.createGain(); vg.gain.value=f*0.06; v.connect(vg); vg.connect(o.frequency);
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.09,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+0.26);
+      o.connect(g); route(g,{pan:p, verb:0.4}); [o,v].forEach(x=>{ x.start(t); x.stop(t+0.3); });
+      noise(0.16,{type:'bandpass',f0:f*1.2,f1:f*0.5,q:4,gain:0.06,attack:0.004,pan:p,verb:0.3}); },
     intercept(){ if(sample('pop',{gain:0.45,rate:1.35,vary:0.12})) return; noise(0.2,{type:'lowpass',f0:3000,f1:300,gain:0.2}); },
     alarm(){ crackle(0.3,{gain:0.14,f:3000,density:60}); tone(0.3,{type:'square',f0:62,f1:48,gain:0.03}); },   // v66: a system shorting out (was a two-tone beep that read as a doorbell)
     // v66: the blasts running along a dying ship before it goes up
@@ -188,8 +213,15 @@ const Sound = (() => {
       // short shield shimmer (a falling resonant tone) instead of the full static, which read as a crunch
       if(kind==='torpedo' || kind==='missile' || kind==='fighter'){ const T=kind==='torpedo';
         blast(T?0.8:0.5,{gain:T?0.24:0.17, lo:T?60:80, bright:T?2800:3200, crack:0.2}); tone(0.35,{type:'sine',f0:T?260:320,f1:T?120:150,gain:0.05}); crackle(0.15,{gain:0.07,f:4000,density:50}); return; }
-      const d= kind==='beam'? 0.55 : 0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03}); },
+      if(kind==='beam'){ discharge(0.5,{gain:0.17, tail:0.2}); tone(0.4,{type:'sine',f0:300,f1:140,gain:0.04}); return; }   // v93 (Jon): the discharge on the shield
+      const d=0.22; crackle(d,{gain:0.18,f:3500,density:70}); tone(d,{type:'sawtooth',f0:120,f1:110,gain:0.022}); tone(0.06,{type:'square',f0:2400,f1:800,gain:0.03}); },
     boom(size=1){ duck(0.35,1.2);
+      // v93 (Jon): a medium hull goes up in stacked, concussive booms; a capital in fast consecutive booms that ring out
+      // (a low, slowly fading ring through the room). Both lead into the recorded explosion below
+      const tierN= size<0.9? 0 : size<1.8? 1 : 2;
+      if(tierN===1){ [0,0.17,0.36].forEach((d,i)=>concuss(d,{gain:0.24+i*0.05,lo:75-i*8,len:0.45+i*0.1,verb:0.45})); }
+      if(tierN===2){ for(let i=0;i<6;i++) concuss(i*0.11+Math.random()*0.03,{gain:0.2+i*0.03,lo:70-i*4,len:0.4,verb:0.6});
+        [55,82.5,110,165].forEach((f,i)=>tone(3.2-i*0.4,{type:'sine',f0:f,f1:f*0.97,gain:0.07/(1+i*0.5),attack:0.05,delay:0.25,verb:0.8})); }
       // size is about a ship's length over 2.2: Patrol craft ~0.5, Destroyer ~1.6, Dreadnought ~2.8; asteroids 1.1
       // v67 (Jon): every hull uses the capital explosion he liked, pitched up and quieter as ships get smaller; the short
       // recordings used for small and medium hulls clipped and cut off. Levels are lower all round so stacks don't clip.
@@ -197,12 +229,12 @@ const Sound = (() => {
       if(sample('boomL',{gain:P.gain, rate:P.rate, vary:0.05})){ if(P.rumble) sample('rumble',{gain:P.rumble, rate:tier===1?1.2:1, vary:0}); tone(0.9+0.5*size,{type:'sine',f0:70,f1:22,gain:P.sub,attack:0.01}); if(tier===0) blast(0.6,{gain:0.12,lo:90,bright:2400,crack:0.4}); return; }
       noise(1.2+size, {type:'lowpass',f0:1400,f1:40,gain:0.7,attack:0.01}); tone(1.2*size,{type:'sine',f0:70,f1:22,gain:0.7}); noise(0.3,{type:'highpass',f0:3000,f1:800,gain:0.25}); },
     power(){ tone(0.5,{type:'sine',f0:220,f1:880,gain:0.1}); tone(0.5,{type:'triangle',f0:330,f1:1320,gain:0.05,delay:0.05}); },
-    turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
+    turn(side){ const base = side==='player'?392:262; [0,0.12].forEach((d,i)=>tone(0.45,{dry:true,type:'triangle',f0:base*(i?1.5:1),gain:0.09,delay:d})); },
     // v63 stings: a rising fanfare that resolves into a held chord; defeat falls to a low minor chord over a rumble
-    win(){ duck(0.2,3.5); [392,494,587,784].forEach((f,i)=>tone(0.9,{type:'triangle',f0:f,gain:0.1,delay:i*0.14}));
-      [392,494,587,784,988].forEach(f=>{ tone(2.6,{type:'triangle',f0:f,gain:0.06,attack:0.25,delay:0.6}); tone(2.6,{type:'sine',f0:f*2,gain:0.02,attack:0.3,delay:0.6}); }); tone(2.8,{type:'sine',f0:98,gain:0.12,attack:0.3,delay:0.6}); },
-    lose(){ duck(0.2,3.5); sample('rumble',{gain:0.6,rate:0.8,vary:0}); [330,277,247,196].forEach((f,i)=>tone(1.0,{type:'sawtooth',f0:f,gain:0.04,delay:i*0.2}));
-      [196,233,294].forEach(f=>tone(3.0,{type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
+    win(){ duck(0.2,3.5); [392,494,587,784].forEach((f,i)=>tone(0.9,{dry:true,type:'triangle',f0:f,gain:0.1,delay:i*0.14}));
+      [392,494,587,784,988].forEach(f=>{ tone(2.6,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.25,delay:0.6}); tone(2.6,{dry:true,type:'sine',f0:f*2,gain:0.02,attack:0.3,delay:0.6}); }); tone(2.8,{dry:true,type:'sine',f0:98,gain:0.12,attack:0.3,delay:0.6}); },
+    lose(){ duck(0.2,3.5); sample('rumble',{gain:0.6,rate:0.8,vary:0}); [330,277,247,196].forEach((f,i)=>tone(1.0,{dry:true,type:'sawtooth',f0:f,gain:0.04,delay:i*0.2}));
+      [196,233,294].forEach(f=>tone(3.0,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{dry:true,type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
   };
   /* ---------- cinematic score: generative, scheduled with lookahead ---------- */
   function startMusic(){
