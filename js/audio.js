@@ -40,7 +40,7 @@ const Sound = (() => {
      or fewer holds 3. It rises at the next bar and falls one level a bar. Times are the audio clock, not timeScale, so
      the big-moment slow motion never drags the music. */
   const DRUMS = { fireHold:4, killHold:6, gain:0.9, drive:2.2, makeup:1.0, verb:0.14, calm:0.7, lowShelf:6 };   // calm: the level-0 and level-1 drums' share   // v97: louder, through their own punchy bus
-  let drumLv=0, drumRose=false, lastFire=-99, lastKill=-99, lastStand=false, drumPreview=null;
+  let drumBars=0, drumLv=0, drumRose=false, lastFire=-99, lastKill=-99, lastStand=false, drumPreview=null;
   /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
      two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
      report after a crack and the roll of an explosion). A voice can also send to either on its own ({drive, verb}) and
@@ -274,7 +274,7 @@ const Sound = (() => {
     shime: { f0:380, f1:230, dur:0.18, g:0.5,  p2:2.1, click:0.6,  nHz:2600, nQ:0.9, nAmt:0.8,  nType:'bandpass', nDur:0.05, players:2 },
     ka:    { f0:950, f1:720, dur:0.05, g:0.3,  p2:0,   click:0.9,  nHz:1900, nQ:0.5, nAmt:1.0,  nType:'highpass', nDur:0.05, players:2 },
   };
-  let drumOne=null, drumBus=null;   // the score's drum voice, for one-shot hits outside the patterns (set in startMusic)
+  let drumOne=null, drumBus=null, seqBus=null;   // the score's drum voice, for one-shot hits outside the patterns (set in startMusic)
   /* ---------- cinematic score: generative, scheduled with lookahead ---------- */
   function startMusic(){
     if(!ctx || musicNodes) return;
@@ -291,6 +291,10 @@ const Sound = (() => {
       const cp=ctx.createDynamicsCompressor(); cp.threshold.value=-20; cp.knee.value=4; cp.ratio.value=5; cp.attack.value=0.004; cp.release.value=0.12;
       const ls=ctx.createBiquadFilter(); ls.type='lowshelf'; ls.frequency.value=140; ls.gain.value=DRUMS.lowShelf; const hc=ctx.createBiquadFilter(); hc.type='lowpass'; hc.frequency.value=7000;   // v98: more low end, softer top
       const mk=ctx.createGain(); mk.gain.value=DRUMS.makeup; drumBus.connect(ls); ls.connect(hc); hc.connect(sh); sh.connect(cp); cp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=DRUMS.verb; mk.connect(ws); ws.connect(revIn); }
+    // v100: the synth pulse's bus: a light tanh drive and a top cut, then the dry music bus with a touch of the hall
+    seqBus=ctx.createGain(); { const sh=ctx.createWaveShaper(), cv=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; cv[i]=Math.tanh(2.5*x)/Math.tanh(2.5); } sh.curve=cv;
+      const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; const mk=ctx.createGain(); mk.gain.value=0.8;
+      seqBus.connect(sh); sh.connect(lp); lp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=0.12; mk.connect(ws); ws.connect(revIn); }
     const mf=m=>440*Math.pow(2,(m-69)/12);
     const env=(g,t,a,peak,hold,rel)=>{ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.setValueAtTime(peak,t+a+hold); g.gain.exponentialRampToValueAtTime(0.0001,t+a+hold+rel); };
     const osc=(type,f,t,stop,detune=0)=>{ const o=ctx.createOscillator(); o.type=type; o.frequency.value=f; o.detune.value=detune; o.start(t); o.stop(stop); return o; };
@@ -306,7 +310,7 @@ const Sound = (() => {
         o1.connect(f); o2.connect(f); f.connect(g); env(g,t,0.06,0.07*vel,dur*0.75,0.45); out(g,0.5); },
       bass(t,m,dur,vel){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=260;
         osc('sawtooth',mf(m),t,t+dur+0.2).connect(f); osc('sine',mf(m-12),t,t+dur+0.2).connect(f); f.connect(g); env(g,t,0.01,0.16*vel,dur*0.5,dur*0.5); out(g,0.1); },
-      // v95: cinematic voices. pad: slow-swelling strings; drone: a low pedal; pulse: short low strings; braam: a low,
+      // v95: cinematic voices. pad: slow-swelling strings; drone: a low pedal; braam: a low,
       // dense brass hit whose filter tears open
       pad(t,notes,dur,vel){ notes.forEach(m=>{ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=0.7;
           f.frequency.setValueAtTime(500,t); f.frequency.linearRampToValueAtTime(700+vel*1100,t+dur*0.4);
@@ -314,8 +318,19 @@ const Sound = (() => {
       drone(t,m,dur){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=230;
         osc('sawtooth',mf(m),t,t+dur+3).connect(f); osc('sawtooth',mf(m),t,t+dur+3,7).connect(f); osc('sine',mf(m-12),t,t+dur+3).connect(f);
         f.connect(g); env(g,t,2.0,0.09,Math.max(0,dur-2),3.0); out(g,0.5); },
-      pulse(t,m,dur,vel){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=520+vel*300;
-        [-7,7].forEach(d=>osc('sawtooth',mf(m),t,t+dur+0.2,d).connect(f)); f.connect(g); env(g,t,0.008,0.05*vel,dur*0.35,0.18); out(g,0.25); },
+      // v100 (Jon: the Expanse, Rocinante against the Zmeya): the tactical layer. seq: a sequenced synth-bass pulse, a saw and
+      // a detuned square through a resonant low-pass that snaps open on each note, into its own light distortion;
+      // tick and clank: short, mostly-noise mechanical percussion (no pitched ring)
+      seq(t,m,vel,open){ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=7;
+        f.frequency.setValueAtTime(180,t); f.frequency.exponentialRampToValueAtTime(260+open*1300*vel,t+0.006); f.frequency.exponentialRampToValueAtTime(170,t+0.09);
+        osc('sawtooth',mf(m),t,t+0.14).connect(f); osc('square',mf(m),t,t+0.14,-8).connect(f); f.connect(g);   // both in the 60-150 Hz band the reference lives in
+        g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.11*vel,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.1); g.connect(seqBus); },
+      tick(t,vel){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=5200; const g=ctx.createGain();
+        g.gain.setValueAtTime(0.05*vel,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.018); n.connect(f); f.connect(g); out(g,0.1); n.start(t,Math.random()); n.stop(t+0.03); },
+      clank(t,vel){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1100; f.Q.value=2.2; const g=ctx.createGain();
+        g.gain.setValueAtTime(0.09*vel,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.07); n.connect(f); f.connect(g); out(g,0.25); n.start(t,Math.random()); n.stop(t+0.09);
+        const l=ctx.createBufferSource(); l.buffer=noiseBuf; const lf=ctx.createBiquadFilter(); lf.type='lowpass'; lf.frequency.value=300; const lg=ctx.createGain();
+        lg.gain.setValueAtTime(0.12*vel,t); lg.gain.exponentialRampToValueAtTime(0.0001,t+0.06); l.connect(lf); lf.connect(lg); out(lg,0.15); l.start(t,Math.random()); l.stop(t+0.08); },
       braam(t,notes,dur,vel){ notes.forEach((m,i)=>{ const g=ctx.createGain(), f=ctx.createBiquadFilter(); f.type='lowpass'; f.Q.value=1.4;
           f.frequency.setValueAtTime(140,t); f.frequency.exponentialRampToValueAtTime(1500*vel,t+0.22); f.frequency.exponentialRampToValueAtTime(420,t+dur);
           [-16,-5,6,17].forEach(d=>osc('sawtooth',mf(m),t,t+dur+1.2,d).connect(f)); f.connect(g); env(g,t,0.05,0.05*vel/(1+i*0.3),dur*0.45,dur*0.6+0.4); out(g,0.55); });
@@ -365,6 +380,13 @@ const Sound = (() => {
           ka:    ['................','................','................','X..X..X.........'] },
     };
     const DRUM_VEL = { X:1.0, x:0.72, g:0.32 };
+    // v100: the tactical layer, 32 steps a bar (two per score step, about 104 ms at 72 BPM; the reference's pulse ran
+    // every 80 ms). seq: the synth bass on the chord root, accents in 3-3-2; tick and clank the mechanical percussion
+    const SEQ_P = {
+      1:{ seq:'X...x...x...x...X...x...x...x.x.', tick:'....x.......x.......x.......x...', clank:'................................' },
+      2:{ seq:'X.xX.xX.X.xX.xX.X.xX.xX.X.xX.x.x', tick:'..x...x...x...x...x...x...x...x.', clank:'........X...............X.......' },
+      3:{ seq:'XxxXxxXxXxxXxxXxXxxXxxXxXxxXxXxX', tick:'.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x', clank:'........X.......X.......X...X.X.' },
+    };
     // the level for the coming bar: the mood's floor, raised by recent fire, a recent kill, a last stand or a lab preview;
     // up at once, down one level a bar
     function drumBar(){ const now=ctx.currentTime;
@@ -372,7 +394,7 @@ const Sound = (() => {
       if(now-lastFire<DRUMS.fireHold) want=Math.max(want,2);
       if(now-lastKill<DRUMS.killHold || (lastStand && mood!=='menu')) want=3;
       if(drumPreview && now<drumPreview.until) want=drumPreview.lv;
-      const was=drumLv; drumLv= want>drumLv? want : want<drumLv? drumLv-1 : drumLv; drumRose= drumLv>was; }
+      const was=drumLv; drumBars++; drumLv= want>drumLv? want : (want<drumLv && drumBars%2===0)? drumLv-1 : drumLv; drumRose= drumLv>was; }   // v100: up at once, down a level every two bars
 
     // v95: the whole score follows the battle's intensity (drumLv, set once a bar by drumBar), not a fixed 32-bar cycle:
     // 0 drone, pads and choir; 1 adds the bass and the drums' heartbeat; 2 adds a low string pulse, braams at phrase starts
@@ -389,7 +411,10 @@ const Sound = (() => {
       if(endMood) return;
       if(st===0 && ((lv>=2 && sb%4===0) || (lv===3 && drumRose))) I.braam(t, [root-12, root, root+7], STEP*12, lv===3? 1 : 0.8);
       if(st===0 && (menu? sb%8===0 : lv<=1? sb%4===0 : chordStart)) I.boom(t);
-      if(lv>=2 && st%2===0){ const v=(ACC.has(st)?1:0.55)*(lv===3?1:0.8); I.pulse(t, root, STEP*1.6, v); if(lv===3 && st%4===0) I.pulse(t, root+12, STEP*1.6, v*0.6); }
+      if(lv>=1 && !menu){ const L=SEQ_P[lv], amt= lv===1? 0.55 : lv===2? 0.8 : 1;   // v100: the tactical layer (replaces the low string pulse)
+        for(let h=0; h<2; h++){ const k=st*2+h, tt=t+h*STEP/2, c=L.seq[k];
+          if(c!=='.') I.seq(tt, root+(c==='X'&&lv===3&&k%8===0? 12 : 0), amt*(c==='X'?1:0.6), lv/3);
+          if(L.tick[k]!=='.') I.tick(tt, amt); if(L.clank[k]!=='.') I.clank(tt, amt); } }
       if(lv===3 && sb%8===0) for(const [o,m,l] of MOTIF) if(o===st) I.horn(t, m, STEP*l, 0.85);
       if(lv>=2 && sb%8===6 && st===0) I.riser(t, STEP*32);
       // percussion (v94): the taiko ensemble at the battle's intensity
