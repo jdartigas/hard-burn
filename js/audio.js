@@ -39,7 +39,7 @@ const Sound = (() => {
      events lift it: weapons fire to 2 for DRUMS.fireHold s, a kill to 3 for DRUMS.killHold s, and a side down to two ships
      or fewer holds 3. It rises at the next bar and falls one level a bar. Times are the audio clock, not timeScale, so
      the big-moment slow motion never drags the music. */
-  const DRUMS = { fireHold:4, killHold:6, gain:0.5 };
+  const DRUMS = { fireHold:4, killHold:6, gain:0.9, drive:2.2, makeup:1.15, verb:0.12, calm:0.7 };   // calm: the level-0 and level-1 drums' share   // v97: louder, through their own punchy bus
   let drumLv=0, drumRose=false, lastFire=-99, lastKill=-99, lastStand=false, drumPreview=null;
   /* v92: the effects chain. Every voice now goes into fx.in, not straight to the sfx bus. fx.in feeds the bus dry, plus
      two parallel sends: drive (a tanh waveshaper, for grit and weight) and verb (a short, dark, synthesized room, for the
@@ -261,13 +261,15 @@ const Sound = (() => {
       [196,233,294].forEach(f=>tone(3.0,{dry:true,type:'triangle',f0:f,gain:0.06,attack:0.4,delay:0.8})); tone(3.2,{dry:true,type:'sine',f0:49,gain:0.14,attack:0.4,delay:0.8}); },
   };
   // v94: the drum voices (from js/taiko-battle-drums.js); wet is each one's share of the score's hall reverb
+  // v97 (Jon: hit harder, more Battlestar): each kind is played as an ensemble (players, a few ms apart and slightly detuned,
+  // so every stroke is thick), with a beater click, a body that drops in pitch, a second body partial and the skin noise
   const DRUM_KINDS = {
-    odaiko:{ f0:95,  f1:40,  dur:1.2,  g:1.0,  nHz:280,  nQ:0.7, nAmt:0.45, nType:'bandpass', nDur:0.09, wet:0.4 },
-    chu:   { f0:175, f1:82,  dur:0.6,  g:0.8,  nHz:700,  nQ:0.8, nAmt:0.45, nType:'bandpass', nDur:0.07, wet:0.3 },
-    shime: { f0:340, f1:215, dur:0.22, g:0.5,  nHz:2600, nQ:0.9, nAmt:0.7,  nType:'bandpass', nDur:0.05, wet:0.2 },
-    ka:    { f0:900, f1:700, dur:0.05, g:0.28, nHz:1800, nQ:0.5, nAmt:1.0,  nType:'highpass', nDur:0.05, wet:0.15 },
+    odaiko:{ f0:110, f1:38,  dur:1.4,  g:1.0,  p2:1.6, click:0.35, nHz:240,  nQ:0.7, nAmt:0.6,  nType:'bandpass', nDur:0.14, players:3 },
+    chu:   { f0:190, f1:78,  dur:0.55, g:0.85, p2:1.7, click:0.45, nHz:650,  nQ:0.8, nAmt:0.6,  nType:'bandpass', nDur:0.09, players:3 },
+    shime: { f0:380, f1:230, dur:0.18, g:0.5,  p2:2.1, click:0.6,  nHz:2600, nQ:0.9, nAmt:0.8,  nType:'bandpass', nDur:0.05, players:2 },
+    ka:    { f0:950, f1:720, dur:0.05, g:0.3,  p2:0,   click:0.9,  nHz:1900, nQ:0.5, nAmt:1.0,  nType:'highpass', nDur:0.05, players:2 },
   };
-  let drumOne=null;   // the score's drum voice, for one-shot hits outside the patterns (set in startMusic)
+  let drumOne=null, drumBus=null;   // the score's drum voice, for one-shot hits outside the patterns (set in startMusic)
   /* ---------- cinematic score: generative, scheduled with lookahead ---------- */
   function startMusic(){
     if(!ctx || musicNodes) return;
@@ -278,6 +280,11 @@ const Sound = (() => {
     const verb=ctx.createConvolver(); verb.buffer=ir; const revIn=ctx.createGain(); revIn.gain.value=1.05; revIn.connect(verb); verb.connect(music);
     const dry=ctx.createGain(); dry.gain.value=1; dry.connect(music);
     const out=(node, wet)=>{ node.connect(dry); const s=ctx.createGain(); s.gain.value=wet; node.connect(s); s.connect(revIn); };
+    // v97: the drums' own bus, close and punchy: soft saturation, a fast compressor and makeup gain, straight to the music
+    // bus with only a little of the hall (the score's voices sit in the hall; the drums sit in front of them)
+    drumBus=ctx.createGain(); { const sh=ctx.createWaveShaper(), cv=new Float32Array(1024), kd=DRUMS.drive; for(let i=0;i<1024;i++){ const x=i/511.5-1; cv[i]=Math.tanh(kd*x)/Math.tanh(kd); } sh.curve=cv;
+      const cp=ctx.createDynamicsCompressor(); cp.threshold.value=-20; cp.knee.value=4; cp.ratio.value=5; cp.attack.value=0.004; cp.release.value=0.12;
+      const mk=ctx.createGain(); mk.gain.value=DRUMS.makeup; drumBus.connect(sh); sh.connect(cp); cp.connect(mk); mk.connect(dry); const ws=ctx.createGain(); ws.gain.value=DRUMS.verb; mk.connect(ws); ws.connect(revIn); }
     const mf=m=>440*Math.pow(2,(m-69)/12);
     const env=(g,t,a,peak,hold,rel)=>{ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.setValueAtTime(peak,t+a+hold); g.gain.exponentialRampToValueAtTime(0.0001,t+a+hold+rel); };
     const osc=(type,f,t,stop,detune=0)=>{ const o=ctx.createOscillator(); o.type=type; o.frequency.value=f; o.detune.value=detune; o.start(t); o.stop(stop); return o; };
@@ -308,11 +315,16 @@ const Sound = (() => {
           [-16,-5,6,17].forEach(d=>osc('sawtooth',mf(m),t,t+dur+1.2,d).connect(f)); f.connect(g); env(g,t,0.05,0.05*vel/(1+i*0.3),dur*0.45,dur*0.6+0.4); out(g,0.55); });
         const sg=ctx.createGain(); osc('sine',mf(notes[0]-12),t,t+dur+1).connect(sg); env(sg,t,0.03,0.18*vel,dur*0.4,dur*0.6); out(sg,0.3); },
       // v94: the taiko ensemble (voices from js/taiko-battle-drums.js): a pitch-dropping body and a filtered skin attack
-      drum(kind,t,vel){ const k=DRUM_KINDS[kind], v=Math.min(1.2,vel)*k.g*DRUMS.gain;
-        const o=osc('sine',k.f0,t,t+k.dur+0.05); o.frequency.setValueAtTime(k.f0,t); o.frequency.exponentialRampToValueAtTime(k.f1,t+Math.min(0.12,k.dur*0.25));
-        const og=ctx.createGain(); og.gain.setValueAtTime(0.0001,t); og.gain.exponentialRampToValueAtTime(v,t+0.004); og.gain.exponentialRampToValueAtTime(0.0001,t+k.dur); o.connect(og); out(og,k.wet);
-        const n=ctx.createBufferSource(); n.buffer=noiseBuf; const nf=ctx.createBiquadFilter(); nf.type=k.nType; nf.frequency.value=k.nHz; nf.Q.value=k.nQ;
-        const ng=ctx.createGain(); ng.gain.setValueAtTime(v*k.nAmt,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+k.nDur); n.connect(nf); nf.connect(ng); out(ng,k.wet*0.7); n.start(t,Math.random()*0.5); n.stop(t+k.nDur+0.02); },
+      drum(kind,t,vel){ const k=DRUM_KINDS[kind], v0=Math.min(1.2,vel)*k.g*DRUMS.gain/Math.sqrt(k.players);
+        for(let pl=0; pl<k.players; pl++){ const tt=t+(pl? Math.random()*0.011 : 0), dt=1+(Math.random()-0.5)*0.05, v=v0*(pl? 0.8+Math.random()*0.2 : 1);
+          const o=osc('sine',k.f0*dt,tt,tt+k.dur+0.05); o.frequency.setValueAtTime(k.f0*dt,tt); o.frequency.exponentialRampToValueAtTime(k.f1*dt,tt+Math.min(0.14,k.dur*0.22));
+          const og=ctx.createGain(); og.gain.setValueAtTime(0.0001,tt); og.gain.exponentialRampToValueAtTime(v,tt+0.003); og.gain.exponentialRampToValueAtTime(0.0001,tt+k.dur); o.connect(og); og.connect(drumBus);
+          if(k.p2){ const o2=osc('sine',k.f0*k.p2*dt,tt,tt+k.dur*0.5); o2.frequency.exponentialRampToValueAtTime(k.f1*k.p2*dt,tt+0.1); const g2=ctx.createGain();
+            g2.gain.setValueAtTime(0.0001,tt); g2.gain.exponentialRampToValueAtTime(v*0.35,tt+0.003); g2.gain.exponentialRampToValueAtTime(0.0001,tt+k.dur*0.45); o2.connect(g2); g2.connect(drumBus); }
+          const n=ctx.createBufferSource(); n.buffer=noiseBuf; const nf=ctx.createBiquadFilter(); nf.type=k.nType; nf.frequency.value=k.nHz; nf.Q.value=k.nQ;
+          const ng=ctx.createGain(); ng.gain.setValueAtTime(v*k.nAmt,tt); ng.gain.exponentialRampToValueAtTime(0.0001,tt+k.nDur); n.connect(nf); nf.connect(ng); ng.connect(drumBus); n.start(tt,Math.random()*0.5); n.stop(tt+k.nDur+0.02);
+          const c=ctx.createBufferSource(); c.buffer=noiseBuf; const cf=ctx.createBiquadFilter(); cf.type='highpass'; cf.frequency.value=3000;   // the beater
+          const cg=ctx.createGain(); cg.gain.setValueAtTime(v*k.click,tt); cg.gain.exponentialRampToValueAtTime(0.0001,tt+0.012); c.connect(cf); cf.connect(cg); cg.connect(drumBus); c.start(tt,Math.random()*0.5); c.stop(tt+0.03); } },
       boom(t){ const g=ctx.createGain(); const o=osc('sine',60,t,t+3); o.frequency.exponentialRampToValueAtTime(34,t+2.5); o.connect(g); env(g,t,0.005,0.6,0.1,2.4); out(g,0.6);
         const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(80,t+1.5); const ng=ctx.createGain(); n.connect(f); f.connect(ng); env(ng,t,0.005,0.35,0.05,1.4); out(ng,0.8); n.start(t); n.stop(t+2); },
       riser(t,dur){ const n=ctx.createBufferSource(); n.buffer=noiseBuf; n.loop=true; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.Q.value=2; f.frequency.setValueAtTime(300,t); f.frequency.exponentialRampToValueAtTime(7000,t+dur);
@@ -328,17 +340,21 @@ const Sound = (() => {
     const BPM=72, STEP=60/BPM/4;
     let step=0, nextT=ctx.currentTime+0.25, barOffset=0;
     // v94: patterns from js/taiko-battle-drums.js, 16 steps a bar, 4-bar phrases; X accent, x hit, g ghost, . rest
+    // patterns: levels 0 and 1 from js/taiko-battle-drums.js, 16 steps a bar; v97 (Jon: more Battlestar): levels 2 and 3
+    // are double time, 32 steps a bar (twice the score's pulse), in 3-3-2 groupings with unison accents and a roll into
+    // the next phrase. X accent, x hit, g ghost, . rest; 4-bar phrases
     const DRUM_P = {
       0:{ odaiko:['X...............','................','....X...........','................'] },   // tension, a slow heartbeat
       1:{ odaiko:['X.....x.X.......','X.....x.........','X.....x.X.......','X.....x...x.x...'],          // stalking
           chu:   ['................','....x.......x...','................','....x.......x.x.'] },
-      2:{ odaiko:['X..x..X.X..x.X..','X..x..X.X..x..X.','X..x..X.X..x.X..','X..x..X.XxXxXxXx'],          // battle
-          chu:   ['..x...x...x.x.x.','..x...x...x.x.xx','..x...x...x.x.x.','................'],
-          shime: ['x.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xx','................'] },
-      3:{ odaiko:['X.xX..X.X.xX.X.x','X.xX..X.X.xX..Xx','X.xX..X.X.xX.X.x','XxXxXxXxXXXXXXXX'],          // full assault
-          chu:   ['.xx.xx.x.xx.xx.x','.xx.xx.x.xx.xxxx','.xx.xx.x.xx.xx.x','................'],
-          shime: ['xxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxx','ggggxxxxXXXXXXXX'],
-          ka:    ['x...x...x...x...','x...x...x...x.x.','x...x...x...x...','xxxxxxxxxxxxxxxx'] },
+      2:{ odaiko:['X..x..x.X..x..x.X..x..x.X..x.x.x','X..x..x.X..x..x.X..x..x.X.x..x.x','X..x..x.X..x..x.X..x..x.X..x.x.x','X..x..x.X..x..x.XxxXxxXxXxXxXXXX'],   // battle
+          chu:   ['...x..x....x..x....x..x....x..xx','...x..x....x..x....x..x..x..x..x','...x..x....x..x....x..x....x..xx','...x..x....x..x.................'],
+          shime: ['x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xx','x.xxx.xxx.xxx.xxgggggggggxxxxxxx'],
+          ka:    ['x.......x.......x.......x.......','x.......x.......x.......x.......','x.......x.......x.......x.......','x.......x.......................'] },
+      3:{ odaiko:['X.xX.xX.X.xX.xX.X.xX.xX.X.xXxXxX','X.xX.xX.X.xX.xX.X.xX.xX.XxXxXxXx','X.xX.xX.X.xX.xX.X.xX.xX.X.xXxXxX','XxXxXxXxXXXXXXXXX..X..X.XXXXXXXX'],   // full assault
+          chu:   ['.xx.xx.x.xx.xx.x.xx.xx.x.xx.xx.x','.xx.xx.x.xx.xx.x.xx.xx.x.xxxxxxx','.xx.xx.x.xx.xx.x.xx.xx.x.xx.xx.x','X..X..X.X..X..X.X..X..X.XXXXXXXX'],
+          shime: ['xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx','ggggggggxxxxxxxxXXXXXXXXXXXXXXXX'],
+          ka:    ['x..x..x.x..x..x.x..x..x.x..x..x.','x..x..x.x..x..x.x..x..x.x..x..x.','x..x..x.x..x..x.x..x..x.x..x..x.','X..X..X.X..X..X.X..X..X.XXXXXXXX'] },
     };
     const DRUM_VEL = { X:1.0, x:0.72, g:0.32 };
     // the level for the coming bar: the mood's floor, raised by recent fire, a recent kill, a last stand or a lab preview;
@@ -369,9 +385,10 @@ const Sound = (() => {
       if(lv===3 && sb%8===0) for(const [o,m,l] of MOTIF) if(o===st) I.horn(t, m, STEP*l, 0.85);
       if(lv>=2 && sb%8===6 && st===0) I.riser(t, STEP*32);
       // percussion (v94): the taiko ensemble at the battle's intensity
-      const pat=DRUM_P[lv], ph=bar%4, quiet= menu? 0.6 : 1;
-      for(const kind in pat){ const c=pat[kind][ph][st]; if(c==='.' || c===undefined) continue;
-        I.drum(kind, Math.max(ctx.currentTime, t+(Math.random()-0.5)*0.012), DRUM_VEL[c]*(0.92+Math.random()*0.16)*quiet); }
+      const pat=DRUM_P[lv], ph=bar%4, quiet=(menu? 0.6 : 1)*(lv<=1? DRUMS.calm : 1);
+      for(const kind in pat){ const row=pat[kind][ph], dbl= row.length===32;   // v97: 32-step rows play two steps per score step
+        for(let h=0; h<(dbl?2:1); h++){ const c=row[dbl? st*2+h : st]; if(c==='.' || c===undefined) continue;
+          I.drum(kind, Math.max(ctx.currentTime, t+h*STEP/2+(Math.random()-0.5)*0.008), DRUM_VEL[c]*(0.92+Math.random()*0.16)*quiet); } }
     }
     setInterval(()=>{
       if(!ctx) return;
