@@ -201,13 +201,13 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
     await wait(0.5); res();
   });
 }
-function fxBeam(att, tgt, outcomes, onEvent, mp){
+function fxBeam(att, tgt, outcomes, onEvent, mp, weight=0.7){
   return new Promise(async res=>{
     const a=mp(0).p, hit=outcomes[0]==='hit'; let b=hitPoint(tgt);
     if(!hit){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,0.2,dir.x).multiplyScalar(rand(1.3,2)*(Math.random()<.5?-1:1))).addScaledVector(dir,25); }
     const col= att.side==='player'?0xffb44a:0xff5a3a; const colC=new THREE.Color(col);
     const core=beamMesh(a,b,0.04,0xffffff,0.95), glow=beamMesh(a,b,0.16,col,0.7);
-    Sound.beam(0.9); flash(a,col,3,0.9);
+    Sound.beam(0.9, weight); flash(a,col,3,0.9);
     let fired=false;
     addFx({t:0,dur:0.9,update(dt){ this.t+=dt; const k=this.t/this.dur; const w=Math.sin(Math.min(1,k*5)*Math.PI/2)*(k>0.8?(1-k)/0.2:1);
         core.scale.x=core.scale.z=w*(0.9+Math.random()*0.3); glow.scale.x=glow.scale.z=w*(0.8+Math.random()*0.5);
@@ -285,6 +285,6 @@ async function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=nu
   const list=att.mounts && slot!=null ? att.mounts.w[slot] : null;
   if(list && list.some(m=>m.t)){ let need=0; for(const m of list) if(m.t) need=Math.max(need, aimTurret(att, m.t, tgt.group.position, 3));
     if(need>0.05) await wait(Math.min(0.45, need/TURRET_SLEW)); }
-  switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp);
+  switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp,w.dmg/34);   // v96: the beam's sound follows its size
     case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); case 'pdc': return fxPdc(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
 }

@@ -39,7 +39,7 @@ async function fireWeapon(att, wi, tgt){
       refreshTags(); updateHUD();
     } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++; if(!tgt.isRock) (screen||tgt).st.ints++;
       if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
-    else { misses++; if(!d.guided && !tgt.isRock) Sound.miss();   // v93: a direct-fire shot glances away (throttled in audio.js)
+    else { misses++; if(!d.guided && !tgt.isRock) Sound.miss(d.kind);   // v93: a direct-fire shot glances away (throttled in audio.js)
       if(!missShown){ missShown=true; floatText(tgt,'Miss','miss',0.4); } }
   };
   await playWeaponFx(d, att, tgt, outcomes, onEvent, screen, wi);
