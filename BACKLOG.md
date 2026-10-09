@@ -554,12 +554,11 @@ drawn at 22% opacity (board.js).
 
 ## Gunship (Jon, after v112)
 
-**v113 built the class** (see CLAUDE.md, Gunship). Still to do:
-- **v114: the strafing run** as its ability, replacing Hard burn: pick an enemy within reach; the gunship flies a
-  straight line past it and fires a pulse volley at every enemy within 1 hex of its path, then its weapons count as
-  fired and it sits exposed where the run ends. Open question for Jon: do the ships it passes get a free PDC shot at it?
-- **Re-price after the strafing run**, since it changes what the ship is worth, then a full round robin with the gunship
-  in an AI plan (Raiders or Swarm are the natural homes) or a new preset.
+**v113 built the class and v114 its strafing run** (see CLAUDE.md, Gunship). Still to do:
+- **Put it in the AI's hands:** a plan or preset with gunships (Raiders or Swarm are the natural homes), then a full round
+  robin, since the eight-of-a-kind pricing says nothing about mixed fleets.
+- **Open question for Jon:** should the ships a strafing run passes get a free PDC shot at it? Easy to add if the run
+  proves too strong in play.
 - **Its own weapon sound** for the pulse cannons, tuned in the sound lab.
 
 ## Phone layout (Jon, after v88)

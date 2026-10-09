@@ -102,6 +102,17 @@ async function useAbility(s, target=null){
     for(let i=0;i<24;i++){ after(i*0.03,()=>{ const p=a0.clone().lerp(b0,Math.random()); Particles.emit(p.setY(p.y+0.4),new THREE.Vector3(0,0.5,0),new THREE.Color(.55,.9,1),0.3,0.7,0.5); }); }
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
     floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:'', fixed?`${fixed} system${fixed>1?'s':''} repaired`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
+  else if(k==='strafe'){ if(!target) return false; const path=strafePath(s,target), w=strafeGun(s); if(!path || !w || !weaponReady(w)) return false;   // v114
+    const wi=s.weapons.indexOf(w); sndAt(s.group.position, ()=>Sound.power()); floatText(s,'Strafing run','heal'); s.engines.forEach(e=>e.boost=(e.boost||0)+1.5);
+    let at=0;
+    for(const {e,i} of strafePasses(s,path)){ if(i>at){ await moveShip(s, path.slice(at,i+1)); at=i; }
+      if(!s.alive) break; if(!e.alive || weaponOffline(w)) continue; w.wait=0; await fireWeapon(s, wi, e); if(!s.alive) break; }
+    if(s.alive && at<path.length-1) await moveShip(s, path.slice(at));
+    // the beams fire once where the run ends, at the enemy in reach they would hurt most
+    if(s.alive) s.weapons.forEach((x,xi)=>{ if(x.def.kind!=='beam' || !weaponReady(x)) return; let bt=null, bd=0; for(const e of alive(other(s.side))){ const d=expected(s,x.def,e).dmg*targetValue(e); if(d>bd){ bd=d; bt=e; } } if(bt) x._strafeT=bt; });
+    for(let xi=0;xi<s.weapons.length;xi++){ const x=s.weapons[xi]; if(x._strafeT){ const t=x._strafeT; x._strafeT=null; if(s.alive && t.alive) await fireWeapon(s, xi, t); } }
+    s.engines.forEach(e=>e.boost=Math.max(0,(e.boost||0)-1.5)); s.mp=0;
+    for(const x of s.weapons) if(!isPdcGun(x)){ x.wait=Math.max(x.wait, x.def.reload); x.firedTurn=state.turn; } }
   else if(k==='blackout'){ if(!target) return false; target.blackout=s.side;   // lasts until this side's next turn begins
     const a0=s.group.position.clone(), b0=target.group.position.clone(); sndAt(s.group.position, ()=>Sound.power());
     for(let i=0;i<30;i++){ after(i*0.02,()=>{ const p=a0.clone().lerp(b0,i/30); Particles.emit(p.setY(p.y+0.3),new THREE.Vector3().randomDirection().multiplyScalar(0.6),new THREE.Color(.75,.5,1),0.22,0.5,0.4); }); }
@@ -177,6 +188,13 @@ function evalCell(s, cell, D){
 async function aiShip(s){
   const D = s.side==='enemy'? DIFF[state.diff] : DIFF.normal;
   if(s.ability.key==='overcharge' && abilityReady(s) && s.shield<s.shieldMax*0.4) await useAbility(s);
+  // v114: a gunship takes a strafing run when one passes two or more enemies and the expected damage, weighted by how much
+  // it wants each target, outweighs the danger where the run ends
+  if(s.ability.key==='strafe' && abilityReady(s)){ const w=strafeGun(s); let best=null, bv=0;
+    for(const t of abilityTargets(s)){ const path=strafePath(s,t), pass=strafePasses(s,path); if(pass.length<2) continue;
+      let v=0; for(const {e,i} of pass) v+=expected(s, w.def, e, path[i]).dmg*targetValue(e);
+      const end=path[path.length-1]; v-=threatAt(s, cellAt(end.q,end.r))*D.caution*0.6; if(v>bv){ bv=v; best=t; } }
+    if(best && bv>35){ await useAbility(s, best); return; } }
   let reach=reachable(s);
   const bestOffense = r => { let b=0; for(const [,c] of r){ if(c.blocked) continue; for(const w of s.weapons){ if(!weaponReady(w) || isPdcGun(w)) continue; for(const t of alive(other(s.side))) if(hitChance(s,w.def,t,c)>0) b=1; } if(b) break; } return b; };
   if(s.ability.key==='burn' && abilityReady(s) && !bestOffense(reach)){ await useAbility(s); reach=reachable(s); }

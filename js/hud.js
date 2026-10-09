@@ -178,6 +178,7 @@ async function playerMove(k){
 async function playerAbility(){
   const s=state.selected; if(!s || state.busy || state.phase!=='player') return;
   if(!abilityReady(s)){ refuse(`${s.ability.def.name} recharging, ${s.ability.wait} turn${s.ability.wait>1?'s':''}`); return; }
+  if(s.ability.key==='strafe' && !weaponReady(strafeGun(s))){ refuse('A strafing run needs the pulse cannons ready'); return; }   // v114
   if(s.ability.def.targeted){ const d=s.ability.def; if(state.mode==='target'){ state.mode=null; } else { if(!abilityTargets(s).length){ refuse(`No ${d.target==='enemy'?'enemy':'ally'} within ${d.range} hexes to ${d.verb}`); return; } state.mode='target'; Sound.ui(); } recomputeHighlights(); updateHUD(); return; }
   state.busy=true; await useAbility(s); state.busy=false; recomputeHighlights(); updateHUD();
 }

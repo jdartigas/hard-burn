@@ -67,6 +67,7 @@ const ABIL = {
   // targeted abilities: `target` says who they're aimed at, `range` how far
   repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, target:'ally', range:3, amount:45, verb:'repair'},
   resupply:  {name:'Resupply',         desc:'Ally within 2 hexes: restore 60 hull and half its shields, and reload one salvo in each missile launcher', reload:2, targeted:true, target:'ally', range:2, amount:60, verb:'resupply'},
+  strafe:    {name:'Strafing run',     desc:'Enemy within 5 hexes: fly a straight line past it, firing the pulse cannons at every enemy within 1 hex of the path; the beams fire once where it ends. Then the move is spent', reload:3, targeted:true, target:'enemy', range:5, over:2, verb:'strafe'},   // v114
   blackout:  {name:'Sensor blackout',  desc:'Enemy within 8 hexes: no missiles or fighters, and -25 accuracy, until your next turn', reload:3, targeted:true, target:'enemy', range:8, verb:'black out'},
   ambush:    {name:'Ambush',           desc:'+2 movement, and missiles fired this turn are half as likely to be intercepted', reload:3},
 };
@@ -79,7 +80,7 @@ const CLASSES = {
   // v113 (Jon): a small hull carrying far more guns than it should, and almost no point defense. Priced with the simulator
   // (BACKLOG, Gunship): eight of them at 82 sit near even against the presets (Classic 70, Swarm 47, Raiders 53, Gunline
   // 50, 30 battles each); seven lose and nine win nearly everything, the usual fleet-size cliff.
-  gunship:  {label:'Gunship',       role:'Close-range brawler',    m:165, cost:82, hull:105, armor:4, shield:35, regen:9,  mp:6, ev:26, pdc:0.15, weapons:['pulseG','beamL','beamL'], ability:'burn', len:2.4, y:0.75},
+  gunship:  {label:'Gunship',       role:'Close-range brawler',    m:165, cost:82, hull:105, armor:4, shield:35, regen:9,  mp:6, ev:26, pdc:0.15, weapons:['pulseG','beamL','beamL'], ability:'strafe', len:2.4, y:0.75},
   fastattack:{label:'Fast attack ship', role:'Ambush striker',      m:100, cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:30, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
   dreadnought:{label:'Dreadnought',  role:'Capital of the line',    m:390, cost:480, hull:400, armor:12,shield:120,regen:22, mp:2, ev:2,  pdc:0.60, weapons:['spinal','railL','railL','beamH','beamH','pulse'], ability:'brace', len:4.6, y:1.1},
   // v34: support classes. `passive` is shown in the ship panel and builder; the effects live in the rules.

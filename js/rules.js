@@ -71,7 +71,20 @@ function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range
   return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt), accAdj(att,w,from)); }
 // who a targeted ability can be used on, right now
 function abilityTargets(s){ const d=s.ability.def; if(!d.targeted) return [];
+  if(s.ability.key==='strafe'){ const w=strafeGun(s); if(!w || !weaponReady(w)) return []; return alive(other(s.side)).filter(o=>hdist(o,s)<=d.range && strafePath(s,o)); }   // v114
   return d.target==='enemy'? alive(other(s.side)).filter(o=>hdist(o,s)<=d.range) : alive(s.side).filter(o=>o!==s && hdist(o,s)<=d.range); }
+// v114: the gunship's strafing run. The path is a straight hex line from the ship through the target and up to
+// ABIL.strafe.over hexes beyond it; it flies through any ship's hex (a flyby), stops before an asteroid or the board's
+// edge, and must end on an empty cell within reach of passing the target. Returns the cells (cost 0, so moveShip spends
+// nothing; the run sets movement to 0 itself), or null when there is no run.
+const strafeGun = s => s.weapons.find(w=>w.def.kind==='pulse' && !isPdcGun(w));
+function strafePath(s, t){ const d=hdist(s,t); if(d<1) return null; const m=(d+ABIL.strafe.over)/d, far=hexRound(s.q+(t.q-s.q)*m, s.r+(t.r-s.r)*m);
+  const line=hexLine(s, far), path=[{q:s.q, r:s.r, cost:0}];
+  for(let i=1;i<line.length;i++){ const c=cellAt(line[i].q,line[i].r); if(!c || c.t==='rock') break; path.push({q:c.q, r:c.r, cost:0}); }
+  while(path.length>1){ const e=path[path.length-1]; if(shipAt(e.q,e.r)) path.pop(); else break; }
+  return path.length>1 && path.some(p=>hdist(p,t)<=1) ? path : null; }
+// the enemies a run passes within 1 hex of, each with the index of the first path cell that reaches it, in path order
+function strafePasses(s, path){ const out=[]; path.forEach((p,i)=>{ for(const e of alive(other(s.side))) if(!out.some(o=>o.e===e) && hdist(p,e)<=1) out.push({e,i}); }); return out; }
 // Whose point defense protects tgt: its own, or an escort's screen when that is stronger. `by` is the ship doing
 // the shooting, so the interception can be drawn from it and credited to it.
 function pdCover(tgt){
