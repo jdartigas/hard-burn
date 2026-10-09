@@ -304,7 +304,7 @@ function buildShip(cls, side, copy=0){
   // --- per-class hulls, modeled from the reference miniatures ---
   // shared Expanse vocabulary: drum-housed drive at the stern, V-strut truss to an octagonal engineering section,
   // brick-tiled armor decks forward, livery plates, stripes, hull numbers, PDC turrets everywhere
-  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702',fastattack:'109',dreadnought:'901',tender:'740',ewar:'322'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870',fastattack:'88',dreadnought:'899',tender:'874',ewar:'833'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
+  const L=CLASSES[cls].len, idn=(P?{patrol:'214',corvette:'365',frigate:'436',destroyer:'537',cruiser:'618',carrier:'702',fastattack:'109',dreadnought:'901',tender:'740',ewar:'322',gunship:'473'}:{patrol:'81',corvette:'865',frigate:'843',destroyer:'857',cruiser:'861',carrier:'870',fastattack:'88',dreadnought:'899',tender:'874',ewar:'833',gunship:'847'})[cls]+(copy?'-'+(copy+1):'');   // extra copies read 537-2, 537-3
   const HULL=M.hull, H2=M.hull2, PL=M.plate, ST=M.stripe;
   function drum(r,len,zf,x=0,y=0){ // drive housing: open drum, ribbed, crenellated rim, bell and plume inside
     const zb=zf-len;
@@ -439,6 +439,30 @@ function buildShip(cls, side, copy=0){
     pdc(.17,.22,-0.6,1); pdc(-.17,.22,-0.6,1); pdc(.3,.05,0.2,1,'x'); pdc(-.3,.05,0.2,-1,'x'); pdc(.15,-.21,-0.3,-1); pdc(-.15,-.21,-0.3,-1);   // 2 dorsal, 2 flank, 2 ventral
     number(idn,.302,.0,0.0,.06,'r'); number(idn,-.302,.0,0.0,.06,'l'); number(idn,0,.21,-0.6,.06,'top');
     light(.29,.1,-0.5,nav); light(-.29,.1,-0.5,nav); light(0,0,1.16,0xffffff); rcs(.24,.12,.6); rcs(-.24,.12,.6);
+  } else if(cls==='gunship'){
+    // v113, from Jon's concept art (side and perspective views): a long, slab-sided armoured hull with an angular wedge
+    // bow; four twin-barrel pulse cannons in octagonal casemates, two on each flank of the front third (fixed, firing
+    // forward); two dorsal light-beam turrets; a raised superstructure aft; three drives stacked vertically at the stern
+    [.2,0,-.2].forEach(y=>drive(.11,.36,-0.78,0,y,{bands:[[0.3,0.58,PL],[0.62,0.68,ST]]}));
+    const eng=sec(-0.8,-0.36,.44,.66,.46,.6,{mat:H2,ch:.2}); band(eng,-0.72,-0.62); band(eng,-0.62,-0.58,ST);
+    collar(-0.38,-0.34,.46,.5);
+    const mid=sec(-0.36,0.52,.5,.46,.5,.44,{ch:.22}), bow=sec(0.52,1.22,.5,.44,.06,.1,{ch:.42});
+    band(mid,-0.3,-0.18); band(mid,-0.18,-0.15,ST); band(mid,0.16,0.3); band(bow,0.62,0.66,ST); band(bow,0.66,0.78); band(bow,0.92,0.97,ST);
+    [-1,1].forEach(sd=>{ plate(-0.3,0.48,.05,.26,.05,.26,{x:sd*.27,mat:H2,ch:.25}); plate(-0.28,0.1,.055,.2,.055,.2,{x:sd*.28,mat:PL,ch:.2,greeble:false}); });   // armoured side slabs
+    plate(-0.4,0.6,.18,.06,.14,.05,{y:-.24,mat:H2,ch:.3});                                   // keel
+    // raised superstructure aft, with a stepped fin
+    plate(-0.66,-0.08,.3,.12,.26,.1,{y:.28,mat:H2,ch:.3}); plate(-0.62,-0.3,.2,.08,.16,.06,{y:.38,ch:.35}); windows(0,.36,-0.2,.16,3);
+    // two dorsal light-beam turrets (slots 1 and 2)
+    plate(-0.02,0.4,.2,.05,.18,.05,{y:.245,mat:PL,ch:.3,greeble:false});
+    pulseTurret(1,0,.27,0.3,1,1.15); pulseTurret(2,0,.27,0.05,1,1.15);
+    // four twin pulse cannons in octagonal casemates on the flanks (slot 0): fixed, barrels forward
+    [-1,1].forEach(sd=>[0.62,0.86].forEach(z=>{ const w=secW(bow,z)/2+0.012, cx=sd*Math.max(w,0.1);
+      const sock=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.04,8),M.dark); sock.rotation.z=Math.PI/2; add(sock,cx,0,z);
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(0.075,0.012,6,8),H2); ring.rotation.y=Math.PI/2; add(ring,cx+sd*0.02,0,z);
+      [-0.025,0.025].forEach(y=>{ tube(.012,z,z+0.17,cx+sd*0.03,y,M.metal,10); tube(.018,z+0.15,z+0.18,cx+sd*0.03,y,M.dark,10); mount(0,cx+sd*0.03,y,z+0.19); }); }));
+    pdc(.2,.24,-0.5,1); pdc(-.2,.24,-0.5,1); pdc(0,-.27,-0.1,-1);                            // little point defense: two dorsal, one ventral
+    number(idn,.262,-.1,-0.1,.06,'r'); number(idn,-.262,-.1,-0.1,.06,'l'); number(idn,0,.34,-0.5,.06,'top');
+    light(.26,.15,0.4,nav); light(-.26,.15,0.4,nav); light(0,.05,1.23,0xffffff); light(.2,-.2,-0.6,nav); light(-.2,-.2,-0.6,nav); rcs(.24,.15,.75); rcs(-.24,.15,.75);
   } else if(cls==='frigate'){
     // v54, from reference/frigate.png: one big banded drive, an open truss, then a hull tapering to a needle bow with
     // twin beam projectors under it and a 2x2 block of missile cells on the dorsal deck

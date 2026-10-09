@@ -552,6 +552,16 @@ drawn at 22% opacity (board.js).
 - **F4. Quick battle mode:** smaller fleets for a ten-minute game, started from the intro screen. *Chosen.*
 - **F5. Battle summary** at the end: damage per ship, MVP, missiles intercepted. *Chosen.*
 
+## Gunship (Jon, after v112)
+
+**v113 built the class** (see CLAUDE.md, Gunship). Still to do:
+- **v114: the strafing run** as its ability, replacing Hard burn: pick an enemy within reach; the gunship flies a
+  straight line past it and fires a pulse volley at every enemy within 1 hex of its path, then its weapons count as
+  fired and it sits exposed where the run ends. Open question for Jon: do the ships it passes get a free PDC shot at it?
+- **Re-price after the strafing run**, since it changes what the ship is worth, then a full round robin with the gunship
+  in an AI plan (Raiders or Swarm are the natural homes) or a new preset.
+- **Its own weapon sound** for the pulse cannons, tuned in the sound lab.
+
 ## Phone layout (Jon, after v88)
 
 Jon's verdict from playing v88 on an Android phone (about 390 x 850): **the touch wording is fine, but the phone UI is far too

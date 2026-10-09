@@ -130,7 +130,7 @@ async function moveShip(s, path){
 }
 
 /* ---------------- AI ---------------- */
-function targetValue(t){ return {ewar:1.4, dreadnought:1.3, carrier:1.25, tender:1.2, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85, fastattack:0.85}[t.cls]||1; }
+function targetValue(t){ return {ewar:1.4, dreadnought:1.3, carrier:1.25, tender:1.2, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, gunship:1.1, patrol:0.85, fastattack:0.85}[t.cls]||1; }   // v113: the gunship is fragile and lethal up close: kill it early
 function scoreAttack(att, w, tgt, from, D){
   const e=expected(att,w,tgt,from); if(!e.p) return 0;
   let v=(e.hull + (e.dmg-e.hull)*0.5)*targetValue(tgt);

@@ -39,6 +39,8 @@ const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce
 const WEAPONS = {
   pulse:  {name:'Pulse cannons', kind:'pulse', range:4, opt:2, acc:82, fall:6, dmg:7,  shots:3, sh:1.6, hu:0.7, pierce:0,   reload:1},
   pulseH: {name:'Pulse battery', kind:'pulse', range:4, opt:2, acc:82, fall:6, dmg:8,  shots:4, sh:1.6, hu:0.7, pierce:0,   reload:1},
+  // v113: the gunship's four twin casemates, one bolt a barrel; heavier and longer-reaching than other pulse guns
+  pulseG: {name:'Pulse cannons', kind:'pulse', range:5, opt:2, acc:80, fall:6, dmg:10, shots:8, sh:1.6, hu:0.85,pierce:0.35,reload:1},
   beam:   {name:'Beam laser',    kind:'beam',  range:5, opt:2, acc:95, fall:8, dmg:24, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
   beamH:  {name:'Heavy beam',    kind:'beam',  range:6, opt:3, acc:95, fall:7, dmg:34, shots:1, sh:1.15,hu:1.0, pierce:0.2, reload:1},
   // v50 (Jon): railguns have no range limit. A slug never slows; what limits it is time of flight, which lets a target
@@ -74,6 +76,10 @@ const CLASSES = {
   frigate:  {label:'Frigate',       role:'Escort, point defense',  m:185, cost:60, hull:95,  armor:4, shield:35, regen:12, mp:5, ev:18, pdc:0.56, weapons:['beam','missL'],         ability:'pdsurge',    len:2.55, y:0.8, pdnet:true},
   destroyer:{label:'Destroyer',     role:'Line combatant',         m:230, cost:140, hull:140, armor:6, shield:45, regen:15, mp:4, ev:12, pdc:0.40, weapons:['rail','pulseH','torp'], ability:'overcharge', len:2.95, y:0.85},
   cruiser:  {label:'Heavy cruiser', role:'Long-range artillery',   m:290, cost:250, hull:230, armor:9, shield:70, regen:18, mp:3, ev:6,  pdc:0.50, weapons:['spinal','beamH','torpH'],ability:'brace',      len:3.7, y:0.95},
+  // v113 (Jon): a small hull carrying far more guns than it should, and almost no point defense. Priced with the simulator
+  // (BACKLOG, Gunship): eight of them at 82 sit near even against the presets (Classic 70, Swarm 47, Raiders 53, Gunline
+  // 50, 30 battles each); seven lose and nine win nearly everything, the usual fleet-size cliff.
+  gunship:  {label:'Gunship',       role:'Close-range brawler',    m:165, cost:82, hull:105, armor:4, shield:35, regen:9,  mp:6, ev:26, pdc:0.15, weapons:['pulseG','beamL','beamL'], ability:'burn', len:2.4, y:0.75},
   fastattack:{label:'Fast attack ship', role:'Ambush striker',      m:100, cost:50, hull:55,  armor:1, shield:16, regen:6,  mp:8, ev:30, pdc:0.15, weapons:['strikeM','pulse'],     ability:'ambush',     len:1.9, y:0.7},
   dreadnought:{label:'Dreadnought',  role:'Capital of the line',    m:390, cost:480, hull:400, armor:12,shield:120,regen:22, mp:2, ev:2,  pdc:0.60, weapons:['spinal','railL','railL','beamH','beamH','pulse'], ability:'brace', len:4.6, y:1.1},
   // v34: support classes. `passive` is shown in the ship panel and builder; the effects live in the rules.
@@ -90,6 +96,8 @@ const CLASS_INFO = {
                purpose:'The smallest hull in the fleet and the hardest to pin down. It runs ahead of the line, harries with its pulse turret and missiles, and its ECM screen makes the ships around it much harder to hit. It cannot take a beating.'},
   fastattack: {best:'Opening a fight with a missile ambush',
                purpose:'An oversized drive with a missile pod on each flank. It closes fast, and when it springs an ambush its strike missiles are half as likely to be shot down. Two salvos, then it is down to its pulse turret.'},
+  gunship:    {best:'Tearing through light ships and screens at close range',
+               purpose:'Far more guns than a hull this size should carry: four twin pulse cannons in casemates along its bow and two dorsal light beams. Up close it strips shields and shreds light hulls, and it can still hurt heavy armour, but its point defense barely works and it has to get within five hexes to fight. It has to get in fast and it pays for being caught.'},
   corvette:   {best:'Getting into position fast and finishing off damaged ships',
                purpose:'A quick, well-armed skirmisher. Twin light railguns reach anywhere on the board, its missiles finish off weakened targets, and a hard burn throws it three hexes further when it needs to flank or escape.'},
   frigate:    {best:'Shooting down missiles aimed at the ships around it',
@@ -107,19 +115,19 @@ const CLASS_INFO = {
   dreadnought:{best:'Absorbing punishment and out-gunning anything at range',
                purpose:'The capital of the line. Six weapons, the heaviest armor and shields afloat, and almost no evasion: it does not dodge, it endures. Brace for impact makes it harder still to kill.'},
 };
-const ORDER = ['fastattack','patrol','corvette','ewar','frigate','destroyer','tender','cruiser','carrier','dreadnought'];   // lightest to heaviest
+const ORDER = ['fastattack','patrol','corvette','gunship','ewar','frigate','destroyer','tender','cruiser','carrier','dreadnought'];   // lightest to heaviest
 // Each class's model seed. Fixed, so adding a class to ORDER never reshuffles how the existing ships look.
-const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7, tender:8, ewar:9 };
+const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7, tender:8, ewar:9, gunship:10 };
 // Electronic warfare: enemy jamming field, and the targeting uplink for allies (see accAdj in rules.js)
 const JAM = { range:4, direct:10, guided:15, uplink:3, boost:8, blackout:25 };
 const NAMES = {
-  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath', tender:'Patient Hands', ewar:'Quiet Choir'},
-  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle', fastattack:'Hook', dreadnought:'Iron Tithe', tender:'Scrapmother', ewar:'Hiss'},
+  player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath', tender:'Patient Hands', ewar:'Quiet Choir', gunship:'Brass Argument'},
+  enemy: {carrier:'Maw of Kerr', cruiser:'Scalding Choir', destroyer:'Rustjaw', frigate:'Quiet Knife', corvette:'Gnat', patrol:'Needle', fastattack:'Hook', dreadnought:'Iron Tithe', tender:'Scrapmother', ewar:'Hiss', gunship:'Gutter Saint'},
 };
 // Home cell per class on the player's side; the enemy's are mirrored through the centre. The first ship of each
 // class deploys here, so the classic one-of-each fleet lines up exactly as it always has. Extra copies take the
 // nearest free cell to their class's home (see deployFleet).
-const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5], fastattack:[-1,-6], dreadnought:[-6,-3], tender:[-8,2], ewar:[-4,1] };
+const DEPLOY = { carrier:[-7,0], cruiser:[-5,-2], destroyer:[-6,2], frigate:[-3,-4], corvette:[-7,4], patrol:[-5,5], fastattack:[-1,-6], dreadnought:[-6,-3], tender:[-8,2], ewar:[-4,1], gunship:[-5,3] };
 const DEPLOY_MAX_X = -2.5;   // deployment zone: cells whose world x (q + r/2) is at or west of this
 const MAX_FLEET = 12;
 // A battle ends after this many turns. If both fleets are still in it, the side with more fleet value left wins:
