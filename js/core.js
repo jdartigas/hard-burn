@@ -67,7 +67,7 @@ const ABIL = {
   // targeted abilities: `target` says who they're aimed at, `range` how far
   repair:    {name:'Repair drones',    desc:'Restore 45 hull to an ally within 3 hexes', reload:3, targeted:true, target:'ally', range:3, amount:45, verb:'repair'},
   resupply:  {name:'Resupply',         desc:'Ally within 2 hexes: restore 60 hull and half its shields, and reload one salvo in each missile launcher', reload:2, targeted:true, target:'ally', range:2, amount:60, verb:'resupply'},
-  strafe:    {name:'Strafing run',     desc:'Enemy within 5 hexes: fly a straight line past it, firing the pulse cannons at every enemy within 1 hex of the path; the beams fire once where it ends. Then the move is spent', reload:3, targeted:true, target:'enemy', range:5, over:2, verb:'strafe'},   // v114
+  strafe:    {name:'Strafing run',     desc:'Enemy within 5 hexes: fly a straight line past it, firing the pulse cannons at every enemy within 1 hex of the path; each one answers with a PDC volley; the beams fire once where it ends. Then the move is spent', reload:3, targeted:true, target:'enemy', range:5, over:2, verb:'strafe'},   // v114
   blackout:  {name:'Sensor blackout',  desc:'Enemy within 8 hexes: no missiles or fighters, and -25 accuracy, until your next turn', reload:3, targeted:true, target:'enemy', range:8, verb:'black out'},
   ambush:    {name:'Ambush',           desc:'+2 movement, and missiles fired this turn are half as likely to be intercepted', reload:3},
 };

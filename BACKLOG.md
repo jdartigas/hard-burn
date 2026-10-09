@@ -557,8 +557,9 @@ drawn at 22% opacity (board.js).
 **v113 built the class and v114 its strafing run** (see CLAUDE.md, Gunship). Still to do:
 - **Put it in the AI's hands:** a plan or preset with gunships (Raiders or Swarm are the natural homes), then a full round
   robin, since the eight-of-a-kind pricing says nothing about mixed fleets.
-- **Open question for Jon:** should the ships a strafing run passes get a free PDC shot at it? Easy to add if the run
-  proves too strong in play.
+- ~~Free PDC shot for passed ships~~ **done in v115**, with AI spacing and focus against gunships. Judge it in play: AI
+  against AI it changed nothing measurable. **Gunships beat the Swarm build 100% at both budgets:** decide whether that
+  hard a counter is wanted (Swarm is the strongest preset, 57), or soften it (cap a run at 3 targets, or more PDC per reply).
 - **Its own weapon sound** for the pulse cannons, tuned in the sound lab.
 
 ## Phone layout (Jon, after v88)

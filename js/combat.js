@@ -84,6 +84,11 @@ async function fireAll(att, tgt){
   for(const i of firingOrder(att)){ if(!tgt.alive || state.over) break; const w=att.weapons[i]; if(weaponReady(w) && hitChance(att,w.def,tgt)>0){ if(await fireWeapon(att,i,tgt)){ any=true; await wait(0.12); } } }
   return any;
 }
+// v115: a ship a strafing run passes gets one free PDC volley at the gunship. Free: its PDC guns and its point defense
+// are left exactly as they were, so the reply never costs it an interception or its own PDC fire
+async function strafeReply(e, g){ const pi=e.weapons.findIndex(isPdcGun); if(pi<0) return; const w=e.weapons[pi]; if(weaponOffline(w) || hdist(e,g)>w.def.range) return;
+  const keep={wait:w.wait, fired:w.firedTurn, pdc:e.fx.pdcFired}; w.wait=0;
+  try{ await fireWeapon(e, pi, g); } finally{ w.wait=keep.wait; w.firedTurn=keep.fired; e.fx.pdcFired=keep.pdc; } }
 async function useAbility(s, target=null){
   const a=s.ability; if(!abilityReady(s)) return false;
   const k=a.key; Sound.drumHit('chu', 0.9);   // v94: a drum hit on every ability
@@ -106,7 +111,9 @@ async function useAbility(s, target=null){
     const wi=s.weapons.indexOf(w); sndAt(s.group.position, ()=>Sound.power()); floatText(s,'Strafing run','heal'); s.engines.forEach(e=>e.boost=(e.boost||0)+1.5);
     let at=0;
     for(const {e,i} of strafePasses(s,path)){ if(i>at){ await moveShip(s, path.slice(at,i+1)); at=i; }
-      if(!s.alive) break; if(!e.alive || weaponOffline(w)) continue; w.wait=0; await fireWeapon(s, wi, e); if(!s.alive) break; }
+      if(!s.alive) break; if(e.alive && !weaponOffline(w)){ w.wait=0; await fireWeapon(s, wi, e); }
+      if(s.alive && e.alive) await strafeReply(e, s);   // v115: the ship it passes answers with its PDCs
+      if(!s.alive) break; }
     if(s.alive && at<path.length-1) await moveShip(s, path.slice(at));
     // the beams fire once where the run ends, at the enemy in reach they would hurt most
     if(s.alive) s.weapons.forEach((x,xi)=>{ if(x.def.kind!=='beam' || !weaponReady(x)) return; let bt=null, bd=0; for(const e of alive(other(s.side))){ const d=expected(s,x.def,e).dmg*targetValue(e); if(d>bd){ bd=d; bt=e; } } if(bt) x._strafeT=bt; });
@@ -141,7 +148,8 @@ async function moveShip(s, path){
 }
 
 /* ---------------- AI ---------------- */
-function targetValue(t){ return {ewar:1.4, dreadnought:1.3, carrier:1.25, tender:1.2, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, gunship:1.1, patrol:0.85, fastattack:0.85}[t.cls]||1; }   // v113: the gunship is fragile and lethal up close: kill it early
+const AI_SPREAD = 8;   // v115: what the AI pays for each ally within a hex of a cell while the enemy has gunships
+function targetValue(t){ return {ewar:1.4, gunship:1.35, dreadnought:1.3, carrier:1.25, tender:1.2, cruiser:1.2, destroyer:1.05, frigate:1.0, corvette:0.9, patrol:0.85, fastattack:0.85}[t.cls]||1; }   // v113: the gunship is fragile and lethal up close: kill it early
 function scoreAttack(att, w, tgt, from, D){
   const e=expected(att,w,tgt,from); if(!e.p) return 0;
   let v=(e.hull + (e.dmg-e.hull)*0.5)*targetValue(tgt);
@@ -169,6 +177,8 @@ function evalCell(s, cell, D){
   if(turnLimit()-state.turn<=2){ const lead=fleetValue(s.side)-fleetValue(other(s.side)); if(lead>0) guard=2.5; else if(lead<0){ press=1.3; guard=0.3; } }
   let score=off*D.aggr*press - threatAt(s,cell)*D.caution*late*guard*(s.hull/s.hullMax<0.4?1.5:1);
   const c=cellAt(cell.q,cell.r); if(c.t==='debris') score+=4;
+  // v115: while the enemy has gunships, don't bunch up: a strafing run rakes every ship within a hex of its path
+  if(alive(other(s.side)).some(o=>o.ability.key==='strafe')){ let n=0; for(const o of alive(s.side)) if(o!==s && hdist(o,cell)<=1) n++; score-=n*AI_SPREAD*D.caution; }
   // v76: don't stop next to a ship that may blow up soon, yours or theirs
   for(const o of state.ships){ if(o===s || !o.alive || hdist(o,cell)>SPLASH.radius) continue; const risk=Math.pow(clamp(1-o.hull/o.hullMax,0,1),2); score -= risk*o.hullMax*SPLASH.share*0.6*D.caution; }
   // stand-off preference for fragile artillery, closing pressure for everyone else
