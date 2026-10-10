@@ -156,7 +156,11 @@ const QUICK = { turns:15, shift:3, maxX:-1.5, fleets:[
   {id:'line',    name:'Line patrol',       fleet:['destroyer','corvette','patrol','patrol']},
   {id:'ewar',    name:'Electronic screen', fleet:['ewar','frigate','corvette','fastattack']},
   {id:'strike',  name:'Strike group',      fleet:['destroyer','fastattack','corvette','patrol']},
-  {id:'raiders', name:'Raiders',           fleet:['fastattack','fastattack','corvette','patrol']} ]};
+  {id:'raiders', name:'Raiders',           fleet:['fastattack','fastattack','corvette','patrol']},
+  // v116: every class can come up in a Quick battle (they are mirror matches, so these need to be interesting, not even)
+  {id:'brawlers', name:'Brawlers',         fleet:['gunship','gunship','frigate','patrol']},
+  {id:'heavy',   name:'Heavy patrol',      fleet:['cruiser','tender','corvette','patrol']},
+  {id:'capital', name:'Capital escort',    fleet:['dreadnought','carrier','frigate','gunship']} ]};
 // The Frigate's escort screen: allies within `radius` hexes intercept with `share` of the Frigate's point defense
 // (if that beats their own). Classes with pdnet:true provide it.
 // stack: false = the stronger of own and screen counts; true = both fire at the incoming round (1-(1-a)(1-b)), so an
@@ -178,6 +182,16 @@ const PRESETS = [
    fleet:['carrier','carrier','carrier','frigate','frigate','corvette','patrol']},
   {id:'wolfpack', name:'Torpedo wolfpack', desc:'Destroyers and corvettes, heavy on missiles. Tears into big ships once it closes.',
    fleet:['destroyer','destroyer','destroyer','corvette','corvette','corvette','corvette','corvette','patrol','patrol']},
+  // v116 (Jon: every class in a preset): the AI plans that only existed as AI builds, as fixed Standard-budget fleets, plus
+  // the gunships. Each is exactly what aiBuild(660, plan) buys, so the presets and the AI's own builds agree
+  {id:'dreadnought', name:'Dreadnought group', desc:'One dreadnought under a frigate screen. Almost impossible to kill quickly, and it out-guns anything at range; torpedo boats are its problem.',
+   fleet:['dreadnought','frigate','frigate','corvette','patrol']},
+  {id:'raiders',  name:'Raiders',          desc:'Fast attack ships with destroyer backing. Ambush missile strikes from long range, then run.',
+   fleet:['fastattack','fastattack','destroyer','fastattack','fastattack','corvette','fastattack','fastattack','destroyer','corvette']},
+  {id:'support',  name:'Support group',    desc:'A heavy cruiser with a repair tender and an electronic warfare ship. Slow to kill, hard to hit, and it keeps its ships in the fight.',
+   fleet:['cruiser','tender','destroyer','ewar','frigate','corvette','patrol']},
+  {id:'gunships', name:'Gunship pack',     desc:'Seven gunships with a frigate screen. They dive in on strafing runs and shred light ships; long-range guns that catch them on the way in are their problem.',
+   fleet:['gunship','gunship','gunship','frigate','gunship','gunship','patrol','gunship','gunship']},
 ];
 // How the AI spends a budget when it builds its own fleet (the "AI build" enemy). Each plan is a wish list it cycles
 // through, buying each class it can still afford, until nothing more fits or the fleet is full. At the Standard
@@ -191,6 +205,7 @@ const AI_PLANS = {
   dreadnought:{label:'Dreadnought', wish:['dreadnought','frigate','frigate','corvette','patrol']},   // v32; below 480 it builds escorts only
   raiders: {label:'Raiders',  wish:['fastattack','fastattack','destroyer','fastattack','fastattack','corvette']},
   support: {label:'Support',  wish:['cruiser','tender','destroyer','ewar','frigate','corvette','patrol']},   // v34
+  gunships:{label:'Gunships', wish:['gunship','gunship','gunship','frigate','gunship','gunship','patrol']},   // v116: four gunships with escorts averaged 38; seven with a frigate and a patrol craft
 };
 function aiBuild(budget, plan){
   const wish=AI_PLANS[plan].wish, f=[]; let left=budget, added=true;

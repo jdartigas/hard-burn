@@ -555,8 +555,8 @@ drawn at 22% opacity (board.js).
 ## Gunship (Jon, after v112)
 
 **v113 built the class and v114 its strafing run** (see CLAUDE.md, Gunship). Still to do:
-- **Put it in the AI's hands:** a plan or preset with gunships (Raiders or Swarm are the natural homes), then a full round
-  robin, since the eight-of-a-kind pricing says nothing about mixed fleets.
+- ~~Put it in the AI's hands~~ **done in v116:** a Gunships AI plan and a Gunship pack preset (average 49% against the
+  other eight presets). A full round robin of all nine presets is still owed: it has not been run since v87.
 - ~~Free PDC shot for passed ships~~ **done in v115**, with AI spacing and focus against gunships. Judge it in play: AI
   against AI it changed nothing measurable. **Gunships beat the Swarm build 100% at both budgets:** decide whether that
   hard a counter is wanted (Swarm is the strongest preset, 57), or soften it (cap a run at 3 targets, or more PDC per reply).
