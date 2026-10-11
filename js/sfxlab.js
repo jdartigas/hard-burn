@@ -20,6 +20,8 @@ const LAB_SOUNDS = [
     ['missile', 'Missile or torpedo launch', 'one round leaving the tube', ()=>Sound.missile()],
     ['fighter', 'Strike wing launch', 'once per wing', ()=>Sound.fighter()],
     ['pdc', 'Point defense burst', 'PDCs firing at a warhead', ()=>Sound.pdc()],
+    ['gun-pulse', 'Gunship pulse cannon', 'one casemate bolt; a volley fires 8, 0.13 s apart', ()=>Sound.gunPulse()],
+    ['strafe', 'Strafing run', 'the gunship\'s fly-by as it starts a run', ()=>Sound.strafe()],
   ]],
   ['Hits on a hull', [
     ['hit-rail', 'Railgun slug', '', ()=>Sound.hit('rail')],
@@ -93,6 +95,8 @@ const LAB_SOUNDS = [
     ['q-rail', 'Railgun on a hull', 'charge, shot, slug hits', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.hit('rail')); }],
     ['q-rail-sh', 'Railgun on shields', '', ()=>{ Sound.rail(); at(RAIL_CHARGE+0.03, ()=>Sound.shield('rail')); }],
     ['q-pulse', 'Pulse volley on a hull', 'three bolts, each landing about 0.3 s later', ()=>{ for(let i=0;i<3;i++){ at(i*0.13, ()=>Sound.pulse()); at(i*0.13+0.3, ()=>Sound.hit('pulse')); } }],
+    ['q-gun', 'Gunship volley on a hull', 'eight casemate bolts', ()=>{ for(let i=0;i<8;i++){ at(i*0.13, ()=>Sound.gunPulse()); at(i*0.13+0.3, ()=>Sound.hit('pulse')); } }],
+    ['q-strafe', 'Strafing run past three ships', 'the roar, then a volley at each ship it passes', ()=>{ Sound.strafe(2.6); [0.5,1.2,1.9].forEach(d=>{ for(let i=0;i<4;i++){ at(d+i*0.13, ()=>Sound.gunPulse()); at(d+i*0.13+0.3, ()=>Sound.hit('pulse')); } }); }],
     ['q-pulse-sh', 'Pulse volley on shields', '', ()=>{ for(let i=0;i<3;i++){ at(i*0.13, ()=>Sound.pulse()); at(i*0.13+0.3, ()=>Sound.shield('pulse')); } }],
     ['q-beam', 'Beam on a hull', '', ()=>{ Sound.beam(0.9, 24/34); at(0.25, ()=>Sound.hit('beam')); }],
     ['q-beam-sh', 'Beam on shields', '', ()=>{ Sound.beam(0.9, 24/34); at(0.25, ()=>Sound.shield('beam')); }],

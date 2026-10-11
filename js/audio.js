@@ -273,6 +273,24 @@ const Sound = (() => {
       if(!sample('hull',{gain:0.7,rate:0.72,vary:0.1})) noise(0.25,{type:'lowpass',f0:2500,f1:200,gain:0.3});
       noise(0.4,{type:'bandpass',f0:2400,f1:600,q:5,gain:0.17,attack:0.004}); crackle(0.35,{gain:0.12,f:1500,density:90});
       tone(0.5,{type:'triangle',f0:520,f1:470,gain:0.025}); tone(0.45,{type:'triangle',f0:1310,f1:1240,gain:0.015}); tone(0.2,{type:'sine',f0:90,f1:40,gain:0.2}); },
+    // v117: the gunship's casemates. A heavier, deeper twin-cannon bolt than the pulse turret: one of four zaps (a falling
+    // saw or square) over a low thump and a hard crack, through drive, with a short report in the room; detuned per shot
+    gunPulse(){ const v=Math.floor(Math.random()*4), d=1+(Math.random()-0.5)*0.08, f0=[900,780,1020,840][v]*d, f1=[70,85,60,95][v];
+      noise(0.012,{type:'highpass',f0:3500,f1:1800,gain:0.22,attack:0.001,drive:0.5});
+      tone(0.16,{type:v%2?'square':'sawtooth',f0,f1,gain:0.05,attack:0.002,drive:0.7});
+      tone(0.22,{type:'sine',f0:120*d,f1:45,gain:0.2,attack:0.002,drive:0.3});
+      noise(0.14,{type:'lowpass',f0:1400,f1:200,gain:0.12,attack:0.002,verb:0.35}); },
+    // v117: a strafing run: a drive roar that swells, sweeps across the stereo field and drops in pitch as it passes
+    strafe(len=2.2){ if(!ctx || !fx) return; const t=now(), pn=ctx.createStereoPanner? ctx.createStereoPanner() : null, out=ctx.createGain(); out.gain.value=1;
+      if(pn){ pn.pan.setValueAtTime(-0.7,t); pn.pan.linearRampToValueAtTime(0.7,t+len); out.connect(pn); pn.connect(fx.in); } else out.connect(fx.in);
+      const src=ctx.createBufferSource(); src.buffer=noiseBuf; src.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.2;
+      bp.frequency.setValueAtTime(500*labRate,t); bp.frequency.exponentialRampToValueAtTime(1600*labRate,t+len*0.45); bp.frequency.exponentialRampToValueAtTime(380*labRate,t+len);
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.55,t+len*0.45); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+      src.connect(bp); bp.connect(g); g.connect(out); src.start(t,Math.random()); src.stop(t+len+0.05);
+      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(150*labRate,t); o.frequency.exponentialRampToValueAtTime(190*labRate,t+len*0.45); o.frequency.exponentialRampToValueAtTime(70*labRate,t+len);
+      const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700; const og=ctx.createGain(); og.gain.setValueAtTime(0.0001,t); og.gain.exponentialRampToValueAtTime(0.12,t+len*0.45); og.gain.exponentialRampToValueAtTime(0.0001,t+len);
+      o.connect(lp); lp.connect(og); og.connect(out); o.start(t); o.stop(t+len+0.05);
+      const vg=ctx.createGain(); vg.gain.value=0.35; g.connect(vg); vg.connect(fx.verb); },
     // v93 (Jon: the energy-ricochet reference): a direct-fire shot that misses glances away. v96 (Jon: the pitched zip
     // whistled like a bird on pulse and PDC misses): no tone at all now, just a noise streak sweeping down past one side,
     // shorter, darker and quieter for PDC rounds

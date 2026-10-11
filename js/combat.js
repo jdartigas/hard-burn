@@ -108,7 +108,8 @@ async function useAbility(s, target=null){
     Particles.burst(b0,30,{speed:2,color:new THREE.Color(.55,.9,1),size:0.3,life:0.9});
     floatText(target,[hull>=1?`+${Math.round(hull)} hull`:'', salvos?`+${salvos} salvo${salvos>1?'s':''}`:'', fixed?`${fixed} system${fixed>1?'s':''} repaired`:''].filter(Boolean).join(', ')||'Resupplied','heal'); }
   else if(k==='strafe'){ if(!target) return false; const path=strafePath(s,target), w=strafeGun(s); if(!path || !w || !weaponReady(w)) return false;   // v114
-    const wi=s.weapons.indexOf(w); sndAt(s.group.position, ()=>Sound.power()); floatText(s,'Strafing run','heal'); s.engines.forEach(e=>e.boost=(e.boost||0)+1.5);
+    // v117: the run has its own fly-by roar
+    const wi=s.weapons.indexOf(w); Sound.strafe(); floatText(s,'Strafing run','heal'); s.engines.forEach(e=>e.boost=(e.boost||0)+1.5);
     let at=0;
     for(const {e,i} of strafePasses(s,path)){ if(i>at){ await moveShip(s, path.slice(at,i+1)); at=i; }
       if(!s.alive) break; if(e.alive && !weaponOffline(w)){ w.wait=0; await fireWeapon(s, wi, e); }

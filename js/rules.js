@@ -239,7 +239,7 @@ function fxBeam(att, tgt, outcomes, onEvent, mp, weight=0.7){
     await wait(0.95); res();
   });
 }
-function fxPulse(att, tgt, outcomes, onEvent, mp){
+function fxPulse(att, tgt, outcomes, onEvent, mp, heavy=false){   // heavy: the gunship's casemates (v117)
   return new Promise(res=>{
     let left=outcomes.length; const col=new THREE.Color(att.side==='player'?0xffd27a:0xff8a5a);
     outcomes.forEach((o,i)=>{
@@ -247,7 +247,7 @@ function fxPulse(att, tgt, outcomes, onEvent, mp){
         const a=mp(i).p; let b=hitPoint(tgt); if(o!=='hit'){ const dir=b.clone().sub(a).normalize(); b.add(new THREE.Vector3(-dir.z,rand(-.3,.3),dir.x).multiplyScalar(rand(1,1.8)*(Math.random()<.5?-1:1))); }
         const dir=b.clone().sub(a); const dist=dir.length(); dir.normalize(); const end= o==='hit'? b : b.clone().addScaledVector(dir,14);
         const bolt=new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshBasicMaterial({color:col.clone().multiplyScalar(2)})); bolt.scale.set(1,1,5);
-        bolt.position.copy(a); bolt.lookAt(b); scene.add(bolt); sndAt(a, ()=>Sound.pulse()); Particles.burst(a,5,{speed:3,color:col,size:0.25,life:0.2});
+        bolt.position.copy(a); bolt.lookAt(b); scene.add(bolt); sndAt(a, ()=> heavy? Sound.gunPulse() : Sound.pulse()); Particles.burst(a,5,{speed:3,color:col,size:0.25,life:0.2});
         const total=a.distanceTo(end), speed=34;
         addFx({d:0,update(dt){ this.d+=speed*dt; const k=Math.min(1,this.d/total); bolt.position.copy(a).lerp(end,k);
             Particles.emit(bolt.position,new THREE.Vector3(),col,0.22,0.15,0);
@@ -308,5 +308,5 @@ async function playWeaponFx(w, att, tgt, outcomes, onEvent, screen=null, slot=nu
   if(list && list.some(m=>m.t)){ let need=0; for(const m of list) if(m.t) need=Math.max(need, aimTurret(att, m.t, tgt.group.position, 3));
     if(need>0.05) await wait(Math.min(0.45, need/TURRET_SLEW)); }
   switch(w.kind){ case 'rail': return fxRail(att,tgt,outcomes,onEvent,mp); case 'beam': return fxBeam(att,tgt,outcomes,onEvent,mp,w.dmg/34);   // v96: the beam's sound follows its size
-    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp); case 'pdc': return fxPdc(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
+    case 'pulse': return fxPulse(att,tgt,outcomes,onEvent,mp,w===WEAPONS.pulseG); case 'pdc': return fxPdc(att,tgt,outcomes,onEvent); default: return fxGuided(att,tgt,outcomes,onEvent,w.kind,w.big,screen,mp); }
 }

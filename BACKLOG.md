@@ -560,7 +560,7 @@ drawn at 22% opacity (board.js).
 - ~~Free PDC shot for passed ships~~ **done in v115**, with AI spacing and focus against gunships. Judge it in play: AI
   against AI it changed nothing measurable. **Gunships beat the Swarm build 100% at both budgets:** decide whether that
   hard a counter is wanted (Swarm is the strongest preset, 57), or soften it (cap a run at 3 targets, or more PDC per reply).
-- **Its own weapon sound** for the pulse cannons, tuned in the sound lab.
+- ~~Its own weapon sound~~ **done in v117:** casemate bolts and a strafing-run roar, in the sound lab for Jon's notes.
 
 ## Phone layout (Jon, after v88)
 
