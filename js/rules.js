@@ -44,14 +44,25 @@ function abilityReady(s){ return s.ability.wait===0; }
 /* ---------------- rules ---------------- */
 function hasLOS(a,b){ const line=hexLine(a,b); for(let i=1;i<line.length-1;i++){ const c=cellAt(line[i].q,line[i].r); if(c && c.t==='rock') return false; } return true; }
 function accMod(side){ return side==='enemy'? DIFF[state.diff].acc : (state.diff==='easy'?5:0); }
+// v118: the hit chance as labelled terms, so the panel can show exactly what the roll used. hitCore sums them.
+// Evasion counts for less up close (EVADE.near) and beams, being light, ignore part of it (EVADE.beam).
+function evadeMul(w, dist){ if(w.guided) return 0.5;
+  const t=clamp((dist-EVADE.near)/(EVADE.full-EVADE.near),0,1), m=EVADE.nearMul+(1-EVADE.nearMul)*t;
+  return m*(w.kind==='beam'?EVADE.beam:1); }
+function hitTerms(w, attSide, dist, tgt, tgtCell, adj=0){
+  const T=[['base',w.acc]];
+  if(!w.guided) T.push(['range',-Math.max(0,dist-w.opt)*w.fall]);
+  T.push(['evasion',-tgt.ev*evadeMul(w,dist)]);
+  if(w.reach && dist>w.reach) T.push(['dodge',-(dist-w.reach)*tgt.ev*w.dodge]);
+  const c=cellAt(tgtCell.q,tgtCell.r); if(c && c.t==='debris') T.push(['debris',w.guided?-5:-15]);
+  if(tgt.fx.ecm) T.push(['ECM',w.guided?-25:-20]);
+  const m=accMod(attSide); if(m) T.push(['difficulty',m]);
+  if(adj) T.push(['sensors',adj]);
+  return T; }
 function hitCore(w, attSide, dist, tgt, tgtCell, los, adj=0){
   if(dist>w.range || dist<1) return 0;
   if(!w.guided && !los) return 0;
-  let p = w.guided ? w.acc - tgt.ev*0.5 : w.acc - Math.max(0,dist-w.opt)*w.fall - tgt.ev;
-  if(w.reach && dist>w.reach) p -= (dist-w.reach)*tgt.ev*w.dodge;   // beyond a railgun's old range, the target has time to dodge
-  const c=cellAt(tgtCell.q,tgtCell.r); if(c && c.t==='debris') p -= w.guided?5:15;
-  if(tgt.fx.ecm) p -= w.guided?25:20;
-  p += accMod(attSide) + adj;
+  const p=hitTerms(w,attSide,dist,tgt,tgtCell,adj).reduce((a,t)=>a+t[1],0);
   return clamp(Math.round(p),5,95);
 }
 // Accuracy changes that depend on the firing ship: sensor blackout on it, an enemy jamming field around where it
@@ -69,6 +80,9 @@ function hitChance(att, w, tgt, from=att){ const d=hdist(from,tgt); if(d>w.range
   if(att.blackout && w.guided) return 0;   // no missile locks under a sensor blackout
   if(w.reach && d>w.reach && att.sys && att.sys.sensors && att.sys.sensors.state==='offline') return 0;   // v75: no long-range railgun track without sensors
   return hitCore(w, att.side, d, tgt, tgt, w.guided?true:hasLOS(from,tgt), accAdj(att,w,from)); }
+// v118: "95 base −14 range −16 evasion" for the target panel
+function hitWhy(att, w, tgt){ const T=hitTerms(w.def, att.side, hdist(att,tgt), tgt, tgt, accAdj(att,w.def)), sa=slotAcc(w); if(sa) T.push(['damaged mount',sa]);
+  return T.filter(t=>Math.round(t[1])).map((t,i)=>{ const v=Math.round(t[1]); return (i? (v<0?'\u2212'+(-v):'+'+v) : v)+' '+t[0]; }).join(' '); }
 // who a targeted ability can be used on, right now
 function abilityTargets(s){ const d=s.ability.def; if(!d.targeted) return [];
   if(s.ability.key==='strafe'){ const w=strafeGun(s); if(!w || !weaponReady(w)) return []; return alive(other(s.side)).filter(o=>hdist(o,s)<=d.range && strafePath(s,o)); }   // v114

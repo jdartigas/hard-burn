@@ -360,7 +360,9 @@ function updateHover(){
       for(const i of idx){ const w=s.weapons[i]; const d=w.def; const ready=weaponReady(w); const e=expected(s,d,h); const p=e.p? clamp(e.p+slotAcc(w),5,95) : 0;
         let note= !ready||!p ? whyNot(s,w,h) : `${p}% · ~${Math.round(e.dmg)}`;
         if(ready&&p){ tot+=e.dmg; hk+=e.hull; }
-        html+=`<div class="tr ${ready&&p?'':'off'}"><span>${d.name}</span><b>${note}</b></div>`; }
+        const why= ready&&p ? hitWhy(s,w,h) : '';
+        html+=`<div class="tr ${ready&&p?'':'off'}"${why?` title="${why}"`:''}><span>${d.name}</span><b>${note}</b></div>`;
+        if(why && idx.length===1) html+=`<div class="hint">${why}</div>`; }
       killNow= !h.isRock && hk>=h.hull*0.92;
       const cover=cellAt(h.q,h.r).t==='debris';
       if(tot>0){ html+=`<div class="sum">Expected damage ~${Math.round(tot)}${h.isRock&&tot>=h.hull?', likely shatters it':''}</div>${cover||h.fx.ecm?`<div class="hint">${cover?'Target has debris cover. ':''}${h.fx.ecm?'Target is under ECM.':''}</div>`:''}`;

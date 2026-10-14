@@ -120,6 +120,8 @@ const ORDER = ['fastattack','patrol','corvette','gunship','ewar','frigate','dest
 // Each class's model seed. Fixed, so adding a class to ORDER never reshuffles how the existing ships look.
 const MODEL_SEED = { patrol:0, corvette:1, frigate:2, destroyer:3, cruiser:4, carrier:5, fastattack:6, dreadnought:7, tender:8, ewar:9, gunship:10 };
 // Electronic warfare: enemy jamming field, and the targeting uplink for allies (see accAdj in rules.js)
+// v118: evasion is worth half at 1-2 hexes, rising to full at 6; beams (light) ignore half of whatever is left
+const EVADE = { near:2, nearMul:0.5, full:6, beam:0.5 };
 const JAM = { range:4, direct:10, guided:15, uplink:3, boost:8, blackout:25 };
 const NAMES = {
   player:{carrier:'Ardent Hand', cruiser:'Tethys Resolve', destroyer:'Iron Vesper', frigate:'Calloway', corvette:'Little Wren', patrol:'Kestrel', fastattack:'Swift Remit', dreadnought:'Unbending Oath', tender:'Patient Hands', ewar:'Quiet Choir', gunship:'Brass Argument'},
