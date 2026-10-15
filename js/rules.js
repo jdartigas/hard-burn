@@ -227,26 +227,35 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
     // charge, as long as the sound's charge-up (RAIL_CHARGE): energy drawn into the muzzle, faster as it builds
     for(let s=0;s<5;s++){ for(let i=0;i<6+s*3;i++){ const off=new THREE.Vector3().randomDirection().multiplyScalar(0.55); Particles.emit(a.clone().add(off), off.clone().multiplyScalar(-3.2), C_CYAN, 0.18, 0.28, 0); }
       await wait(RAIL_CHARGE/5); }
-    const core=beamMesh(a,b,0.05,0xffffff,1), glow=beamMesh(a,b,0.22,0x7fd0ff,0.55);
+    // v120 (Jon): a thin slug track, not a beam
+    const core=beamMesh(a,b,0.018,0xffffff,0.9), glow=beamMesh(a,b,0.06,0x7fd0ff,0.25);
     flash(a,0x9fd8ff,5,0.25); Particles.burst(a,20,{speed:5,color:C_WHITE,size:0.3,life:0.3});
     const dir=b.clone().sub(a); const n=Math.min(60,Math.floor(dir.length()*2));
-    for(let i=0;i<n;i++){ const p=a.clone().addScaledVector(dir,i/n); Particles.emit(p,new THREE.Vector3().randomDirection().multiplyScalar(0.4),new THREE.Color(.35,.55,.8),0.25,rand(0.5,1.1),1.5,0.4); }
+    for(let i=0;i<n;i++){ const p=a.clone().addScaledVector(dir,i/n); Particles.emit(p,new THREE.Vector3().randomDirection().multiplyScalar(0.3),new THREE.Color(.22,.34,.5),0.12,rand(0.35,0.8),1.5,0.3); }
     addShake(0.25);
     after(0.03, ()=>onEvent(0, outcomes[0]));
     // v119 (Jon): with the shields down, a hit punches clean through the hull and the slug carries on out the far side
     if(hit && !tgt.isRock) after(0.06, ()=>{ if(tgt.shield<1) railPunch(tgt, a, b); });
-    addFx({t:0,dur:0.45,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=1-k; glow.material.opacity=0.55*(1-k); glow.scale.x=glow.scale.z=1+k*1.5; return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
+    addFx({t:0,dur:0.45,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=0.9*(1-k); glow.material.opacity=0.25*(1-k); glow.scale.x=glow.scale.z=1+k*0.6; return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
     await wait(0.5); res();
   });
 }
 // v119: the exit wound. A cone of molten spall blown out along the slug's path, and its trail continuing past the ship.
 function railPunch(tgt, a, b){
   const dir=b.clone().sub(a).normalize(), exit=b.clone().addScaledVector(dir, Math.max(0.6, tgt.len*0.35)), far=exit.clone().addScaledVector(dir, 45);
-  const core=beamMesh(exit,far,0.04,0xffffff,0.9), glow=beamMesh(exit,far,0.16,0x7fd0ff,0.45);
-  flash(exit,0xffb060,4,0.3); Particles.burst(b,10,{speed:3,color:C_FIRE,size:0.25,life:0.4});
-  for(let i=0;i<44;i++){ const v=dir.clone().multiplyScalar(rand(4,14)).add(new THREE.Vector3().randomDirection().multiplyScalar(rand(1,4)));
-    Particles.emit(exit, v, i%3? C_SPARK : C_WHITE, rand(0.12,0.3), rand(0.4,1.0), 1.2); }
-  addFx({t:0,dur:0.35,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=0.9*(1-k); glow.material.opacity=0.45*(1-k); return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
+  const core=beamMesh(exit,far,0.018,0xffffff,0.9), glow=beamMesh(exit,far,0.06,0x7fd0ff,0.25);
+  flash(exit,0xffb060,8,0.45); flash(b,0xff7a30,3,0.3); addShake(0.2);
+  Particles.burst(b,16,{speed:4,color:C_FIRE,size:0.3,life:0.5});
+  const cone=(n,sp0,sp1,widen,sz0,sz1,lf0,lf1,drag)=>{ for(let i=0;i<n;i++){ const v=dir.clone().multiplyScalar(rand(sp0,sp1)).add(new THREE.Vector3().randomDirection().multiplyScalar(rand(0.5,widen)));
+    Particles.emit(exit, v, Math.random()<0.3? C_WHITE : Math.random()<0.6? C_SPARK : C_FIRE, rand(sz0,sz1), rand(lf0,lf1), drag); } };
+  // the spray: a fast tight jet of white-hot metal, a wide fan of sparks, and slow glowing chunks that linger
+  cone(70, 10, 22, 3, 0.08, 0.2, 0.3, 0.8, 0.8);
+  cone(110, 4, 12, 8, 0.1, 0.26, 0.5, 1.4, 1.0);
+  cone(24, 1.5, 5, 3, 0.3, 0.5, 1.2, 2.2, 0.6);
+  Particles.burst(exit,40,{speed:9,color:C_SPARK,size:0.18,life:0.7,drag:1.2});
+  // secondary pops as torn plating flares out
+  for(let k=1;k<=3;k++) after(0.08*k+rand(0,0.06), ()=>{ const q=exit.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(0.4)); Particles.burst(q,22,{speed:6,color:C_SPARK,size:0.16,life:0.5,drag:1.4}); flash(q,0xffa040,2.5,0.15); });
+  addFx({t:0,dur:0.35,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=0.9*(1-k); glow.material.opacity=0.25*(1-k); return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
 }
 function fxBeam(att, tgt, outcomes, onEvent, mp, weight=0.7){
   return new Promise(async res=>{
