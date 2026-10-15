@@ -35,7 +35,7 @@ async function fireWeapon(att, wi, tgt){
       impactFx(tgt,r,att.group.position, d.kind==='rail'||d.big?1.6:1, d.big? 'torpedo' : d.kind);
       if(r.h>=0.5) floatText(tgt, Math.round(r.h), r.h>=25?'hu big':'hu'); else if(r.s>0) floatText(tgt, Math.round(r.s), 'sh');
       if(r.crit && i!==killShot) applyCrit(tgt, r.crit);
-      if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; att.st.kills++; destroyShip(tgt, att); } }
+      if(i===killShot){ tgt.hull=0; if(tgt.isRock) destroyRock(tgt, att); else { tgt.alive=false; st.kills++; att.st.kills++; destroyShip(tgt, att, d); } }
       refreshTags(); updateHUD();
     } else if(o==='int'){ ints++; const ds=state.stats[tgt.side]; ds.ints++; if(screen) ds.screened++; if(!tgt.isRock) (screen||tgt).st.ints++;
       if(ints===1){ floatText(tgt, screen? 'Screened':'Intercepted','int',0.4); if(screen) floatText(screen,'Point defense','int',0.2); } }
@@ -53,11 +53,14 @@ async function fireWeapon(att, wi, tgt){
   return true;
 }
 const pendingDeaths=[];
-function destroyShip(s, by){
+function destroyShip(s, by, w=null){
   Sound.drum('kill'); Sound.drum('stand', alive('player').length<=2 || alive('enemy').length<=2);   // v94: the drums peak
-  log(`${s.name} destroyed${by?` by ${by.name}`:''}`, 'k', 'kill');
+  // v121: how it dies is picked from what killed it (deaths.js), and the log and a floating label say so
+  const how= simRunning || window.__norender ? {kind:'reactor'} : pickDeath(s, w);
+  log(`${s.name} destroyed${by?` by ${by.name}`:''}: ${DEATH_LABEL[how.kind].toLowerCase()}`, 'k', 'kill');
+  if(!simRunning && !window.__norender) floatText(s, DEATH_LABEL[how.kind], 'hu big', 0.6);
   const wc=cellAt(s.q,s.r); if(wc && wc.t==='open') wc.t='debris';   // the wreck leaves a debris field: cover, double movement
-  const pr=explodeShip(s); pendingDeaths.push(pr); bigMoment(s); blastNeighbours(s, by);
+  const pr=killShip(s, how); pendingDeaths.push(pr); bigMoment(s); blastNeighbours(s, by);
   if(state.selected===s) select(null);
   checkEnd();
 }

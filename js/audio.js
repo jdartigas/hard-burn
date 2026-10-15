@@ -294,6 +294,27 @@ const Sound = (() => {
     // v93 (Jon: the energy-ricochet reference): a direct-fire shot that misses glances away. v96 (Jon: the pitched zip
     // whistled like a bird on pulse and PDC misses): no tone at all now, just a noise streak sweeping down past one side,
     // shorter, darker and quieter for PDC rounds
+    // v121: the quiet deaths (deaths.js). size runs about 0.5 (patrol) to 2 (dreadnought)
+    // dead in space: a crackle as the bridge goes, relays clunking open, and the ship's hum winding down to nothing
+    powerDown(){ crackle(0.35,{gain:0.07,f:3000,density:45});
+      [0.05,0.4,0.85].forEach((d,i)=>metal(150-i*25,{gain:0.09,decay:0.3,bright:0.25,ring:0.5,delay:d}));
+      tone(2.2,{type:'triangle',f0:520,f1:32,gain:0.06,attack:0.02,verb:0.35}); tone(2.4,{type:'sine',f0:110,f1:28,gain:0.14,attack:0.02}); },
+    // broken back: the keel groaning under load, low creaks of struck plate ringing long
+    hullGroan(size=1){ const b=70/Math.sqrt(size);
+      [0,0.28,0.6,0.85].forEach((d,i)=>metal(b*(1+i*0.12)*(0.9+Math.random()*0.2),{gain:0.07+i*0.02,decay:1.3,bright:0.15,ring:1.4,delay:d,verb:0.45}));
+      tone(1.1,{type:'sawtooth',f0:b*1.3,f1:b*0.8,gain:0.035,attack:0.25,drive:0.5}); noise(1.1,{type:'lowpass',f0:300,f1:120,gain:0.12,attack:0.3}); },
+    // ...then the tear: a concussive crack, a ringing shear, and air screaming out of the open sections
+    tear(size=1){ duck(0.6,0.8); concuss(0,{gain:0.22+size*0.04,lo:62,len:0.6,verb:0.5}); metal(85/Math.sqrt(size),{gain:0.16,decay:1.1,bright:0.6,ring:1.2,delay:0.03});
+      crackle(0.6,{gain:0.08,f:2200,density:40,delay:0.05}); noise(1.8,{type:'highpass',f0:3200,f1:1400,gain:0.06,attack:0.05,delay:0.1}); },
+    // gutted: one breach, a dull punch and a short hiss
+    breach(){ tone(0.14,{type:'sine',f0:140,f1:55,gain:0.12,attack:0.002}); noise(0.3,{type:'bandpass',f0:2200,f1:700,q:0.8,gain:0.06,attack:0.004}); },
+    // drive failure: a stuck drive roaring, its pitch wobbling as the hull spins, under a rising alarm-like whine
+    spinOut(len=2.4){ for(let i=0;i<5;i++){ const d=i*len/5; tone(len/5+0.08,{type:'sawtooth',f0:90+i*14+(i%2?18:-10),f1:100+i*14,gain:0.045,attack:0.03,delay:d,drive:0.6}); }
+      noise(len,{type:'bandpass',f0:500,f1:1500,q:1,gain:0.16,attack:0.15}); tone(len,{type:'sine',f0:300,f1:900,gain:0.025,attack:0.3,verb:0.3}); },
+    // collision: the hull ploughing into rock, a heavy crunch and debris raining off it
+    crash(size=1){ duck(0.4,1); blast(0.6,{gain:0.24,lo:55,bright:1800,crack:0.8});
+      [0,0.07,0.16].forEach((d,i)=>metal(70+i*30,{gain:0.13,decay:0.7,bright:0.8,ring:0.8,delay:d}));
+      crackle(1.2,{gain:0.12,f:1500,density:35,delay:0.08}); concuss(0.05,{gain:0.2+size*0.05,lo:50,len:0.8,verb:0.55}); },
     miss(kind){ if(!ctx) return; const t=now(), P=kind==='pdc'; if(t-lastMiss<(P?0.15:0.08)) return; lastMiss=t;
       const p=(Math.random()<0.5?-1:1)*(0.4+Math.random()*0.5), f=1800+Math.random()*1200;
       noise(P?0.09:0.2,{type:'bandpass',f0:P?f*0.7:f,f1:P?f*0.35:f*0.3,q:2.2,gain:P?0.05:0.08,attack:P?0.004:0.012,pan:p,verb:0.3});

@@ -74,7 +74,9 @@ const DebrisKit = (() => {
   return { get: ()=> kit || build() };
 })();
 
-function breakUpShip(s){
+// v121: opts shape the wreck for each way of dying (deaths.js): sections, debris (count scale), fires (hull fires per
+// section), scorch (how burnt the plating reads), drift and spin (scale the separation), vel (a velocity carried in)
+function breakUpShip(s, opts={}){
   s.group.updateMatrixWorld(true);
   const body=s.body, P=s.side==='player';
   const skip=new Set([...s.engines.map(e=>e.group), ...s.lights]);
@@ -82,7 +84,7 @@ function breakUpShip(s){
   const decks=body.children.filter(c=>c.isMesh && c.userData.chunk && c.geometry.boundingBox!==undefined);
   let zmin=1e9, zmax=-1e9; const ends=[];
   body.children.forEach(c=>{ if(skip.has(c)) return; if(c.isMesh && c.userData.chunk){ c.geometry.computeBoundingBox(); const bb=c.geometry.boundingBox; const a=c.position.z+bb.min.z, b=c.position.z+bb.max.z; zmin=Math.min(zmin,a); zmax=Math.max(zmax,b); ends.push(b); } });
-  const len=zmax-zmin, nSec={patrol:2,corvette:2,frigate:3,destroyer:3,cruiser:4,carrier:3,fastattack:2,dreadnought:5,tender:3,ewar:2,gunship:2}[s.cls]||3;
+  const len=zmax-zmin, nSec=opts.sections || {patrol:2,corvette:2,frigate:3,destroyer:3,cruiser:4,carrier:3,fastattack:2,dreadnought:5,tender:3,ewar:2,gunship:2}[s.cls]||3;
   const cuts=[]; for(let i=1;i<nSec;i++){ const ideal=zmin+len*i/nSec; let best=ideal, bd=1e9; for(const e of ends){ const d=Math.abs(e-ideal); if(d<bd && e>zmin+len*0.12 && e<zmax-len*0.12 && !cuts.some(c=>Math.abs(c-e)<len*0.12)){ bd=d; best=e; } } cuts.push(bd<len*0.2?best:ideal+rand(-0.05,0.05)); }
   cuts.sort((a,b)=>a-b);
   const bounds=[zmin-1,...cuts,zmax+1];
@@ -94,7 +96,7 @@ function breakUpShip(s){
     const z0=Math.max(bounds[i],zmin), z1=Math.min(bounds[i+1],zmax), cz=(z0+z1)/2;
     const outer=new THREE.Group(); outer.position.copy(bp).addScaledVector(axis, cz*bs.z); outer.quaternion.copy(bq); outer.scale.copy(bs);
     const inner=new THREE.Group(); inner.position.z=-cz; outer.add(inner); scene.add(outer);
-    const k=rand(0.26,0.42);
+    const k=opts.scorch || rand(0.26,0.42);
     wreck.sections.push({outer, inner, z0, z1, cz, k, vel:new THREE.Vector3(), spin:new THREE.Vector3(), fires:[], embers:[], heat:1, cache:new Map()});
   }
   // distribute parts; instanced detail is split instance by instance
@@ -130,18 +132,19 @@ function breakUpShip(s){
     [wreck.sections[ci], wreck.sections[ci+1]].forEach((sec,side)=>{ const e=tornEdge(r); e.position.set(rand(-.03,.03),rand(-.03,.03), z + (side===0? 0.004 : -0.004)); sec.inner.add(e); sec.embers.push({mesh:e, base:e.material.color.clone()});
       sec.fires.push({local:new THREE.Vector3(rand(-r,r)*0.5, rand(-r,r)*0.5, z), dir: side===0?1:-1, vent:true, rate:rand(0.8,1.2)}); }); });
   // hull fires scattered over each section
-  wreck.sections.forEach(sec=>{ const n=1+Math.floor(Math.random()*2); for(let i=0;i<n;i++) sec.fires.push({local:new THREE.Vector3(rand(-.2,.2), rand(0,.22), rand(sec.z0,sec.z1)*0.9), dir:0, vent:false, rate:rand(0.5,1)}); });
+  wreck.sections.forEach(sec=>{ const n= opts.fires!==undefined? opts.fires : 1+Math.floor(Math.random()*2); for(let i=0;i<n;i++) sec.fires.push({local:new THREE.Vector3(rand(-.2,.2), rand(0,.22), rand(sec.z0,sec.z1)*0.9), dir:0, vent:false, rate:rand(0.5,1)}); });
   // sections separate along the keel, tumbling slowly
   const mid=(zmin+zmax)/2;
   wreck.sections.forEach(sec=>{ const along=sec.cz-mid; const dir=axis.clone().multiplyScalar(Math.sign(along)||(Math.random()<.5?-1:1));
     sec.vel.copy(dir).multiplyScalar(rand(0.35,0.65)).add(new THREE.Vector3(rand(-.15,.15),rand(-.05,.1),rand(-.15,.15)));
-    sec.spin.set(rand(-.25,.25), rand(-.18,.18), rand(-.35,.35)); });
+    sec.spin.set(rand(-.25,.25), rand(-.18,.18), rand(-.35,.35));
+    sec.vel.multiplyScalar(opts.drift ?? 1); sec.spin.multiplyScalar(opts.spin ?? 1); if(opts.vel) sec.vel.add(opts.vel); });
   // debris field: torn plates, hull shards and twisted structure, instanced per material
   // debris field: torn plates in the ship's own armor, girders, conduit, hull skin and machinery, several shapes of each
   const M=s.mats, K=DebrisKit.get();
   const plan=[{geos:K.plate, mat:M.hull, n:16, sz:[0.1,0.26]}, {geos:K.plate, mat:M.plate, n:9, sz:[0.08,0.22]}, {geos:K.shell, mat:M.hull2, n:6, sz:[0.12,0.26]},
               {geos:K.girder, mat:M.metal, n:9, sz:[0.14,0.34]}, {geos:K.pipe, mat:M.dark, n:6, sz:[0.1,0.22]}, {geos:K.chunk, mat:M.dark, n:10, sz:[0.05,0.14]}];
-  plan.forEach(pd=>{ const counts=pd.geos.map(()=>0); for(let j=0;j<pd.n;j++) counts[Math.floor(Math.random()*pd.geos.length)]++;
+  plan.forEach(pd=>{ pd.n=Math.round(pd.n*(opts.debris ?? 1)); if(!pd.n) return; const counts=pd.geos.map(()=>0); for(let j=0;j<pd.n;j++) counts[Math.floor(Math.random()*pd.geos.length)]++;
     const base=scorchedMaterial(pd.mat, wreck.cache, rand(0.4,0.6)); let mat=wreck.cache.get('ds:'+base.uuid); if(!mat){ mat=base.clone(); mat.side=THREE.DoubleSide; wreck.cache.set('ds:'+base.uuid, mat); }
     pd.geos.forEach((geo,gi)=>{ const cnt=counts[gi]; if(!cnt) return;
       const im=new THREE.InstancedMesh(geo, mat, cnt); im.castShadow=im.receiveShadow=true; im.frustumCulled=false; scene.add(im);
