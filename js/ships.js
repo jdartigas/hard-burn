@@ -136,7 +136,7 @@ function deckGeometry(len, w0,h0, w1,h1, ch, uvs=1.05){
 // hidden (userData.mergedAway), because breakUpShip cuts the hull apart from them. Animated or transparent parts
 // (engines, nav lights, shield, decals, the instanced detail layer) are left as they are.
 function mergeShipParts(sh){
-  mergeStatic(sh.body, new Set([...sh.engines.map(e=>e.group), ...sh.lights, sh.pickMesh, sh.shieldMesh, sh.fineMesh].filter(Boolean)), true);
+  mergeStatic(sh.body, new Set([...sh.engines.map(e=>e.group), ...sh.lights, ...(sh.knock||[]), sh.pickMesh, sh.shieldMesh, sh.fineMesh].filter(Boolean)), true);
 }
 // Merge the opaque, non-instanced meshes under `body` into one mesh per material and shadow setting. With
 // keepOriginals they stay in place, hidden and flagged mergedAway; otherwise they are removed.
@@ -188,7 +188,7 @@ function rigMaterial(m, rig){
 function buildShip(cls, side, copy=0){
   const M=shipMaterials(side), g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const P=side==='player', R=mulberry32((P?1000:2000)+MODEL_SEED[cls]*77);
-  const engines=[], lights=[], greebles={dark:[], hull:[], metal:[]}, decks=[];
+  const engines=[], lights=[], knock=[], greebles={dark:[], hull:[], metal:[]}, decks=[];
   // weapon mounts, in body space: w[slot] lists the muzzles for that loadout slot (CLASSES[cls].weapons order), each
   // with the direction a shot leaves in; pdc lists every point-defense turret with its outward axis.
   const mounts={ w:CLASSES[cls].weapons.map(()=>[]), pdc:[] };
@@ -285,7 +285,9 @@ function buildShip(cls, side, copy=0){
     const d=new THREE.Mesh(new THREE.LatheGeometry(prof,32),new THREE.MeshStandardMaterial({color:0x9da2a6,metalness:0.4,roughness:0.6,side:THREE.DoubleSide}));
     const grp=new THREE.Group(); grp.add(d); const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.014,r*1.1,8),M.dark); mast.position.y=-r*0.5; grp.add(mast);
     const feed=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,r*0.6,6),M.dark); feed.position.y=r*0.3; grp.add(feed);
-    grp.rotation.set(-0.6,R()*6,0.3); add(grp,x,y+r*0.5,z); }
+    grp.rotation.set(-0.6,R()*6,0.3); add(grp,x,y+r*0.5,z);
+    // v122: dishes stay separate meshes so battle damage can tear them off (hulldamage.js)
+    knock.push(grp); }
   function windows(x,y,z,len,n,axis='z'){ for(let i=0;i<n;i++){ const t=(i+0.5)/n; const w=new THREE.Mesh(new THREE.BoxGeometry(axis==='z'?0.012:0.025,0.012,axis==='z'?len/n*0.55:0.012),M.window);
       add(w, x, y, z + (t-0.5)*len); } }
   function stripe(z0,z1,w,y,x=0){ [-1,1].forEach(k=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(0.025,0.006,z1-z0),M.accent); add(m,x+k*w*0.32,y,(z0+z1)/2); }); }
@@ -703,13 +705,13 @@ function buildShip(cls, side, copy=0){
   const shield=new THREE.Mesh(new THREE.SphereGeometry(1,32,20),shMat); shield.scale.set(L*0.36,L*0.26,L*0.62); shield.visible=false; g.add(shield);
   const pickMesh=new THREE.Mesh(new THREE.SphereGeometry(L*0.5,8,6), new THREE.MeshBasicMaterial()); pickMesh.visible=false; g.add(pickMesh);
   enableShadows(g);
-  mergeShipParts({group:g, body, engines, lights, shieldMesh:shield, pickMesh, fineMesh});
+  mergeShipParts({group:g, body, engines, lights, knock, shieldMesh:shield, pickMesh, fineMesh});
   // the model's own length, bow tip to nozzle: opaque hull only, no plumes, glows or shield (v47 sizes ships from it)
   const box=new THREE.Box3(), part=new THREE.Box3(); g.updateMatrixWorld(true); const inv=new THREE.Matrix4().copy(g.matrixWorld).invert();
   body.traverse(o=>{ const m=o.material; if(!o.isMesh || !o.visible || !m || Array.isArray(m) || m.transparent || m.isShaderMaterial) return;
     if(!o.geometry.boundingBox) o.geometry.computeBoundingBox(); part.copy(o.isInstancedMesh? (o.computeBoundingBox(), o.boundingBox) : o.geometry.boundingBox).applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); box.union(part); });
   const modelLen=box.max.z-box.min.z;
-  return {group:g, body, engines, lights, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts, turrets, turretRig:rig, modelLen,
+  return {group:g, body, engines, lights, knock, shieldMesh:shield, shMat, pickMesh, mats:M, fineMesh, mounts, turrets, turretRig:rig, modelLen,
     turretGoal:new Float32Array(turrets.length), turretHold:new Float32Array(turrets.length)};
 }
 

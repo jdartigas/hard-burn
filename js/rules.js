@@ -208,6 +208,8 @@ function sndAt(pos, fn){ if(!pos || !Sound.positional) return fn();
 function impactFx(tgt, res, from, heavy=1, kind=null){   // kind: the weapon's, so the impact sounds like what hit
   const p=hitPoint(tgt);
   if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); sndAt(p, ()=>Sound.shield(kind)); }
+  // v122: the hit leaves a wound on the hull where it struck (hulldamage.js)
+  if(res.h>0.5 && !tgt.isRock) hullWound(tgt, from, p, res.h);
   if(res.h>0.5){ Particles.burst(p,24*heavy,{speed:7,color:C_SPARK,size:0.35,life:0.7}); Particles.burst(p,8*heavy,{speed:1.5,color:C_FIRE,size:1.1*heavy,life:0.5,grow:1});
     Particles.burst(p,6,{speed:0.8,color:C_SMOKE,size:1.2,life:1.4,drag:0.5,grow:1}); flash(p,0xff9944,4*heavy,0.35); sndAt(p, ()=>Sound.hit(kind)); addShake(0.12*heavy); }
 }

@@ -108,6 +108,7 @@ function damageSummary(s){ const d=damagedSystems(s); if(!d.length) return '';
 // smoke from damaged fittings, sparks from offline ones (cosmetic: Math.random)
 const C_DMG_SMOKE=new THREE.Color(.16,.14,.13), C_DMG_SPARK=new THREE.Color(1,.7,.3);
 function updateDamageFx(s, dt){
+  hullDamageTick(s, dt);   // v122: hull wounds and damage tiers (hulldamage.js)
   if(!s.sys || window.__norender) return;
   const puff=(p,offline)=>{ if(offline) Particles.emit(p, new THREE.Vector3().randomDirection().multiplyScalar(rand(2,5)), C_DMG_SPARK, 0.1, rand(0.2,0.45), 2);
     else Particles.emit(p, new THREE.Vector3(rand(-.2,.2),rand(.3,.7),rand(-.2,.2)), C_DMG_SMOKE, rand(0.35,0.7), rand(1.2,2.2), 0.4, 0.6); };

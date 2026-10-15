@@ -7,12 +7,14 @@
 const wrecks=[];
 const C_VENT=new THREE.Color(.55,.62,.7), C_VENT_DIM=new THREE.Color(.22,.26,.3), C_ARC=new THREE.Color(.6,.85,1), C_EMBER=new THREE.Color(1,.35,.08);
 const shardGeo=new THREE.BoxGeometry(1,1,1);
-function scorchedMaterial(m, cache, k){
+// v122: U carries a ship's hull wounds (hulldamage.js) onto the wreck section that uses this material
+function scorchedMaterial(m, cache, k, U=null){
   if(cache.has(m)) return cache.get(m);
   let c=null;
   if(m.isShaderMaterial) c=null;
   else if(m.isMeshBasicMaterial){ c=m.clone(); c.color.multiplyScalar(m.map? 0.45 : 0.05); }
   else { c=m.clone(); if(c.color) c.color.multiplyScalar(k); if('emissiveIntensity' in c) c.emissiveIntensity=0; if('envMapIntensity' in c) c.envMapIntensity=0.7; }
+  if(c){ delete c.onBeforeCompile; delete c.customProgramCacheKey; if(U && c.isMeshStandardMaterial) hdHook(c, U); }
   cache.set(m,c); return c;
 }
 // jagged glowing rim for a torn cross-section
@@ -97,7 +99,7 @@ function breakUpShip(s, opts={}){
     const outer=new THREE.Group(); outer.position.copy(bp).addScaledVector(axis, cz*bs.z); outer.quaternion.copy(bq); outer.scale.copy(bs);
     const inner=new THREE.Group(); inner.position.z=-cz; outer.add(inner); scene.add(outer);
     const k=opts.scorch || rand(0.26,0.42);
-    wreck.sections.push({outer, inner, z0, z1, cz, k, vel:new THREE.Vector3(), spin:new THREE.Vector3(), fires:[], embers:[], heat:1, cache:new Map()});
+    wreck.sections.push({outer, inner, z0, z1, cz, k, vel:new THREE.Vector3(), spin:new THREE.Vector3(), fires:[], embers:[], heat:1, cache:new Map(), hdU:hdCarry(s)});
   }
   // distribute parts; instanced detail is split instance by instance
   const mtx=new THREE.Matrix4();
@@ -111,17 +113,17 @@ function breakUpShip(s, opts={}){
         if(parts.length<=1 || sz<0.05) buckets[secOf(pz)].push(mtx.clone());
         else parts.forEach(([si,lo,hi])=>{ const m=mtx.clone(); m.elements[10]=hi-lo; m.elements[14]=(lo+hi)/2; buckets[si].push(m); }); }
       buckets.forEach((list,si)=>{ if(!list.length) return; const sec=wreck.sections[si];
-        const im=new THREE.InstancedMesh(c.geometry, scorchedMaterial(c.material, sec.cache, sec.k), list.length); list.forEach((m,j)=>im.setMatrixAt(j,m));
+        const im=new THREE.InstancedMesh(c.geometry, scorchedMaterial(c.material, sec.cache, sec.k, sec.hdU), list.length); list.forEach((m,j)=>im.setMatrixAt(j,m));
         im.castShadow=c.castShadow; im.receiveShadow=c.receiveShadow; im.visible=c!==s.fineMesh; sec.inner.add(im); if(c===s.fineMesh) wreck.fineMeshes.push({im, sec}); });
       return;
     }
     // straight hull decks that span a break are cut into one piece per section instead of poking out of a single one
     if(c.isMesh && c.userData.chunk && Math.abs(c.rotation.x)<1e-3 && Math.abs(c.rotation.y)<0.4){ const bb=c.geometry.boundingBox, a=c.position.z+bb.min.z*c.scale.z, b=c.position.z+bb.max.z*c.scale.z, parts=overlaps(a,b);
-      if(parts.length>1){ parts.forEach(([si,lo,hi])=>{ const sec=wreck.sections[si]; const cl=c.clone(); cl.visible=true; cl.material=scorchedMaterial(c.material, sec.cache, sec.k);
+      if(parts.length>1){ parts.forEach(([si,lo,hi])=>{ const sec=wreck.sections[si]; const cl=c.clone(); cl.visible=true; cl.material=scorchedMaterial(c.material, sec.cache, sec.k, sec.hdU);
           const k=(hi-lo)/(bb.max.z-bb.min.z); cl.scale.z=k; cl.position.z=lo-bb.min.z*k; sec.inner.add(cl); }); return; } }
     const sec=wreck.sections[secOf(c.position.z)];
     const cl=c.clone(true);
-    cl.traverse(o=>{ if(o.userData.mergedAway) o.visible=true; if(o.material){ const m=scorchedMaterial(o.material, sec.cache, sec.k); if(!m) o.visible=false; else o.material=m; } });
+    cl.traverse(o=>{ if(o.userData.mergedAway) o.visible=true; if(o.material){ const m=scorchedMaterial(o.material, sec.cache, sec.k, sec.hdU); if(!m) o.visible=false; else o.material=m; } });
     sec.inner.add(cl);
   });
   // a wreck stays for the rest of the battle: merge each section's pieces so it costs a handful of draw calls
@@ -161,6 +163,7 @@ const _q=new THREE.Quaternion(), _e=new THREE.Euler(), _m=new THREE.Matrix4(), _
 function updateWrecks(dt){
   for(const w of wrecks){ w.t+=dt; const t=w.t;
     for(const sec of w.sections){
+      if(sec.hdU) sec.hdU.uBodyInv.value.copy(sec.inner.matrixWorld).invert();
       const drag=Math.max(0, 1-0.6*dt); sec.vel.multiplyScalar(drag); if(sec.vel.lengthSq()<0.0002) sec.vel.setLength(0.014);
       sec.spin.multiplyScalar(Math.max(0,1-0.15*dt)); if(sec.spin.lengthSq()<0.0016) sec.spin.setLength(0.04);
       sec.outer.position.addScaledVector(sec.vel, dt);
