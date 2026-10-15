@@ -233,9 +233,20 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
     for(let i=0;i<n;i++){ const p=a.clone().addScaledVector(dir,i/n); Particles.emit(p,new THREE.Vector3().randomDirection().multiplyScalar(0.4),new THREE.Color(.35,.55,.8),0.25,rand(0.5,1.1),1.5,0.4); }
     addShake(0.25);
     after(0.03, ()=>onEvent(0, outcomes[0]));
+    // v119 (Jon): with the shields down, a hit punches clean through the hull and the slug carries on out the far side
+    if(hit && !tgt.isRock) after(0.06, ()=>{ if(tgt.shield<1) railPunch(tgt, a, b); });
     addFx({t:0,dur:0.45,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=1-k; glow.material.opacity=0.55*(1-k); glow.scale.x=glow.scale.z=1+k*1.5; return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
     await wait(0.5); res();
   });
+}
+// v119: the exit wound. A cone of molten spall blown out along the slug's path, and its trail continuing past the ship.
+function railPunch(tgt, a, b){
+  const dir=b.clone().sub(a).normalize(), exit=b.clone().addScaledVector(dir, Math.max(0.6, tgt.len*0.35)), far=exit.clone().addScaledVector(dir, 45);
+  const core=beamMesh(exit,far,0.04,0xffffff,0.9), glow=beamMesh(exit,far,0.16,0x7fd0ff,0.45);
+  flash(exit,0xffb060,4,0.3); Particles.burst(b,10,{speed:3,color:C_FIRE,size:0.25,life:0.4});
+  for(let i=0;i<44;i++){ const v=dir.clone().multiplyScalar(rand(4,14)).add(new THREE.Vector3().randomDirection().multiplyScalar(rand(1,4)));
+    Particles.emit(exit, v, i%3? C_SPARK : C_WHITE, rand(0.12,0.3), rand(0.4,1.0), 1.2); }
+  addFx({t:0,dur:0.35,update(dt){ this.t+=dt; const k=this.t/this.dur; core.material.opacity=0.9*(1-k); glow.material.opacity=0.45*(1-k); return k<1; }, dispose(){ disposeMesh(core); disposeMesh(glow); }});
 }
 function fxBeam(att, tgt, outcomes, onEvent, mp, weight=0.7){
   return new Promise(async res=>{

@@ -107,6 +107,36 @@ its own version.
 
 ---
 
+## Railguns against shields (measured v119, Jon's call)
+
+Jon: the Dreadnought's light railguns barely scratch a Patrol craft ("~3 damage"). That figure was mostly ECM and evasion (28% to hit), but the gun is also the weakest in the game against shields: rails put 0.6 of their damage into shields, so a light railgun takes 10.8 shield points a hit, under most hulls' regen.
+
+**Weapon x class audit** (v118 hit model, each weapon at its optimal range, guided at 5 hexes, fresh target, no ECM). Damage per volley, then volleys to kill alone with regen (99 = never):
+
+| Weapon | Patrol | Corvette | Frigate | Destroyer | Cruiser | Dreadnought |
+|---|---|---|---|---|---|---|
+| Pulse cannons | 16 / 12 | 22 / 49 | 25 / 99 | 26 / 99 | 27 / 99 | 27 / 99 |
+| Gunship pulse | 47 / 2 | 49 / 3 | 54 / 4 | 58 / 7 | 73 / 20 | 101 / 65 |
+| Beam laser | 22 / 4 | 23 / 8 | 25 / 14 | 25 / 34 | 26 / 99 | 26 / 99 |
+| Heavy beam | 30 / 3 | 31 / 5 | 32 / 7 | 36 / 12 | 36 / 28 | 37 / 99 |
+| Light beam | 13 / 12 | 14 / 47 | 15 / 99 | 15 / 99 | 15 / 99 | 15 / 99 |
+| **Light railgun** | **7 / 99** | **8 / 99** | **8 / 99** | **9 / 99** | **9 / 99** | **9 / 99** |
+| Railgun | 13 / 8 | 13 / 22 | 14 / 65 | 14 / 99 | 15 / 99 | 16 / 99 |
+| Spinal railgun | 29 / 3 | 29 / 4 | 26 / 6 | 27 / 9 | 29 / 17 | 31 / 39 |
+| Missile rack | 15 / 8 | 15 / 26 | 9 / 99 | 13 / 99 | 12 / 99 | 9 / 99 |
+| Torpedo | 29 / 3 | 26 / 5 | 18 / 16 | 24 / 18 | 22 / 99 | 19 / 99 |
+| Strike wing | 35 / 2 | 34 / 4 | 32 / 8 | 37 / 11 | 36 / 28 | 35 / 98 |
+
+Outliers: the light railgun (every class, never kills alone), then the railgun. Missiles against Frigates and Dreadnoughts are low by design (point defense). The gunship pulse is high by design.
+
+**Every rail buff tried tips its owner's fleets** (nine-preset round robin, 8 a pairing; v118 baseline Classic 45, Gunline 59, Swarm 50, Carrier 44, Wolfpack 50, Dreadnought 55, Raiders 53, Support 48, Gunships 45):
+- Light 24/0.75 + heavy 32/0.75: Swarm 73, Wolfpack 72, Gunships 30, Classic 36.
+- Light 20/0.7 + heavy 32/0.75: Swarm 69, Wolfpack 66, Gunships 34.
+- Heavy 32/0.75 only: Support 63, Raiders 63, Wolfpack 63, Gunships 36.
+- Dreadnought's two light railguns swapped for railguns: Dreadnought 75.
+
+The Corvette carries the light railgun and Swarm/Wolfpack field five or six of them, so its numbers move those fleets super-linearly. Options for Jon: (a) buff the light railgun and raise the Corvette's cost to pay for it; (b) leave rails as armour-breakers that are poor against shields (current design) and accept the matchup; (c) a Dreadnought-only change paired with a cost or hull trim. Not changed yet.
+
 ## TOP PRIORITY — Fleet setup before battle
 
 **This is the first thing to build.** Everything else in this file comes after
