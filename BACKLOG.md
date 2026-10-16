@@ -137,6 +137,14 @@ Outliers: the light railgun (every class, never kills alone), then the railgun. 
 
 The Corvette carries the light railgun and Swarm/Wolfpack field five or six of them, so its numbers move those fleets super-linearly. Options for Jon: (a) buff the light railgun and raise the Corvette's cost to pay for it; (b) leave rails as armour-breakers that are poor against shields (current design) and accept the matchup; (c) a Dreadnought-only change paired with a cost or hull trim. Not changed yet.
 
+**Option (a) measured (v123, Jon chose it):** light railgun 22/0.7 (24/0.75 worse), Corvette 40 -> 50, presets re-fitted to 660. Round robin, 8 a pairing, v123 baseline Classic 45, Gunline 59, Swarm 50, Carrier 44, Wolfpack 50, Dreadnought 55, Raiders 53, Support 48, Gunships 45 (spread 15):
+- Presets = aiBuild(660) at the new price (Classic 670): Classic 56, Gunline 59, Swarm 55, Carrier 38, Wolfpack 44, Dreadnought 56, Raiders 41, Support 44, Gunships 58 (spread 21).
+- Same with light 24/0.75: Support 31, Classic 59 (spread 28).
+- Hand-fitted to keep hull counts (Corvettes swapped for Patrols, Classic 670): Classic 61, Carrier 36 (spread 25).
+- Classic without its Patrol (650), Carrier plus a Patrol (660): Classic 39, Dreadnought 59, Carrier 58 (spread 20).
+- Corvette 50 with the Standard budget raised to 670 (single-Corvette fleets keep their shape): Swarm 77, Wolfpack 34 (spread 43).
+Every variant is worse than the baseline: one hull more or less in a preset swings it 15 to 25 points, which swamps the gun change. Not shipped; waiting on Jon.
+
 ## TOP PRIORITY — Fleet setup before battle
 
 **This is the first thing to build.** Everything else in this file comes after
