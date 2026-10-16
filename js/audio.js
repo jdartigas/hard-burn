@@ -294,6 +294,9 @@ const Sound = (() => {
     // v93 (Jon: the energy-ricochet reference): a direct-fire shot that misses glances away. v96 (Jon: the pitched zip
     // whistled like a bird on pulse and PDC misses): no tone at all now, just a noise streak sweeping down past one side,
     // shorter, darker and quieter for PDC rounds
+    // v124: a railgun slug on shields, under the shield static: a heavy low thump and a short glassy crack
+    slugShield(){ tone(0.3,{type:'sine',f0:110,f1:42,gain:0.17,attack:0.002}); noise(0.05,{type:'highpass',f0:5000,f1:2500,gain:0.1,attack:0.001});
+      noise(0.35,{type:'bandpass',f0:1800,f1:500,q:1.2,gain:0.07,attack:0.003,verb:0.35}); },
     // v121: the quiet deaths (deaths.js). size runs about 0.5 (patrol) to 2 (dreadnought)
     // dead in space: a crackle as the bridge goes, relays clunking open, and the ship's hum winding down to nothing
     powerDown(){ crackle(0.35,{gain:0.07,f:3000,density:45});

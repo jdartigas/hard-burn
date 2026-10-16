@@ -50,6 +50,7 @@ const LAB_SOUNDS = [
     ['boom-m', 'Medium ship destroyed', 'Destroyer', ()=>Sound.boom(1.6)],
     ['boom-l', 'Capital ship destroyed', 'Dreadnought', ()=>Sound.boom(2.8)],
     ['boom-rock', 'Asteroid shattered', '', ()=>Sound.boom(1.1)],
+    ['slug-shield', 'Railgun slug on shields (extra)', 'the thump added under the shield static when a slug hits shields', ()=>{ Sound.shield('rail'); Sound.slugShield(); }],
     ['death-dark', 'Dead in space', 'bridge destroyed: the ship powers down and drifts', ()=>Sound.powerDown()],
     ['death-groan', 'Hull groan', 'broken back, first the keel straining...', ()=>Sound.hullGroan(1)],
     ['death-tear', 'Hull tearing apart', '...then the sections tear apart and vent', ()=>Sound.tear(1)],

@@ -193,8 +193,8 @@ const lightPool=[0,1,2,3].map(()=>{ const l=new THREE.PointLight(0xffaa55,0,30,2
 function flash(p, color=0xffaa55, intensity=6, dur=0.5){ const L=lightPool.reduce((a,b)=>a.t<b.t?a:b); L.l.position.copy(p); L.l.color.set(color); L.l.intensity=intensity*4.5; L.t=dur; L.max=dur; L.i=intensity*4.5; }
 let shake=0;
 function addShake(v){ if(!REDUCED) shake=Math.min(1.2, shake+v); }
-function shieldFlash(s, from){ s.shieldMesh.visible=true; const dir=V.copy(from).sub(s.group.position); dir.applyQuaternion(s.group.quaternion.clone().invert());
-  dir.set(dir.x/s.shieldMesh.scale.x, dir.y/s.shieldMesh.scale.y, dir.z/s.shieldMesh.scale.z).normalize(); s.shMat.uniforms.uHit.value.copy(dir); s.shMat.uniforms.uFlash.value=1.2; }
+function shieldFlash(s, from, k=1.2){ s.shieldMesh.visible=true; const dir=V.copy(from).sub(s.group.position); dir.applyQuaternion(s.group.quaternion.clone().invert());
+  dir.set(dir.x/s.shieldMesh.scale.x, dir.y/s.shieldMesh.scale.y, dir.z/s.shieldMesh.scale.z).normalize(); s.shMat.uniforms.uHit.value.copy(dir); s.shMat.uniforms.uFlash.value=Math.max(s.shMat.uniforms.uFlash.value,k); }
 const C_SPARK=new THREE.Color(1,.62,.25), C_FIRE=new THREE.Color(1,.42,.12), C_WHITE=new THREE.Color(1,.95,.85), C_CYAN=new THREE.Color(.4,.8,1), C_SMOKE=new THREE.Color(.12,.1,.09);
 // v102: play a sound from a place in the world: pan from where it lands on screen (85% at most), distance from the camera,
 // and whether it is off screen; a point behind the camera pans to its side. Sound.at does the rest (audio.js)
@@ -207,7 +207,13 @@ function sndAt(pos, fn){ if(!pos || !Sound.positional) return fn();
   Sound.at({pan:clamp(pan,-1,1)*0.85, dist:camera.position.distanceTo(pos)*70/fitRadius(), off}, fn); }
 function impactFx(tgt, res, from, heavy=1, kind=null){   // kind: the weapon's, so the impact sounds like what hit
   const p=hitPoint(tgt);
-  if(res.s>0){ shieldFlash(tgt, from); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); sndAt(p, ()=>Sound.shield(kind)); }
+  if(res.s>0){ shieldFlash(tgt, from, kind==='rail'? 2.6 : 1.2); Particles.burst(p,10*heavy,{speed:4,color:C_CYAN,size:0.3,life:0.4}); sndAt(p, ()=>Sound.shield(kind));
+    // v124 (Jon): a slug on shields has to read as a heavy blow, not a fizzle: a hard flare, a white core flash, a fan of
+    // cyan sparks thrown back off the shell, a low thump and a jolt. Balance unchanged: railguns stay poor against shields
+    if(kind==='rail'){ const back=V.copy(from).sub(p).normalize().clone();
+      flash(p,0xbfe8ff,7,0.3); Particles.burst(p,22,{speed:3,color:C_WHITE,size:0.35,life:0.25});
+      for(let i=0;i<46;i++) Particles.emit(p, back.clone().multiplyScalar(rand(2,7)).add(new THREE.Vector3().randomDirection().multiplyScalar(rand(2,6))), i%4? C_CYAN : C_WHITE, rand(0.1,0.25), rand(0.3,0.7), 1.6);
+      sndAt(p, ()=>Sound.slugShield()); addShake(0.14); } }
   // v122: the hit leaves a wound on the hull where it struck (hulldamage.js)
   if(res.h>0.5 && !tgt.isRock) hullWound(tgt, from, p, res.h);
   if(res.h>0.5){ Particles.burst(p,24*heavy,{speed:7,color:C_SPARK,size:0.35,life:0.7}); Particles.burst(p,8*heavy,{speed:1.5,color:C_FIRE,size:1.1*heavy,life:0.5,grow:1});
@@ -244,7 +250,8 @@ function fxRail(att, tgt, outcomes, onEvent, mp){
 }
 // v119: the exit wound. A cone of molten spall blown out along the slug's path, and its trail continuing past the ship.
 function railPunch(tgt, a, b){
-  const dir=b.clone().sub(a).normalize(), exit=b.clone().addScaledVector(dir, Math.max(0.6, tgt.len*0.35)), far=exit.clone().addScaledVector(dir, 45);
+  // v124: the spray comes out of the real exit wound when the slug's line crosses the hull (hulldamage.js)
+  const dir=b.clone().sub(a).normalize(), exit=railHoles(tgt, a, b) || b.clone().addScaledVector(dir, Math.max(0.6, tgt.len*0.35)), far=exit.clone().addScaledVector(dir, 45);
   const core=beamMesh(exit,far,0.018,0xffffff,0.9), glow=beamMesh(exit,far,0.06,0x7fd0ff,0.25);
   flash(exit,0xffb060,8,0.45); flash(b,0xff7a30,3,0.3); addShake(0.2);
   Particles.burst(b,16,{speed:4,color:C_FIRE,size:0.3,life:0.5});

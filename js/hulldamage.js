@@ -27,8 +27,9 @@ void hdEval(inout float ch, inout float so, inout float gl, inout float ga, inou
     so=max(so,1.0-smoothstep(0.9,2.1,e));
     float ring=smoothstep(0.35,0.62,e)*(1.0-smoothstep(0.62,0.9,e));
     float hh=uH[i]; gl+=hh*ring+hh*hh*c*0.4*step(0.7,n);
-    if(uK[i]>0.5){ float g=1.0-smoothstep(0.25,0.5,e); ga=max(ga,g); rib=max(rib,step(0.72,fract(vHdL.z*30.0))*g);
-      gl+=0.24*smoothstep(0.36,0.48,e)*(1.0-smoothstep(0.48,0.6,e)); }
+    if(uK[i]>0.5){ bool H=uK[i]>1.5; float co=H?0.62:0.38;   // a railgun hole (2) has a far wider open core than a gash (1)
+      float g=1.0-smoothstep(co-0.13,co+0.12,e); ga=max(ga,g); rib=max(rib,step(0.72,fract(vHdL.z*30.0))*g);
+      float rim=smoothstep(co-0.02,co+0.1,e)*(1.0-smoothstep(co+0.1,co+0.24,e)); gl+=(H?0.16+uH[i]*1.2:0.24)*rim+(H?uH[i]*1.4*g:0.0); }
   }
 }`;
 // hook a ship material so it draws the wounds in U (shared by every material of one ship, or one wreck section)
@@ -73,6 +74,25 @@ function hullWound(s, from, p, dmg){
     best.r=Math.min(s.modelLen*HD.mergeCap, best.r*1.12+r*0.3); best.t=0; }
 }
 
+// v124 (Jon): a railgun slug through an unshielded hull leaves a hole going in and a bigger, torn exit wound coming
+// out the far side, both open from the start (dark, ribbed, ember rim). Holes are never closed by the damage tiers.
+// Returns the exit point in world space, so the spray comes out of the wound (rules.js railPunch), or null.
+function railHoles(s, a, b){
+  if(simRunning || window.__norender || !s.group.visible) return null;
+  const hd=s.hd || hdInit(s), dir=b.clone().sub(a).normalize(); s.group.updateMatrixWorld(true);
+  const cast=(o,d)=>{ _hdRay.set(o,d); _hdRay.far=1e4; return _hdRay.intersectObjects(hd.solids,false).find(h=>h.object.parent); };
+  const inv=new THREE.Matrix4().copy(s.body.matrixWorld).invert();
+  const hole=(h,r)=>{ const w={p:s.body.worldToLocal(h.point.clone()), n:h.face? h.face.normal.clone().transformDirection(h.object.matrixWorld).transformDirection(inv) : dir.clone().transformDirection(inv), r:s.modelLen*r, t:0, gash:false, hole:true};
+    if(hd.wounds.length>=HD.max){ const i=hd.wounds.reduce((bi,x,j,arr)=>!x.hole && (bi<0 || x.r<arr[bi].r)? j : bi, -1); if(i<0) return w; hd.wounds.splice(i,1); }
+    hd.wounds.push(w); return w; };
+  let hin=cast(a.clone().addScaledVector(dir,-2), dir);
+  // the visible slug aims at a point beside the hull centre; if that line grazes past, take the line through the centre
+  if(!hin){ dir.copy(s.group.position).sub(a).normalize(); hin=cast(a.clone().addScaledVector(dir,-2), dir); } if(!hin) return null;
+  hole(hin, 0.06);
+  const back=hin.point.clone().addScaledVector(dir, s.len*1.5+2), hout=cast(back, dir.clone().negate()); if(!hout) return null;
+  const ex=hole(hout, 0.14); hdPlates(s, ex, 7);
+  return hout.point.clone();
+}
 // ---- per frame, for each living ship (from updateDamageFx) ----
 function hullDamageTick(s, dt){
   if(window.__norender) return;
@@ -80,7 +100,7 @@ function hullDamageTick(s, dt){
   const U=hd.U, frac=Math.max(0,s.hull)/s.hullMax;
   U.uBodyInv.value.copy(s.body.matrixWorld).invert();
   U.uGrow.value=1+(1-frac)*HD.grow;
-  hd.wounds.forEach((w,i)=>{ w.t+=dt; U.uW.value[i].set(w.p.x,w.p.y,w.p.z,w.r); U.uK.value[i]=w.gash?1:0;
+  hd.wounds.forEach((w,i)=>{ w.t+=dt; U.uW.value[i].set(w.p.x,w.p.y,w.p.z,w.r); U.uK.value[i]= w.hole? 2 : w.gash? 1 : 0;
     U.uH.value[i]=Math.exp(-w.t/HD.hot)+HD.ember*Math.exp(-w.t/HD.emberLife); });
   U.uN.value=hd.wounds.length;
   // repairs: the wounds cool and close up a little
