@@ -1,4 +1,4 @@
-// Laniakea's Edge: how a ship dies (v121, Jon). Most ships die quietly, the way they do in The Expanse: the bridge is
+// Beyond The Reach: how a ship dies (v121, Jon). Most ships die quietly, the way they do in The Expanse: the bridge is
 // holed and the hull goes dark, the keel fails and the sections drift apart, a drive sticks open and the ship spins
 // away (into an asteroid, if one is close), or the hull is gutted by a dozen small breaches. The reactor going up
 // (explodeShip, wrecks.js) is kept for the big moments: torpedo kills, damaged magazines, and railgun slugs that find

@@ -1,4 +1,4 @@
-// Laniakea's Edge: the first-battle tutorial (v85, review roadmap round 4). A real battle on a fixed seed against the
+// Beyond The Reach: the first-battle tutorial (v85, review roadmap round 4). A real battle on a fixed seed against the
 // normal AI on Easy, with a step card that moves on when the player does what it asks. Each step's `done` is a check on
 // the game state, polled from frame(), so nothing in the combat code knows the tutorial exists. Once the steps run
 // out it gives tips as situations come up. Tutorial battles are never recorded (recordBattle checks state.tutorial).

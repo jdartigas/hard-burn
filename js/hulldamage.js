@@ -1,4 +1,4 @@
-// Laniakea's Edge: battle damage on the hull (v122, Jon). Every hit that reaches the hull leaves a wound where it
+// Beyond The Reach: battle damage on the hull (v122, Jon). Every hit that reaches the hull leaves a wound where it
 // struck: a charred patch with a ragged edge that glows hot, cools to an ember and goes black. How much of the hull
 // is gone sets a tier, and the model gets worse with it, restrained in the manner of The Expanse:
 //   tier 1 (under 75%): fittings blown off near the worst wound, a thin smoke trail
@@ -11,7 +11,8 @@
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';
 
-const HD = { max:12, tiers:[0.75,0.5,0.25], grow:0.7, hot:0.9, ember:0.12, emberLife:10, mergeCap:0.13, list:0.07 };
+// v123 (Jon): more obvious: bigger, darker wounds, wider soot, longer embers, brighter gash rims
+const HD = { max:12, tiers:[0.75,0.5,0.25], grow:0.9, hot:0.9, ember:0.07, emberLife:12, mergeCap:0.13, list:0.07 };
 const HD_FRAG = `uniform vec4 uW[12]; uniform float uH[12]; uniform float uK[12]; uniform int uN; uniform float uGrow; varying vec3 vHdL;
 float hdHash(vec3 p){ return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
 float hdNoise(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -22,12 +23,12 @@ void hdEval(inout float ch, inout float so, inout float gl, inout float ga, inou
   float n=hdNoise(vHdL*38.0)*0.6+hdNoise(vHdL*95.0)*0.4;
   for(int i=0;i<12;i++){ if(i>=uN) break;
     vec4 w=uW[i]; float e=distance(vHdL,w.xyz)/(w.w*uGrow)+(n-0.5)*0.55;
-    float c=1.0-smoothstep(0.45,0.85,e); ch=max(ch,c);
-    so=max(so,1.0-smoothstep(0.85,1.7,e));
+    float c=1.0-smoothstep(0.55,0.95,e); ch=max(ch,c);
+    so=max(so,1.0-smoothstep(0.9,2.1,e));
     float ring=smoothstep(0.35,0.62,e)*(1.0-smoothstep(0.62,0.9,e));
-    gl+=uH[i]*(ring*0.8+c*0.18*step(0.7,n));
+    float hh=uH[i]; gl+=hh*ring+hh*hh*c*0.4*step(0.7,n);
     if(uK[i]>0.5){ float g=1.0-smoothstep(0.25,0.5,e); ga=max(ga,g); rib=max(rib,step(0.72,fract(vHdL.z*30.0))*g);
-      gl+=0.14*smoothstep(0.36,0.48,e)*(1.0-smoothstep(0.48,0.6,e)); }
+      gl+=0.24*smoothstep(0.36,0.48,e)*(1.0-smoothstep(0.48,0.6,e)); }
   }
 }`;
 // hook a ship material so it draws the wounds in U (shared by every material of one ship, or one wreck section)
@@ -36,10 +37,10 @@ function hdHook(m, U){
     sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nuniform mat4 uBodyInv; varying vec3 vHdL;')
       .replace('#include <project_vertex>','#include <project_vertex>\nvec4 hdP=vec4(transformed,1.0);\n#ifdef USE_INSTANCING\nhdP=instanceMatrix*hdP;\n#endif\nvHdL=(uBodyInv*modelMatrix*hdP).xyz;');
     sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\n'+HD_FRAG)
-      .replace('#include <color_fragment>','#include <color_fragment>\nfloat hdC=0.0, hdS=0.0, hdG=0.0, hdGa=0.0, hdR=0.0; hdEval(hdC,hdS,hdG,hdGa,hdR);\ndiffuseColor.rgb*=mix(1.0,0.5,hdS)*mix(1.0,0.07,hdC);\ndiffuseColor.rgb=mix(diffuseColor.rgb, vec3(0.012)+vec3(0.09)*hdR, hdGa);')
+      .replace('#include <color_fragment>','#include <color_fragment>\nfloat hdC=0.0, hdS=0.0, hdG=0.0, hdGa=0.0, hdR=0.0; hdEval(hdC,hdS,hdG,hdGa,hdR);\ndiffuseColor.rgb*=mix(1.0,0.38,hdS)*mix(1.0,0.04,hdC);\ndiffuseColor.rgb=mix(diffuseColor.rgb, vec3(0.012)+vec3(0.12)*hdR, hdGa);')
       .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=mix(roughnessFactor,1.0,max(hdC,hdGa));')
       .replace('#include <metalnessmap_fragment>','#include <metalnessmap_fragment>\nmetalnessFactor=mix(metalnessFactor,0.15,max(hdC,hdGa)*0.8);')
-      .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance=totalEmissiveRadiance*(1.0-max(hdC,hdGa))+vec3(1.0,0.36,0.08)*hdG;'); };
+      .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance=totalEmissiveRadiance*(1.0-max(hdC,hdGa))+vec3(1.0,0.36,0.08)*hdG*0.5;'); };
   m.customProgramCacheKey=()=>'hd1'; m.needsUpdate=true;
 }
 function hdUniforms(){ return { uBodyInv:{value:new THREE.Matrix4()}, uW:{value:Array.from({length:HD.max},()=>new THREE.Vector4())},
@@ -66,7 +67,7 @@ function hullWound(s, from, p, dmg){
     hit=_hdRay.intersectObjects(hd.solids,false).find(h=>h.object.parent && solid(h)); if(hit) break; }
   const lp= s.body.worldToLocal(hit? hit.point.clone() : p.clone());
   const ln= hit && hit.face ? _hdN.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).transformDirection(new THREE.Matrix4().copy(s.body.matrixWorld).invert()).clone() : new THREE.Vector3(0,1,0);
-  const r=s.modelLen*(0.025+0.05*Math.min(1,Math.sqrt(dmg/s.hullMax*3)));
+  const r=s.modelLen*(0.033+0.065*Math.min(1,Math.sqrt(dmg/s.hullMax*3)));
   if(hd.wounds.length<HD.max) hd.wounds.push({p:lp, n:ln, r, t:0, gash:false});
   else { let best=hd.wounds[0], bd=1e9; for(const w of hd.wounds){ const d=w.p.distanceTo(lp); if(d<bd){ bd=d; best=w; } }
     best.r=Math.min(s.modelLen*HD.mergeCap, best.r*1.12+r*0.3); best.t=0; }

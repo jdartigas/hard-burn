@@ -1,4 +1,4 @@
-// Laniakea's Edge: the naked-eye sky, 8920 stars to magnitude 6.5, brightest first.
+// Beyond The Reach: the naked-eye sky, 8920 stars to magnitude 6.5, brightest first.
 // Derived from the HYG Database v4.1 by David Nash (astronexus), https://github.com/astronexus/HYG-Database,
 // licensed CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). This file is a filtered and rounded
 // subset and is shared under the same license. Fields per star: x, y, z in parsecs (equatorial J2000: x toward

@@ -1,4 +1,4 @@
-// Laniakea's Edge: the recorded sound effects (v63), as base64 AAC so they load however the game is opened: a page
+// Beyond The Reach: the recorded sound effects (v63), as base64 AAC so they load however the game is opened: a page
 // opened from a file (file://) may not fetch() its own assets, but it can load a script. Generated from assets/sfx/*.m4a
 // (Kenney, CC0; see assets/CREDITS.md) by the snippet in CLAUDE.md. Do not edit by hand.
 'use strict';

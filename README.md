@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.webp" alt="Laniakea's Edge" width="520"></p>
+<p align="center"><img src="assets/btr-logo.webp" alt="Beyond The Reach: Explore | Build | Trade | Command" width="520"></p>
 
 <p align="center"><b>Turn-based fleet combat in the browser.</b><br>
 Close the distance, strip their shields and break their line before they break yours.</p>
@@ -7,7 +7,7 @@ Close the distance, strip their shields and break their line before they break y
 
 ---
 
-Laniakea's Edge is a 2.5D tactical space battle game. You command a fleet against an AI fleet on a hex grid strewn
+Beyond The Reach is a 2.5D tactical space battle game. You command a fleet against an AI fleet on a hex grid strewn
 with destructible asteroids, in hard-science settings from Earth orbit to the asteroid belt. Ships are modeled in
 code after a set of painted, 3D-printed miniatures, in a style inspired by *The Expanse*.
 
@@ -85,4 +85,4 @@ Planet maps from NASA, USGS and JPL (public domain); Mars image by [WikiImages](
 effects from Kenney's Sci-Fi Sounds and Impact Sounds packs (CC0). Full sources and licenses are in
 [`assets/CREDITS.md`](assets/CREDITS.md).
 
-Laniakea's Edge was called Hard Burn early in development, which is why the repository still carries that name.
+Beyond The Reach was called Hard Burn early in development (then Orion's Spur and Laniakea's Edge), which is why the repository still carries that name.

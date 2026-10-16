@@ -1,4 +1,4 @@
-// Laniakea's Edge: the sound lab (v90). Open the game with ?sfx to audition every game sound on its own, or a weapon's
+// Beyond The Reach: the sound lab (v90). Open the game with ?sfx to audition every game sound on its own, or a weapon's
 // firing and impact together with the game's own timing. Each row has volume and pitch sliders and a notes field, all
 // remembered in this browser; "Copy notes" gathers every changed row into text to paste back to Claude. Debug only:
 // nothing here is reachable without the URL flag, and the sliders never change the game's sounds.

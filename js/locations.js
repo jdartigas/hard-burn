@@ -1,4 +1,4 @@
-// Laniakea's Edge: battle locations. The board and rules are the same everywhere; the sky, the sun and the bodies
+// Beyond The Reach: battle locations. The board and rules are the same everywhere; the sky, the sun and the bodies
 // around the board change. The Shattered Reach is the fictional scenery built in render.js and environment.js;
 // the real locations use the real star catalogue (js/stardata.js) and NASA maps (assets/, see assets/CREDITS.md).
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,

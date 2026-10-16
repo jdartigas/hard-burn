@@ -1,6 +1,6 @@
 # Backlog
 
-Work Laniakea's Edge (Hard Burn until v44, then briefly Orion's Spur) still owes, in rough priority order. Each item carries enough
+Work Beyond The Reach (Hard Burn until v44, briefly Orion's Spur, Laniakea's Edge v45 to v122) still owes, in rough priority order. Each item carries enough
 context to pick up cold. `CLAUDE.md` describes what the game *is*; this file
 describes what it doesn't do yet.
 
@@ -14,7 +14,7 @@ describes what it doesn't do yet.
 
 ## CLASS A MILESTONE — Mobile release (iOS and Android) (Jon, after v88)
 
-Ship Laniakea's Edge to the App Store and Google Play. **Decided approach: wrap the existing web game, don't rewrite it.**
+Ship Beyond The Reach to the App Store and Google Play. **Decided approach: wrap the existing web game, don't rewrite it.**
 The game stays one codebase for the web and both stores.
 
 ### Packaging options
@@ -53,7 +53,7 @@ The game stays one codebase for the web and both stores.
 - **The Expanse:** "inspired by" is fine; keep the name out of the store listing and keywords, and make sure no design
   copies a trademarked ship.
 - **Jon's miniatures (Path 2):** if the STL models go in, check each Printables license allows commercial use. Many don't.
-- **The name:** check "Laniakea's Edge" is free on both stores and not trademarked.
+- **The name:** check "Beyond The Reach" is free on both stores and not trademarked.
 
 ### Business decisions (Jon)
 - **Price model:** paid up front ($3-8 is typical for a premium tactics game) is simplest: no ads, accounts or server.
@@ -633,7 +633,7 @@ Options E and F from the v56 camera plan, deferred when A–D were built:
 Each class gets lore for the ship viewer: who builds it, its history, famous hulls, how crews talk about it.
 The viewer already has the slot: add `lore` to the class's entry in `CLASS_INFO` (js/core.js) and a **Lore**
 section appears in the viewer's spec panel. Until a class has lore the section stays hidden (Jon's call, v57).
-Open questions: the setting's factions and history (Laniakea's Edge Fleet Yards appears on the blueprint sheets),
+Open questions: the setting's factions and history ("Laniakea's Edge Fleet Yards" appears on the blueprint sheets, from before the rename),
 whether lore unlocks through play or is always there, and whether named hulls (the "Swift Remit" on the cruiser
 sheet) become part of the game.
 

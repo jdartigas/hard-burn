@@ -1,4 +1,4 @@
-// Laniakea's Edge: ship destruction: blasts, hull breakup, debris, burning wrecks.
+// Beyond The Reach: ship destruction: blasts, hull breakup, debris, burning wrecks.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,
 // so anything used at load time must be defined in an earlier file (or earlier in this one).
 'use strict';

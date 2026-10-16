@@ -1,4 +1,4 @@
-// Laniakea's Edge: the damage model. Hits that reach the hull can knock out a ship's systems: a weapon, its engines,
+// Beyond The Reach: the damage model. Hits that reach the hull can knock out a ship's systems: a weapon, its engines,
 // its shield generator or its point defense. Systems are damaged (weaker) or offline (out for a while), crews repair
 // them over time, and a Repair tender's Resupply fixes everything.
 // Plain script, not a module: all js/ files share one global scope and are loaded in order by index.html,

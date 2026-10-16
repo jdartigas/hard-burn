@@ -5,7 +5,7 @@
   Sources: laserSmall, thrusterFire, explosionCrunch and lowFrequency_explosion (Sci-Fi Sounds);
   impactPunch_heavy, impactPlate_heavy and impactMetal_heavy (Impact Sounds).
 
-Everything else in Laniakea's Edge is generated in code. These are real data, used so the sky and the planets
+Everything else in Beyond The Reach is generated in code. These are real data, used so the sky and the planets
 are where and what they really are.
 
 - **Earth surface** (`assets/sol/earth.jpg`): NASA Visible Earth, Blue Marble, "land_shallow_topo_2048".

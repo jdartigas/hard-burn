@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Laniakea's Edge — fleet engagement</title>
+<title>Beyond The Reach — fleet engagement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <script>
 // The one place the version lives: shown in the game, and appended to every file below so a new release is
 // never mixed with cached old files. Bump it on every change that ships.
-const GAME_VERSION = '122';
+const GAME_VERSION = '123';
 // touch screens (iPad, phones) get html.touch, for layout that suits fingers rather than a mouse
 if(window.matchMedia && matchMedia('(pointer:coarse)').matches) document.documentElement.classList.add('touch');
 document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+'">');
@@ -22,7 +22,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="hud">
   <header id="topbar">
-    <div id="brand">Laniakea's Edge</div>
+    <div id="brand">Beyond The Reach</div>
     <div id="turninfo"><b id="ti-turn">Turn 1</b><span id="ti-phase">Your orders</span></div>
     <div id="strength">
       <span class="lbl">Your fleet</span>
@@ -66,7 +66,7 @@ document.write('<link rel="stylesheet" href="css/hard-burn.css?v='+GAME_VERSION+
 
 <div id="menu" class="screen on">
   <div class="inner">
-    <h1 id="title"><img src="assets/logo.webp" alt="Laniakea's Edge" width="1000" height="568"></h1>
+    <h1 id="title"><img src="assets/btr-logo.webp" alt="Beyond The Reach: Explore, Build, Trade, Command" width="1200" height="436"></h1>
     <div class="eyebrow">Turn-based fleet combat</div>
     <p class="lede">Close the distance, strip their shields and break their line before they break yours.</p>
     <div class="diff-row">
@@ -271,7 +271,7 @@ function cantStart(title, body){ const d=document.createElement('div');
   d.innerHTML=`<div style="max-width:30em"><h1 style="font:400 22px Michroma,Arial,sans-serif;letter-spacing:.08em;color:#6FD0FF;margin:0 0 14px">${title}</h1><p style="margin:0;color:#b4cddc">${body}</p></div>`;
   document.body.appendChild(d); }
 const webgl=(()=>{ try{ const c=document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }catch(e){ return false; } })();
-if(!webgl) cantStart("This browser can't show 3D graphics", "Laniakea's Edge needs WebGL. Turn on hardware acceleration (graphics acceleration) in your browser's settings and reload, or try another browser.");
+if(!webgl) cantStart("This browser can't show 3D graphics", "Beyond The Reach needs WebGL. Turn on hardware acceleration (graphics acceleration) in your browser's settings and reload, or try another browser.");
 else try{
   // The game is plain scripts sharing one global scope (js/), loaded in this order once three.js is ready.
   for(const f of ['core','sfxdata','audio','render','board','environment','stardata','locations','ships','rules','wrecks','deaths','damage','hulldamage','combat','hud','input','menus','tutorial','shipview','sfxlab','main']) await new Promise((ok,fail)=>{
