@@ -176,8 +176,9 @@ const BUDGETS = { skirmish:330, standard:660, large:1000 };
 const PRESETS = [
   {id:'classic',  name:'Classic',          desc:'One of every class. The original engagement.',
    fleet:['patrol','corvette','frigate','destroyer','cruiser','carrier']},
-  {id:'gunline',  name:'Gunline',          desc:'Two heavy cruisers behind a light screen. Outguns carriers; torpedo boats that get close are its problem.',
-   fleet:['cruiser','cruiser','frigate','corvette','corvette','patrol']},
+  // v127: a second frigate in place of a corvette and the patrol craft: 59% to 50% across the presets
+  {id:'gunline',  name:'Gunline',          desc:'Two heavy cruisers behind a frigate screen. Outguns carriers; torpedo boats that get close are its problem.',
+   fleet:['cruiser','cruiser','frigate','frigate','corvette']},
   {id:'swarm',    name:'Swarm',            desc:'Twelve light hulls. Too many targets for big guns to keep up with.',
    fleet:['destroyer','frigate','frigate','frigate','frigate','corvette','corvette','corvette','corvette','corvette','corvette','patrol']},
   {id:'carrier',  name:'Carrier group',    desc:'Three carriers and their escorts. Strike wings reach anywhere on the board, but heavy guns punish them.',
@@ -200,7 +201,7 @@ const PRESETS = [
 // budget, Balanced, Gunline and Wolfpack come out as the Classic, Gunline and Wolfpack presets.
 const AI_PLANS = {
   balanced:{label:'Balanced', wish:['cruiser','destroyer','frigate','carrier','corvette','patrol']},
-  gunline: {label:'Gunline',  wish:['cruiser','cruiser','frigate','corvette','corvette','patrol']},
+  gunline: {label:'Gunline',  wish:['cruiser','cruiser','frigate','frigate','corvette']},   // v127: was a second corvette and a patrol (59%)
   swarm:   {label:'Swarm',    wish:['destroyer','frigate','frigate','corvette','corvette','corvette','patrol']},
   carrier: {label:'Carriers', wish:['carrier','carrier','frigate','carrier','corvette','frigate','patrol']},
   wolfpack:{label:'Wolfpack', wish:['destroyer','corvette','corvette','destroyer','corvette','patrol']},
