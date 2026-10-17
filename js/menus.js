@@ -164,10 +164,16 @@ function applyHudPrefs(){ const h=$('#hud'); h.classList.toggle('roster-off',!hu
 for(const k of ['roster','enemies','log']) $('#tg-'+k).onclick=e=>{ e.stopPropagation(); hudPrefs[k]=!hudPrefs[k]; store.set('hud',hudPrefs); applyHudPrefs(); Sound.ui(); };
 applyHudPrefs();
 // --hud-bottom: height of the bottom command area, so the log and fleet lists sit above it however it wraps
-function measureHud(){ const top=Math.min($('#shippanel').getBoundingClientRect().top, $('#endturn').getBoundingClientRect().top);
-  document.documentElement.style.setProperty('--hud-bottom', Math.max(0,Math.round(innerHeight-top))+'px'); }
-try{ const ro=new ResizeObserver(measureHud); ro.observe($('#shippanel')); ro.observe($('#endturn')); }catch(e){}
-addEventListener('resize', measureHud); measureHud();
+// v125 (Jon, iPad: the log sat over End turn): measured against the HUD's own box rather than innerHeight, which
+// iPad Safari can report out of step with the fixed layer; hidden parts are skipped, and it re-measures when the
+// visible area changes and every second during a battle, so a stale value can't stick
+function measureHud(){ const H=$('#hud').getBoundingClientRect(); if(!H.height) return;
+  const tops=['#shippanel','#endturn'].map(q=>$(q).getBoundingClientRect()).filter(r=>r.height>0).map(r=>r.top); if(!tops.length) return;
+  document.documentElement.style.setProperty('--hud-bottom', Math.max(0,Math.round(H.bottom-Math.min(...tops)))+'px'); }
+try{ const ro=new ResizeObserver(measureHud); ro.observe($('#shippanel')); ro.observe($('#endturn')); ro.observe($('#hud')); }catch(e){}
+addEventListener('resize', measureHud); addEventListener('orientationchange', ()=>setTimeout(measureHud,300));
+if(window.visualViewport) visualViewport.addEventListener('resize', measureHud);
+setInterval(()=>{ if(state.phase!=='menu') measureHud(); }, 1000); measureHud();
 // Surrender takes two presses: the first arms it, the second (within 4 s) ends the battle as a loss.
 // It can't be undone, so it lives in the pause menu rather than beside End turn.
 let surrenderArmed=0;

@@ -74,7 +74,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);ou
 .erow.dead{opacity:.3}
 .erow .mbar{margin-top:3px}
 
-#log{position:absolute;right:12px;bottom:calc(var(--hud-bottom,100px) + 8px);width:300px;padding:5px 10px 6px;display:flex;flex-direction:column;z-index:1}
+/* v125: max() keeps the log clear of End turn even if --hud-bottom is ever measured short (it was on an iPad) */
+#log{position:absolute;right:12px;bottom:max(calc(var(--hud-bottom,100px) + 8px), calc(96px + env(safe-area-inset-bottom,0px)));width:300px;padding:5px 10px 6px;display:flex;flex-direction:column;z-index:1}
 #log h3{display:flex;justify-content:space-between;align-items:center;margin:0 0 3px!important;font-size:11.5px!important}
 #tg-log{background:none;border:0;color:var(--dim);font-size:11.5px;padding:0 0 0 8px}
 #tg-log:hover{color:var(--accent)}
