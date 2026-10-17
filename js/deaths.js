@@ -33,7 +33,9 @@ function spinOrCrash(s){
 }
 
 function killShip(s, how){
-  if(simRunning || window.__norender || how.kind==='reactor') return explodeShip(s);
+  // v126: a sim never shows the wreck, and breaking a hull up was a tenth of every simulated battle
+  if(simRunning || window.__norender){ s.group.visible=false; s.tag.style.display='none'; return Promise.resolve(); }
+  if(how.kind==='reactor') return explodeShip(s);
   s.tag.style.display='none';
   if(how.kind==='dark') return dieDark(s);
   if(how.kind==='broken') return dieBroken(s);

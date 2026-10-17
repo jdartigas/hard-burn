@@ -4,9 +4,19 @@
 'use strict';
 
 /* ---------------- setup / teardown ---------------- */
+function disposeModel(g){ g.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.map && m.map!==texCache.player.map && m.map!==texCache.enemy.map && m.map!==radTex) m.map.dispose(); m.dispose(); }); } }); }
+// v126: a sim builds each ship model once and reuses it battle after battle (rules never read the model; building
+// them was a third of every simulated battle). Kept across sims (a round robin is many short ones), freed past
+// SIM_MODEL_CAP models
+const SIM_MODELS=new Map(), SIM_MODEL_CAP=160;
+function simModel(cls, side, copy){ const k=cls+'|'+side+'|'+copy; let m=SIM_MODELS.get(k);
+  if(!m){ m=buildShip(cls, side, copy); SIM_MODELS.set(k, m); }
+  m.group.visible=true; m.group.rotation.set(0,0,0); m.body.position.set(0,0,0); m.body.rotation.set(0,0,0); m.engines.forEach(e=>e.boost=0);
+  return m; }
+function freeSimModels(){ SIM_MODELS.forEach(m=>{ scene.remove(m.group); disposeModel(m.group); }); SIM_MODELS.clear(); }
 function clearBattle(){
   clearWrecks();
-  for(const s of state.ships){ scene.remove(s.group); s.tag.remove(); s.group.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{ if(m.map && m.map!==texCache.player.map && m.map!==texCache.enemy.map && m.map!==radTex) m.map.dispose(); m.dispose(); }); } }); }
+  for(const s of state.ships){ scene.remove(s.group); s.tag.remove(); if(!s.simCached) disposeModel(s.group); }
   state.ships=[]; fxList.splice(0).forEach(f=>f.dispose&&f.dispose()); tweens.length=0; timers.length=0; pendingDeaths.length=0;
   document.querySelectorAll('.ftxt').forEach(e=>e.remove());
   $('#logbody').innerHTML=''; selRing.visible=tgtRing.visible=actRing.visible=hoverRing.visible=pathLine.visible=false; setTiles(new Map());
@@ -166,7 +176,7 @@ async function sim(fleets, n=20, seed0=1){
       if(aWon) out.a++; else if(bWon) out.b++; else out.draw++;
       if(r.byValue) out.byValue++; out.turns+=r.turns; out.battles.push(`${seed0+i}:${r.winner}:${r.turns}:${r.sig}`); out.aLeft+=(swap?r.east:r.west).left; out.bLeft+=(swap?r.west:r.east).left;
     }
-  } finally { simRunning=false; window.__norender=false; state.diff=prevDiff; timeScale=prevScale; toMenu(); }
+  } finally { simRunning=false; window.__norender=false; state.diff=prevDiff; timeScale=prevScale; toMenu(); if(SIM_MODELS.size>SIM_MODEL_CAP) freeSimModels(); }
   out.turns=+(out.turns/n).toFixed(1); out.aLeft=+(out.aLeft/n).toFixed(1); out.bLeft=+(out.bLeft/n).toFixed(1);
   out.aWinRate=Math.round((out.a+out.draw/2)/n*100);
   return out;

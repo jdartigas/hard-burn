@@ -201,7 +201,7 @@ function log(msg, cls='', kind=cls==='sys'?'sys':''){ const d=document.createEle
   if(LOG_MARK[kind]){ const m=document.createElement('span'); m.className='mk'; m.setAttribute('aria-hidden','true'); m.textContent=LOG_MARK[kind]; d.append(m); }
   d.append(msg); const b=$('#logbody'); b.prepend(d); while(b.children.length>50) b.lastChild.remove(); }
 function pct(a,b){ return clamp(a/b*100,0,100).toFixed(1)+'%'; }
-function refreshTags(){ for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
+function refreshTags(){ if(simRunning) return; for(const s of state.ships){ s.tagSh.style.width=pct(s.shield,s.shieldMax); s.tagHu.style.width=pct(s.hull,s.hullMax); s.tagHuBar.classList.toggle('low', s.hull/s.hullMax<0.35);
   const fx=[]; if(s.fx.pdcFired) fx.push('PDCs spent'); if(s.fx.ecm) fx.push('ECM'); if(s.fx.brace) fx.push('Braced'); if(s.fx.pdsurge) fx.push('PD surge'); if(s.blackout) fx.push('Blackout'); const dmg=s.alive? damagedSystems(s).length : 0; if(dmg) fx.push(`\u26a0 ${dmg} damaged`); s.tagFx.textContent=fx.join(', '); s.tagFx.classList.toggle('dmg', !!dmg); } }
 function weaponStatus(w){ if(w.mag && w.mag.state==='offline') return `Magazine offline, ${w.mag.t} turn${w.mag.t>1?'s':''}`; if(weaponOffline(w)) return `Offline, ${w.sys.t} turn${w.sys.t>1?'s':''}`; if(w.ammo===0) return 'Out of ammo'; if(w.wait>0) return w.firedTurn===state.turn?'Fired':`Reloading, ${w.wait} turn${w.wait>1?'s':''}`; return w.ammo!==undefined?`Ready, ${w.ammo} salvo${w.ammo>1?'s':''} left`:'Ready'; }
 // v79: point-defense state for the ship panel and hover card: own PDCs ready or spent, and the share of
@@ -231,6 +231,7 @@ function blastLine(h, killNow){ if(!h.alive || !(killNow || h.hull/h.hullMax<BLA
     return `<span class="${o.side==='player'?'own':''}">${esc(o.name)} ~${Math.round(r.s+r.h)}${o.hull-r.h<=0.5?' (destroyed)':''}</span>`; }).join(', ');
   return `<div class="bwarn">\u26a0 Blast if destroyed, ~${Math.round(dmg)} within ${SPLASH.radius} hex: ${list||'no ships in reach'}</div>`; }
 function updateHUD(){
+  if(simRunning) return;   // v126: display only; a sim never shows it
   $('#ti-turn').textContent=`Turn ${Math.max(1,state.turn)} / ${turnLimit()}`;
   $('#ti-phase').textContent= state.phase==='player'?'Your orders': state.phase==='enemy'?'Enemy maneuvering':'';
   const str=side=>{ const all=state.ships.filter(s=>s.side===side); const t=all.reduce((a,s)=>a+s.hullMax,0); return all.reduce((a,s)=>a+Math.max(0,s.hull),0)/t*100; };
